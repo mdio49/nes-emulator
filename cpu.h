@@ -3,6 +3,16 @@
 
 #include <stdint.h>
 
+#define PAGE_MASK       0x00FF
+#define PAGE_SIZE       0x0100
+#define MEM_SIZE        0xFFFF
+
+#define AS_CPU          0x0000
+#define AS_IO           0x2000
+#define AS_EXP          0x4020
+#define AS_SAVE         0x6000
+#define AS_PROG         0x8000
+
 #define SR_NEGATIVE     0x80
 #define SR_OVERFLOW     0x40
 #define SR_IGNORED      0x20
@@ -13,14 +23,14 @@
 #define SR_CARRY        0x01
 
 typedef struct sr_flags {
-    unsigned flag_negative : 1;
-    unsigned flag_overflow : 1;
-    unsigned flag_ignored : 1;
-    unsigned flag_break : 1;
-    unsigned flag_decimal : 1;
+    unsigned flag_negative  : 1;
+    unsigned flag_overflow  : 1;
+    unsigned flag_ignored   : 1;
+    unsigned flag_break     : 1;
+    unsigned flag_decimal   : 1;
     unsigned flag_interrupt : 1;
-    unsigned flag_zero : 1;
-    unsigned flag_carry : 1;
+    unsigned flag_zero      : 1;
+    unsigned flag_carry     : 1;
 } srflags_t;
 
 /**
@@ -48,7 +58,7 @@ typedef struct addrmode {
     /**
     * Gets the absolute address of the argument using this address mode.
     */
-    addr_t (*get_address)(tframe_t *frame, uint8_t *mem, uint8_t *args);
+    addr_t (*get_address)(const tframe_t *frame, const uint8_t *mem, const uint8_t *args);
 
     /**
     * The number of operator arguments (bytes) required by this address mode
@@ -69,11 +79,11 @@ typedef struct addrmode {
  * 
  * ZEROPAGE:    $LL         Zero-page addressing. Instruction applies to the memory location $00LL.
  * ZEROPAGEX:   $LL,X       Same as zero page, but offset by the value at register X. Wraps around if larger than 255
- *                          so that memory address is always between $0000 and $00FF. Does not use the carry bit.
+ *                          so that memory address is always between $0000 and $00FF.
  * ZEROPAGEY:   $LL,Y       Same as zero page X, but for the register Y.
  * 
  * ABSOLUTE:    $LLHH       Absolute addressing. Instruction appllies to the memory location $HHLL.
- * ABSOLUTEX:   $LLHH,X.    Same as absolute, but offset by the value at register X. Uses the carry bit.
+ * ABSOLUTEX:   $LLHH,X.    Same as absolute, but offset by the value at register X.
  * ABSOLUTEY:   $LLHH,Y.    Same as absolute X, but for the register Y.
  * 
  * RELATIVE:    $BB         Relative addressing. Target address is program counter offset by the signed value $BB.
@@ -108,6 +118,11 @@ extern const addrmode_t AM_INDIRECT_X;
 extern const addrmode_t AM_INDIRECT_Y;
 
 typedef struct instruction {
+
+    /**
+     * The name of the instruction.
+     */
+    const char *name;
 
     /**
      * Applies the instruction to the given address after it has been evaluated by its addressing mode.
@@ -219,13 +234,6 @@ extern const instruction_t INS_RTI;
 extern const instruction_t INS_BIT;
 extern const instruction_t INS_NOP;
 
-typedef struct ins_addr_pair {
-
-    instruction_t   *instruction;
-    addrmode_t      *addr_mode;
-
-} ins_addr_pair_t;
-
 /**
  * Opcodes are formatted in a pattern a-b-c where a and b are 3-bit numbers
  * and c is a 2-bit number. This organises the instructions so that the type of
@@ -233,25 +241,64 @@ typedef struct ins_addr_pair {
  */
 typedef struct opcode {
     
-    unsigned num : 3;           // The first 3-bits of the opcode (often determines the instruction).
+    unsigned group    : 2;      // The final 2-bits of the opcode (determines which group the instruction falls under).
     unsigned addrmode : 3;      // The second 3-bits of the optcode (often determines the address mode).
-    unsigned group : 2;         // The final 2-bits of the opcode (determines which group the instruction falls under).
+    unsigned num      : 3;      // The first 3-bits of the opcode (often determines the instruction).
 
 } opcode_t;
 
 /**
- * Determines the address mode for the given opcode.
+ * A single CPU operation that contains an instruction along with the address mode
+ * that will be used to process the argument(s) to this instruction.
+ */
+typedef struct operation {
+
+    const instruction_t   *instruction;   // The instruction to execute.
+    const addrmode_t      *addr_mode;     // The address mode to use.
+    const uint8_t         *args;          // The arguments of the instruction.
+
+} operation_t;
+
+/**
+ * @brief Determines the address mode for the given opcode.
+ * 
+ * @param opc The opcode.
+ * @return The address mode.
  */
 const addrmode_t *get_address_mode(opcode_t opc);
 
 /**
- * Determines the instruction for the given opcode.
+ * @brief Determines the instruction for the given opcode.
+ * 
+ * @param opc The opcode.
+ * @return The instruction.
  */
 const instruction_t *get_instruction(opcode_t opc);
 
 /**
- * Executes an instruction, given the CPU state, memory, opcode and the memory following the opcode.
+ * @brief Fetches the next instruction from memory without advancing the program counter.
+ * 
+ * @param frame The CPU state.
+ * @param mem The memory.
+ * @return A pointer to the next instruction.
  */
-void execute(tframe_t *frame, uint8_t *mem, opcode_t opc, uint8_t *args);
+uint8_t *fetch(const tframe_t *frame, uint8_t *mem);
+
+/**
+ * @brief Decodes the given instruction.
+ * 
+ * @param insptr The instruction pointer.
+ * @return A struct containing the decoded instruction.
+ */
+operation_t decode(const uint8_t *insptr);
+
+/**
+ * @brief Executes an instruction. Advances the program counter after the instruction has been executed.
+ * 
+ * @param frame The CPU state.
+ * @param mem The memory.
+ * @param op The instruction to execute.
+ */
+void execute(tframe_t *frame, uint8_t *mem, operation_t op);
 
 #endif

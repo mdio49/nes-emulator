@@ -1,4 +1,11 @@
 #include "cpu.h"
+#include <stdio.h>
+#include <stdlib.h>
+
+typedef union opcode_converter {
+    opcode_t    opcode;
+    uint8_t     raw;
+} opcode_converter_t;
 
 const instruction_t *INS_GROUP1[8][8] = {
     { &INS_BRK, &INS_NOP, &INS_PHP, &INS_NOP, &INS_BPL, &INS_NOP, &INS_CLC, &INS_NOP },
@@ -68,6 +75,7 @@ const addrmode_t *get_address_mode(opcode_t opc) {
             else {
                 am = NULL;
             }
+            break;
         case 0x03:
             am = (opc.group == 0x00 && opc.num == 0x03) ? &AM_INDIRECT : &AM_ABSOLUTE;
             break;
@@ -115,24 +123,57 @@ const instruction_t *get_instruction(opcode_t opc) {
     return ins;
 }
 
-void execute(tframe_t *frame, uint8_t *mem, opcode_t opc, uint8_t *args) {
-    const addrmode_t *am = get_address_mode(opc);
-    const instruction_t *ins = get_instruction(opc);
+uint8_t *fetch(const tframe_t *frame, uint8_t *mem) {
+    return mem + frame->pc;
+}
 
-    if (ins == NULL) {
-        // Illegal instruction; print error and terminate.
-        return;
+operation_t decode(const uint8_t *insptr) {
+    // Get the opcode and args from the instruction pointer.
+    const uint8_t opc = *insptr;
+    const uint8_t *args = insptr + 1;
+
+    // Convert the raw data into an opcode_t.
+    opcode_converter_t decoder;
+    decoder.raw = opc;
+
+    //printf("%d %d %d\n", decoder.opcode.group, decoder.opcode.num, decoder.opcode.addrmode);
+
+    // Decode the opcode to determine the instruction and address mode.
+    operation_t result;
+    result.instruction = get_instruction(decoder.opcode);
+    result.addr_mode = get_address_mode(decoder.opcode);
+    result.args = args;
+
+    // If the instruction is invalid, then print an error and terminate.
+    if (result.instruction == NULL) {
+        printf("Invalid instruction: %d. Program terminated.\n", decoder.raw);
+        exit(1);
     }
 
-    if (am != NULL) {
-        // Use the address mode provided by the op code.
-        addr_t addr = am->get_address(frame, mem, args);
-        ins->apply(frame, mem, addr);
-        frame->pc += 1 + am->argc;
+    return result;
+}
+
+void execute(tframe_t *frame, uint8_t *mem, operation_t op) {
+    int argc;
+    if (op.addr_mode != NULL) {
+        addr_t addr = op.addr_mode->get_address(frame, mem, op.args);
+        if (op.instruction->apply == NULL) {
+           printf("Instruction %s not implemented. Program terminated.\n", op.instruction->name);
+            exit(1);
+        }
+        op.instruction->apply(frame, mem, addr);
+        argc = op.addr_mode->argc;
     }
     else {
         // Immediate addressing.
-        ins->apply_immediate(frame, mem, args[0]);
-        frame->pc += 2;
+        if (op.instruction->apply_immediate == NULL) {
+            printf("Instruction %s does not support immediate addressing. Program terminated.\n", op.instruction->name);
+            exit(1);
+        }
+        op.instruction->apply_immediate(frame, mem, op.args[0]);
+        argc = 1;
     }
+
+    // Advance the program counter.
+    frame->pc += argc + 1;
 }

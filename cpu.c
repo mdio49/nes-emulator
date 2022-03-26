@@ -3,6 +3,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+/**
+ * A union to convert raw byte values into opcodes and vice versa.
+ */
+typedef union opcode_converter {
+    opcode_t    opcode;
+    uint8_t     raw;
+} opcode_converter_t;
+
+uint16_t word(uint8_t low, uint8_t high) {
+    return (high << 8) + low;
+}
+
 uint8_t *fetch(const tframe_t *frame, uint8_t *mem) {
     return mem + frame->pc;
 }
@@ -15,8 +27,6 @@ operation_t decode(const uint8_t *insptr) {
     // Convert the raw data into an opcode_t.
     opcode_converter_t decoder;
     decoder.raw = opc;
-
-    //printf("%d %d %d\n", decoder.opcode.group, decoder.opcode.num, decoder.opcode.addrmode);
 
     // Decode the opcode to determine the instruction and address mode.
     operation_t result;
@@ -43,9 +53,9 @@ void execute(tframe_t *frame, uint8_t *mem, operation_t op) {
     // Evaluate the value of the instruction's argument(s) using the correct address mode.
     uint8_t *value = (uint8_t *)op.addr_mode->evaluate(frame, mem, op.args);
 
-    // Apply the instruction using this value.
-    op.instruction->apply(frame, mem, value);
-
-    // Advance the program counter.
+    // Advance the program counter first to make jumping instructions easier.
     frame->pc += op.addr_mode->argc + 1;
+
+    // Execute the instruction.
+    op.instruction->apply(frame, mem, value);
 }

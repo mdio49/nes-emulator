@@ -16,9 +16,10 @@ void print_ins(operation_t ins) {
 
 int main(int argc, char *argv[]) {
     // Setup CPU.
-    tframe_t frame;
+    tframe_t frame = { 0 };
     uint8_t memory[MEM_SIZE] = { 0 };
-    frame.sr.flag_ignored = 1;
+    frame.sr.flags.ign = 1;
+    frame.sp = 0xFF;
 
     // Load program from input.
     for (int i = 1; i < argc; i++) {
@@ -27,7 +28,7 @@ int main(int argc, char *argv[]) {
 
     // Execute program.
     frame.pc = AS_PROG;
-    while (memory[frame.pc] != 0x00) {
+    while (frame.sr.flags.brk == 0) {
         uint8_t *insptr = fetch(&frame, memory);
         operation_t ins = decode(insptr);
         print_ins(ins);
@@ -35,7 +36,16 @@ int main(int argc, char *argv[]) {
     }
 
     // Dump state.
-    printf("pc: 0x%.4x, a: %d. x: %d, y: %d, sp: %d\n", frame.pc, frame.ac, frame.x, frame.y, frame.sp);
+    printf("Program halted.\n");
+    printf("pc: 0x%.4x, a: %d. x: %d, y: %d, sp: 0x%.2x, sr: ", frame.pc, frame.ac, frame.x, frame.y, frame.sp);
+    printf(frame.sr.flags.neg ? "n" : "-");
+    printf(frame.sr.flags.vflow ? "v" : "-");
+    printf(frame.sr.flags.ign ? "-" : "-");
+    printf(frame.sr.flags.brk ? "b" : "-");
+    printf(frame.sr.flags.dec ? "d" : "-");
+    printf(frame.sr.flags.irq ? "i" : "-");
+    printf(frame.sr.flags.zero ? "z" : "-");
+    printf(frame.sr.flags.carry ? "c" : "-");
 
     return 0;
 }

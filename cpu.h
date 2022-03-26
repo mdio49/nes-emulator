@@ -13,18 +13,23 @@
 #define AS_SAVE         0x6000
 #define AS_PROG         0x8000
 
+#define STACK_START     0x0100
+
 /**
  * The flags for each bit in the status register.
  */
-typedef struct sr_flags {
-    unsigned flag_negative  : 1;
-    unsigned flag_overflow  : 1;
-    unsigned flag_ignored   : 1;
-    unsigned flag_break     : 1;
-    unsigned flag_decimal   : 1;
-    unsigned flag_interrupt : 1;
-    unsigned flag_zero      : 1;
-    unsigned flag_carry     : 1;
+typedef union sr_flags {
+    struct flags {
+        unsigned carry : 1;     // Carry flag.
+        unsigned zero  : 1;     // Zero flag.
+        unsigned irq   : 1;     // Interrupt flag (IRQ disable).
+        unsigned dec   : 1;     // Decimal flag.
+        unsigned brk   : 1;     // Break flag.
+        unsigned ign   : 1;     // Ignored flag (unused).
+        unsigned vflow : 1;     // Overflow flag.
+        unsigned neg   : 1;     // Negative/sign flag.
+    } flags;
+    uint8_t bits;
 } srflags_t;
 
 /**
@@ -86,14 +91,6 @@ typedef struct opcode {
 } opcode_t;
 
 /**
- * A union to convert raw byte values into opcodes and vice versa.
- */
-typedef union opcode_converter {
-    opcode_t    opcode;
-    uint8_t     raw;
-} opcode_converter_t;
-
-/**
  * A single CPU operation that contains an instruction along with the address mode
  * that will be used to process the argument(s) to this instruction.
  */
@@ -120,6 +117,15 @@ const addrmode_t *get_address_mode(opcode_t opc);
  * @return The instruction.
  */
 const instruction_t *get_instruction(opcode_t opc);
+
+/**
+ * @brief Converts two bytes into a 16-bit word.
+ * 
+ * @param low The least significant byte.
+ * @param high The most significant byte.
+ * @return The resultant 16-bit word.
+ */
+uint16_t word(uint8_t low, uint8_t high);
 
 /**
  * @brief Fetches the next instruction from memory without advancing the program counter.

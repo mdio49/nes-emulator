@@ -104,6 +104,7 @@ const instruction_t *get_instruction(opcode_t opc) {
     switch (opc.group) {
         case 0x00:
             ins = INS_GROUP1[opc.num][opc.addrmode];
+            break;
         case 0x01:
             if (opc.num == 0x04 && opc.addrmode == 0x02) {
                 ins = &INS_NOP;

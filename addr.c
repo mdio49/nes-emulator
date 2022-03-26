@@ -1,9 +1,5 @@
 #include "cpu.h"
 
-static uint16_t word(uint8_t first, uint8_t second) {
-    return (second << 8) + first;
-}
-
 static const uint8_t *addrm_impl(const tframe_t *frame, const uint8_t *mem, const uint8_t *args) {
     return NULL; // Address is not used.
 }
@@ -17,7 +13,7 @@ static const uint8_t *addrm_imm(const tframe_t *frame, const uint8_t *mem, const
 }
 
 static const uint8_t *addrm_zpg(const tframe_t *frame, const uint8_t *mem, const uint8_t *args) {
-    return &mem[word(args[0], 0)];
+    return &mem[args[0]];
 }
 
 static const uint8_t *addrm_zpgx(const tframe_t *frame, const uint8_t *mem, const uint8_t *args) {

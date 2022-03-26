@@ -1,6 +1,9 @@
-#include "cpu.h"
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "addr.h"
+#include "cpu.h"
+#include "instructions.h"
 
 typedef union opcode_converter {
     opcode_t    opcode;
@@ -52,11 +55,11 @@ const addrmode_t *get_address_mode(opcode_t opc) {
                     am = &AM_IMPLIED;
                 }
                 else {
-                    am = NULL;
+                    am = &AM_IMMEDIATE;
                 }
             }
             else if (opc.group == 0x02) {
-                am = NULL;
+                am = &AM_IMMEDIATE;
             }
             else {
                 am = &AM_INDIRECT;
@@ -73,7 +76,7 @@ const addrmode_t *get_address_mode(opcode_t opc) {
                 am = opc.num <= 0x03 ?  &AM_ACCUMULATOR : &AM_IMPLIED;
             }
             else {
-                am = NULL;
+                am = &AM_IMMEDIATE;
             }
             break;
         case 0x03:
@@ -154,26 +157,18 @@ operation_t decode(const uint8_t *insptr) {
 }
 
 void execute(tframe_t *frame, uint8_t *mem, operation_t op) {
-    int argc;
-    if (op.addr_mode != NULL) {
-        addr_t addr = op.addr_mode->get_address(frame, mem, op.args);
-        if (op.instruction->apply == NULL) {
-           printf("Instruction %s not implemented. Program terminated.\n", op.instruction->name);
-            exit(1);
-        }
-        op.instruction->apply(frame, mem, addr);
-        argc = op.addr_mode->argc;
-    }
-    else {
-        // Immediate addressing.
-        if (op.instruction->apply_immediate == NULL) {
-            printf("Instruction %s does not support immediate addressing. Program terminated.\n", op.instruction->name);
-            exit(1);
-        }
-        op.instruction->apply_immediate(frame, mem, op.args[0]);
-        argc = 1;
+    // If the instruction hasn't been implemented, then print an error and terminate.
+    if (op.instruction->apply == NULL) {
+        printf("Instruction %s not implemented. Program terminated.\n", op.instruction->name);
+        exit(1);
     }
 
+    // Evaluate the value of the instruction's argument(s) using the correct address mode.
+    uint8_t *value = (uint8_t *)op.addr_mode->evaluate(frame, mem, op.args);
+
+    // Apply the instruction using this value.
+    op.instruction->apply(frame, mem, value);
+
     // Advance the program counter.
-    frame->pc += argc + 1;
+    frame->pc += op.addr_mode->argc + 1;
 }

@@ -18,6 +18,7 @@ int main(int argc, char *argv[]) {
     // Setup CPU.
     tframe_t frame;
     uint8_t memory[MEM_SIZE] = { 0 };
+    frame.sr.flag_ignored = 1;
 
     // Load program from input.
     for (int i = 1; i < argc; i++) {

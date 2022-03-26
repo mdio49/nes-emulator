@@ -8,8 +8,8 @@ main: main.o
 main.o: main.c cpu.o
 	$(CC) $(CFLAGS) -c main.c
 
-cpu.o: addr.c cpu.c cpu.h insdefs.c
-	$(CC) $(CFLAGS) -c addr.c cpu.c insdefs.c
+cpu.o: addr.c addr.h cpu.c cpu.h instructions.c instructions.h
+	$(CC) $(CFLAGS) -c addr.c cpu.c instructions.c
 
 clean:
 	rm *.o $(TARGET).exe -rf

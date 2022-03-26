@@ -9,7 +9,7 @@ void print_ins(operation_t ins) {
     printf("%s", ins.instruction->name);
     int argc = ins.addr_mode != NULL ? ins.addr_mode->argc : 1;
     for (int i = 0; i < argc; i++) {
-        printf(" %d", ins.args[i]);
+        printf(" $%.2x", ins.args[i]);
     }
     printf("\n");
 }
@@ -35,7 +35,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Dump state.
-    printf("pc: 0x%x, a: %d. x: %d, y: %d, sp: %d\n", frame.pc, frame.ac, frame.x, frame.y, frame.sp);
+    printf("pc: 0x%.4x, a: %d. x: %d, y: %d, sp: %d\n", frame.pc, frame.ac, frame.x, frame.y, frame.sp);
 
     return 0;
 }

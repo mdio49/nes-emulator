@@ -160,28 +160,28 @@ const instruction_t INS_ORA = { "ORA", ora_apply };
  */
 
 static void asl_apply(tframe_t *frame, uint8_t *mem, uint8_t *value) {
-    if (*value & 0x80 == 0x80)
+    if ((*value & 0x80) == 0x80)
         frame->sr.flag_carry = 1;
     *value <<= 1;
     update_sign_flags(frame, *value);
 }
 
 static void lsr_apply(tframe_t *frame, uint8_t *mem, uint8_t *value) {
-    if (*value & 0x01 == 0x01)
+    if ((*value & 0x01) == 0x01)
         frame->sr.flag_carry = 1;
     *value >>= 1;
     update_sign_flags(frame, *value);
 }
 
 static void rol_apply(tframe_t *frame, uint8_t *mem, uint8_t *value) {
-    if (*value & 0x80 == 0x80)
+    if ((*value & 0x80) == 0x80)
         frame->sr.flag_carry = 1;
     *value = (*value << 1) | frame->sr.flag_carry;
     update_sign_flags(frame, *value);
 }
 
 static void ror_apply(tframe_t *frame, uint8_t *mem, uint8_t *value) {
-    if (*value & 0x01 == 0x01)
+    if ((*value & 0x01) == 0x01)
         frame->sr.flag_carry = 1;
     *value = (*value >> 1) | (frame->sr.flag_carry << 7);
     update_sign_flags(frame, *value);

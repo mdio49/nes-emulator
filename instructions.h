@@ -3,7 +3,7 @@
 
 #include "cpu.h"
 
-// Load, store and interregister instructions.
+// Load, store and transfer instructions.
 
 extern const instruction_t INS_LDA;
 extern const instruction_t INS_LDX;

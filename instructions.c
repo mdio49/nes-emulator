@@ -27,6 +27,17 @@ static uint8_t pull(tframe_t *frame, uint8_t *mem) {
     return value;
 }
 
+static void push_word(tframe_t *frame, uint8_t *mem, uint16_t value) {
+    push(frame, mem, value >> 8);       // high
+    push(frame, mem, value & 0x00FF);   // low
+}
+
+static uint16_t pull_word(tframe_t *frame, uint8_t *mem) {
+    uint8_t low = pull(frame, mem);
+    uint8_t high = pull(frame, mem);
+    return word(low, high);
+}
+
 /**
  * Transfer instructions.
  */
@@ -203,29 +214,25 @@ const instruction_t INS_ORA = { "ORA", ora_apply };
  */
 
 static void asl_apply(tframe_t *frame, uint8_t *mem, uint8_t *value) {
-    if ((*value & 0x80) == 0x80)
-        frame->sr.flags.carry = 1;
+    frame->sr.flags.carry = ((*value & 0x80) == 0x80);
     *value <<= 1;
     update_sign_flags(frame, *value);
 }
 
 static void lsr_apply(tframe_t *frame, uint8_t *mem, uint8_t *value) {
-    if ((*value & 0x01) == 0x01)
-        frame->sr.flags.carry = 1;
+    frame->sr.flags.carry = ((*value & 0x01) == 0x01);
     *value >>= 1;
     update_sign_flags(frame, *value);
 }
 
 static void rol_apply(tframe_t *frame, uint8_t *mem, uint8_t *value) {
-    if ((*value & 0x80) == 0x80)
-        frame->sr.flags.carry = 1;
+    frame->sr.flags.carry = ((*value & 0x80) == 0x80);
     *value = (*value << 1) | frame->sr.flags.carry;
     update_sign_flags(frame, *value);
 }
 
 static void ror_apply(tframe_t *frame, uint8_t *mem, uint8_t *value) {
-    if ((*value & 0x01) == 0x01)
-        frame->sr.flags.carry = 1;
+    frame->sr.flags.carry = ((*value & 0x01) == 0x01);
     *value = (*value >> 1) | (frame->sr.flags.carry << 7);
     update_sign_flags(frame, *value);
 }
@@ -365,19 +372,16 @@ const instruction_t INS_BVS = { "BVS", bvs_apply };
  */
 
 static void jmp_apply(tframe_t *frame, uint8_t *mem, uint8_t *value) {
-    frame->pc = (uint16_t)(value - mem);
+    frame->pc = (uint16_t)(value - mem); // The value points to the instruction we want to jump to.
 }
 
 static void jrs_apply(tframe_t *frame, uint8_t *mem, uint8_t *value) {
-    push(frame, mem, frame->pc >> 8);       // high
-    push(frame, mem, frame->pc & 0x00FF);   // low
+    push_word(frame, mem, frame->pc - 1);
     jmp_apply(frame, mem, value); 
 }
 
 static void rts_apply(tframe_t *frame, uint8_t *mem, uint8_t *value) {
-    uint8_t low = pull(frame, mem);
-    uint8_t high = pull(frame, mem);
-    frame->pc = word(low, high); 
+    frame->pc = pull_word(frame, mem) + 1;
 }
 
 const instruction_t INS_JMP = { "JMP", jmp_apply };
@@ -390,16 +394,13 @@ const instruction_t INS_RTS = { "RTS", rts_apply };
 
 static void brk_apply(tframe_t *frame, uint8_t *mem, uint8_t *value) {
     frame->sr.flags.brk = 1;
-    push(frame, mem, (frame->pc + 1) >> 8);       // high
-    push(frame, mem, (frame->pc + 1) & 0x00FF);   // low
+    push_word(frame, mem, frame->pc + 1);
     push(frame, mem, frame->sr.bits);
 }
 
 static void rti_apply(tframe_t *frame, uint8_t *mem, uint8_t *value) {
     frame->sr.bits = pull(frame, mem);
-    uint8_t low = pull(frame, mem);
-    uint8_t high = pull(frame, mem);
-    frame->pc = word(low, high);
+    frame->pc = pull_word(frame, mem);
 }
 
 const instruction_t INS_BRK = { "BRK", brk_apply };

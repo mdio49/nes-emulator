@@ -3,14 +3,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-/**
- * A union to convert raw byte values into opcodes and vice versa.
- */
-typedef union opcode_converter {
-    opcode_t    opcode;
-    uint8_t     raw;
-} opcode_converter_t;
-
 uint16_t word(uint8_t low, uint8_t high) {
     return (high << 8) + low;
 }
@@ -58,4 +50,5 @@ void execute(tframe_t *frame, uint8_t *mem, operation_t op) {
 
     // Execute the instruction.
     op.instruction->apply(frame, mem, value);
+
 }

@@ -50,5 +50,4 @@ void execute(tframe_t *frame, uint8_t *mem, operation_t op) {
 
     // Execute the instruction.
     op.instruction->apply(frame, mem, value);
-
 }

@@ -15,6 +15,15 @@
 
 #define STACK_START     0x0100
 
+#define SR_CARRY        0x01
+#define SR_ZERO         0x02
+#define SR_INTERRUPT    0x04
+#define SR_DECIMAL      0x08
+#define SR_BREAK        0x10
+#define SR_IGNORED      0x20
+#define SR_OVERFLOW     0x40
+#define SR_NEGATIVE     0x80
+
 /**
  * The flags for each bit in the status register.
  */

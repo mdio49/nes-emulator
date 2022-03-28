@@ -6,6 +6,7 @@ void test_instructions(tframe_t *frame, uint8_t *mem);
 
 void test_load_store(tframe_t *frame, uint8_t *mem, uint8_t *reg, const instruction_t *load, const instruction_t *store);
 void test_inc_dec(tframe_t *frame, uint8_t *mem, uint8_t *value, const instruction_t *inc, const instruction_t *dec);
+void test_compare(tframe_t *frame, uint8_t *mem, uint8_t *reg, const instruction_t *cmp);
 void test_branch(tframe_t *frame, uint8_t *mem, const instruction_t *branch, uint8_t mask, unsigned int true_val);
 
 int main() {
@@ -239,9 +240,223 @@ void test_instructions(tframe_t *frame, uint8_t *mem) {
     assert(frame->sr.flags.vflow == 0);
     assert(frame->sr.flags.zero == 0);
 
+    frame->ac = 0x99;
+    frame->sr.flags.carry = 1;
+    value = 0x99;
+
+    INS_ADC.apply(frame, mem, &value);
+    assert(frame->ac == 0x99);
+    assert(frame->sr.flags.carry == 1);
+    assert(frame->sr.flags.neg == 1);
+    assert(frame->sr.flags.vflow == 0);
+    assert(frame->sr.flags.zero == 0);
+
+    // BCD overflow cases.
+    frame->ac = 0x0A;               // 10
+    frame->sr.flags.carry = 0;
+    value = 0x00;                   // +0
+
+    INS_ADC.apply(frame, mem, &value);
+    assert(frame->ac == 0x10);      // 10
+    assert(frame->sr.flags.carry == 0);
+    assert(frame->sr.flags.neg == 0);
+    assert(frame->sr.flags.vflow == 0);
+    assert(frame->sr.flags.zero == 0);
+
+    frame->ac = 0xA0;               // 100
+    frame->sr.flags.carry = 0;
+    value = 0x00;                   // + 0
+
+    INS_ADC.apply(frame, mem, &value);
+    assert(frame->ac == 0x00);      // 100
+    assert(frame->sr.flags.carry == 1);
+    assert(frame->sr.flags.neg == 0);
+    assert(frame->sr.flags.vflow == 0);
+    assert(frame->sr.flags.zero == 1);
+
+    frame->ac = 0xFF;               // 165
+    frame->sr.flags.carry = 0;
+    value = 0x00;                   // + 0
+
+    INS_ADC.apply(frame, mem, &value);
+    assert(frame->ac == 0x65);      // 165
+    assert(frame->sr.flags.carry == 1);
+    assert(frame->sr.flags.neg == 0);
+    assert(frame->sr.flags.vflow == 0);
+    assert(frame->sr.flags.zero == 0);
+    
+    frame->ac = 0xFF;               // 165
+    frame->sr.flags.carry = 0;
+    value = 0x34;                   // +34
+
+    INS_ADC.apply(frame, mem, &value);
+    assert(frame->ac == 0x99);      // 199
+    assert(frame->sr.flags.carry == 1);
+    assert(frame->sr.flags.neg == 1);
+    assert(frame->sr.flags.vflow == 0);
+    assert(frame->sr.flags.zero == 0);
+
     // SBC
 
-    // TODO
+    // Standard arithmetic.
+    frame->sr.flags.dec = 0;
+
+    frame->ac = 0x08;
+    frame->sr.flags.carry = 1;
+    value = 0x02;
+
+    INS_SBC.apply(frame, mem, &value);
+    assert(frame->ac == 0x06);
+    assert(frame->sr.flags.carry == 1);
+    assert(frame->sr.flags.neg == 0);
+    assert(frame->sr.flags.vflow == 0);
+    assert(frame->sr.flags.zero == 0);
+
+    frame->ac = 0x08;
+    frame->sr.flags.carry = 1;
+    value = 0x08;
+
+    INS_SBC.apply(frame, mem, &value);
+    assert(frame->ac == 0x00);
+    assert(frame->sr.flags.carry == 1);
+    assert(frame->sr.flags.neg == 0);
+    assert(frame->sr.flags.vflow == 0);
+    assert(frame->sr.flags.zero == 1);
+
+    frame->ac = 0x08;
+    frame->sr.flags.carry = 1;
+    value = 0x09;
+
+    INS_SBC.apply(frame, mem, &value);
+    assert(frame->ac == 0xFF);
+    assert(frame->sr.flags.carry == 0);
+    assert(frame->sr.flags.neg == 1);
+    assert(frame->sr.flags.vflow == 0);
+    assert(frame->sr.flags.zero == 0);
+
+    frame->ac = 0x08;
+    frame->sr.flags.carry = 0;
+    value = 0x02;
+
+    INS_SBC.apply(frame, mem, &value);
+    assert(frame->ac == 0x05);
+    assert(frame->sr.flags.carry == 1);
+    assert(frame->sr.flags.neg == 0);
+    assert(frame->sr.flags.vflow == 0);
+    assert(frame->sr.flags.zero == 0);
+
+    frame->ac = 0x81;
+    frame->sr.flags.carry = 1;
+    value = 0x02;
+
+    INS_SBC.apply(frame, mem, &value);
+    assert(frame->ac == 0x7F);
+    assert(frame->sr.flags.carry == 1);
+    assert(frame->sr.flags.neg == 0);
+    assert(frame->sr.flags.vflow == 0);
+    assert(frame->sr.flags.zero == 0);
+
+    frame->ac = 0x85;
+    frame->sr.flags.carry = 1;
+    value = 0x02;
+
+    INS_SBC.apply(frame, mem, &value);
+    assert(frame->ac == 0x83);
+    assert(frame->sr.flags.carry == 1);
+    assert(frame->sr.flags.neg == 1);
+    assert(frame->sr.flags.vflow == 0);
+    assert(frame->sr.flags.zero == 0);
+
+    frame->ac = 0x00;
+    frame->sr.flags.carry = 1;
+    value = 0xFF;
+
+    INS_SBC.apply(frame, mem, &value);
+    assert(frame->ac == 0x01);
+    assert(frame->sr.flags.carry == 0);
+    assert(frame->sr.flags.neg == 0);
+    assert(frame->sr.flags.vflow == 0);
+    assert(frame->sr.flags.zero == 0);
+
+    // Binary coded decimal.
+    frame->sr.flags.dec = 1;
+
+    frame->ac = 0x08;
+    frame->sr.flags.carry = 1;
+    value = 0x02;
+
+    INS_SBC.apply(frame, mem, &value);
+    assert(frame->ac == 0x06);
+    assert(frame->sr.flags.carry == 1);
+    assert(frame->sr.flags.neg == 0);
+    assert(frame->sr.flags.vflow == 0);
+    assert(frame->sr.flags.zero == 0);
+
+    frame->ac = 0x08;
+    frame->sr.flags.carry = 1;
+    value = 0x08;
+
+    INS_SBC.apply(frame, mem, &value);
+    assert(frame->ac == 0x00);
+    assert(frame->sr.flags.carry == 1);
+    assert(frame->sr.flags.neg == 0);
+    assert(frame->sr.flags.vflow == 0);
+    assert(frame->sr.flags.zero == 1);
+
+    frame->ac = 0x08;
+    frame->sr.flags.carry = 1;
+    value = 0x09;
+
+    INS_SBC.apply(frame, mem, &value);
+    assert(frame->ac == 0x99);
+    assert(frame->sr.flags.carry == 0);
+    assert(frame->sr.flags.neg == 1);
+    assert(frame->sr.flags.vflow == 0);
+    assert(frame->sr.flags.zero == 0);
+
+    frame->ac = 0x08;
+    frame->sr.flags.carry = 0;
+    value = 0x02;
+
+    INS_SBC.apply(frame, mem, &value);
+    assert(frame->ac == 0x05);
+    assert(frame->sr.flags.carry == 1);
+    assert(frame->sr.flags.neg == 0);
+    assert(frame->sr.flags.vflow == 0);
+    assert(frame->sr.flags.zero == 0);
+
+    frame->ac = 0x81;
+    frame->sr.flags.carry = 1;
+    value = 0x02;
+
+    INS_SBC.apply(frame, mem, &value);
+    assert(frame->ac == 0x79);
+    assert(frame->sr.flags.carry == 1);
+    assert(frame->sr.flags.neg == 0);
+    assert(frame->sr.flags.vflow == 0);
+    assert(frame->sr.flags.zero == 0);
+
+    frame->ac = 0x85;
+    frame->sr.flags.carry = 1;
+    value = 0x02;
+
+    INS_SBC.apply(frame, mem, &value);
+    assert(frame->ac == 0x83);
+    assert(frame->sr.flags.carry == 1);
+    assert(frame->sr.flags.neg == 1);
+    assert(frame->sr.flags.vflow == 0);
+    assert(frame->sr.flags.zero == 0);
+
+    frame->ac = 0x00;
+    frame->sr.flags.carry = 1;
+    value = 0x99;
+
+    INS_SBC.apply(frame, mem, &value);
+    assert(frame->ac == 0x01);
+    assert(frame->sr.flags.carry == 0);
+    assert(frame->sr.flags.neg == 0);
+    assert(frame->sr.flags.vflow == 0);
+    assert(frame->sr.flags.zero == 0);
 
     /**
      * Test logical operators.
@@ -468,7 +683,9 @@ void test_instructions(tframe_t *frame, uint8_t *mem) {
      * Test comparisons.
      */
 
-    // TODO
+    test_compare(frame, mem, &frame->ac, &INS_CMP);
+    test_compare(frame, mem, &frame->x, &INS_CPX);
+    test_compare(frame, mem, &frame->y, &INS_CPY);
 
     /**
      * Test conditional branch instructions.
@@ -541,27 +758,27 @@ void test_load_store(tframe_t *frame, uint8_t *mem, uint8_t *reg, const instruct
 
     value = 0x00;
     load->apply(frame, mem, &value);
-    assert(*reg == value);
+    assert(*reg == 0x00);
     assert(frame->sr.flags.neg == 0);
     assert(frame->sr.flags.zero == 1);
 
     value = 0x05;
     load->apply(frame, mem, &value);
-    assert(*reg == value);
+    assert(*reg == 0x05);
     assert(frame->sr.flags.neg == 0);
     assert(frame->sr.flags.zero == 0);
 
     store->apply(frame, mem, &mem[0x20]);
-    assert(mem[0x20] == value);
+    assert(mem[0x20] == 0x05);
 
     value = 0xF9;
     load->apply(frame, mem, &value);
-    assert(*reg == value);
+    assert(*reg == 0xF9);
     assert(frame->sr.flags.neg == 1);
     assert(frame->sr.flags.zero == 0);
 
     store->apply(frame, mem, &mem[0x21]);
-    assert(mem[0x21] == value);
+    assert(mem[0x21] == 0xF9);
 }
 
 void test_inc_dec(tframe_t *frame, uint8_t *mem, uint8_t *value, const instruction_t *inc, const instruction_t *dec) {
@@ -632,6 +849,74 @@ void test_inc_dec(tframe_t *frame, uint8_t *mem, uint8_t *value, const instructi
     inc->apply(frame, mem, value);
     assert(*value == 129);
     assert(frame->sr.flags.neg == 1);
+    assert(frame->sr.flags.zero == 0);
+}
+
+void test_compare(tframe_t *frame, uint8_t *mem, uint8_t *reg, const instruction_t *cmp) {
+    uint8_t value;
+
+    // 8 - 5 = 3 > 0
+    *reg = 0x08;
+    value = 0x05;
+    cmp->apply(frame, mem, &value);
+    assert(frame->sr.flags.carry == 1);
+    assert(frame->sr.flags.neg == 0);
+    assert(frame->sr.flags.zero == 0);
+
+    // 8 - 8 = 0
+    *reg = 0x08;
+    value = 0x08;
+    cmp->apply(frame, mem, &value);
+    assert(frame->sr.flags.carry == 1);
+    assert(frame->sr.flags.neg == 0);
+    assert(frame->sr.flags.zero == 1);
+
+    // 8 - 10 = -2 < 0
+    *reg = 0x08;
+    value = 0x0A;
+    cmp->apply(frame, mem, &value);
+    assert(frame->sr.flags.carry == 0);
+    assert(frame->sr.flags.neg == 1);
+    assert(frame->sr.flags.zero == 0);
+
+    // (-1) - (-1) = 0
+    *reg = 0xFF;
+    value = 0xFF;
+    cmp->apply(frame, mem, &value);
+    assert(frame->sr.flags.carry == 1);
+    assert(frame->sr.flags.neg == 0);
+    assert(frame->sr.flags.zero == 1);
+    
+    // (-1) - (-2) = 1 > 0
+    *reg = 0xFF;
+    value = 0xFE;
+    cmp->apply(frame, mem, &value);
+    assert(frame->sr.flags.carry == 1);
+    assert(frame->sr.flags.neg == 0);
+    assert(frame->sr.flags.zero == 0);
+    
+    // (-2) - (-1) = -1 < 0
+    *reg = 0xFE;
+    value = 0xFF;
+    cmp->apply(frame, mem, &value);
+    assert(frame->sr.flags.carry == 0);
+    assert(frame->sr.flags.neg == 1);
+    assert(frame->sr.flags.zero == 0);
+
+    // (-1) - 0 = -1 < 0
+    *reg = 0xFF;
+    value = 0x00;
+    cmp->apply(frame, mem, &value);
+    assert(frame->sr.flags.carry == 1);
+    assert(frame->sr.flags.neg == 1);
+    assert(frame->sr.flags.zero == 0);
+
+    // 0 - (-1) = 1 > 0
+    *reg = 0x00;
+    value = 0xFF;
+    cmp->apply(frame, mem, &value);
+    assert(frame->sr.flags.carry == 0);
+    assert(frame->sr.flags.neg == 0);
     assert(frame->sr.flags.zero == 0);
 }
 

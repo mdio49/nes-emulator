@@ -1,6 +1,5 @@
 #include <stdbool.h>
 #include <glad/glad.h>
-#include <GLFW/glfw3.h>
 
 typedef struct shader {
     
@@ -14,3 +13,5 @@ typedef struct shader {
 shader_t *shader_create(unsigned char type, const char *src);
 void shader_compile(shader_t *shader);
 void shader_destroy(shader_t *shader);
+
+shader_t *shader_fromfile(const char *path);

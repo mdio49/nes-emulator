@@ -7,6 +7,7 @@
 
 static GLFWwindow *window = NULL;
 static int vao, vbo;
+static int shader;
 
 static const float vertices[] = {
     0.0f, 0.0f, 0.0f,
@@ -62,15 +63,24 @@ bool gdevice_create() {
 	glEnableVertexAttribArray(0);
 
 	// Create shader.
-	shader_t *vertex = shader_create(GL_VERTEX_SHADER, NULL);
-	shader_t *frag = shader_create(GL_FRAGMENT_SHADER, NULL);
+	shader_t *vertex = shader_fromfile(GL_VERTEX_SHADER, "graphics/shaders/main.vert");
+	shader_t *frag = shader_create(GL_FRAGMENT_SHADER, "graphics/shaders/main.frag");
 
 	shader_compile(vertex);
 	shader_compile(frag);
 
+	shader = glCreateProgram();
+	glAttachShader(shader, vertex->id);
+	glAttachShader(shader, frag->id);
+	glLinkProgram(shader);
 	
+	free(vertex->src);
+	free(frag->src);
+
 	shader_destroy(vertex);
 	shader_destroy(frag);
+
+	glUseProgram(shader);
 
     return true;
 }
@@ -90,4 +100,3 @@ void gdevice_destroy() {
         glfwDestroyWindow(window);
     glfwTerminate();
 }
-

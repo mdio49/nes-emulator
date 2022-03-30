@@ -42,3 +42,26 @@ void shader_destroy(shader_t *shader) {
     glDeleteShader(shader->id);
     free(shader);
 }
+
+shader_t *shader_fromfile(GLuint type, const char *path) {
+    // Open the file.
+	FILE *fp = fopen(path, "r");
+    if (fp == NULL) {
+        fprintf(stderr, "Unable to open file.");
+        exit(1);
+    }
+
+    // Get the length of the file.
+    fseek(fp, 0L, SEEK_END);
+    long size = ftell(fp);
+    rewind(fp);
+
+    // Allocate memory for the buffer and read in the data.
+    char *buffer = malloc(size);
+    fread(buffer, size, 1, fp);
+    fclose(fp);
+
+    // Create the shader and return.
+    shader_t *shader = shader_create(type, buffer);
+    return shader;
+}

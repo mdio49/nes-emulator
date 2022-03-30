@@ -16,8 +16,11 @@ test.o: test.c main.o
 main.o: main.c cpu.o
 	$(CC) $(CFLAGS) -c main.c
 
-cpu.o: sys/cpu/*.c
+cpu.o: sys/cpu/*.c memory.o
 	$(CC) $(CFLAGS) -c sys/cpu/*.c 
+
+memory.o: sys/memory/*.c
+	$(CC) $(CFLAGS) -c sys/memory/*.c
 
 clean:
 	rm *.o *.exe -rf

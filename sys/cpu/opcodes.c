@@ -5,8 +5,8 @@
  * @date 2022-03-26
  */
 
-#include "addr.h"
-#include "instructions.h"
+#include <addrmodes.h>
+#include <instructions.h>
 
 static const instruction_t *INS_GROUP1[8][8] = {
     { &INS_BRK, &INS_NOP, &INS_PHP, &INS_NOP, &INS_BPL, &INS_NOP, &INS_CLC, &INS_NOP },

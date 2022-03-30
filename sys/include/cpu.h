@@ -2,6 +2,8 @@
 #define CPU_H
 
 #include <stdint.h>
+#include <stdbool.h>
+#include "vm.h"
 
 #define PAGE_MASK       0x00FF
 #define PAGE_SIZE       0x0100
@@ -25,7 +27,7 @@
 #define SR_NEGATIVE     0x80
 
 /**
- * The flags for each bit in the status register.
+ * @brief The flags for each bit in the status register.
  */
 typedef union sr_flags {
     struct flags {
@@ -42,7 +44,7 @@ typedef union sr_flags {
 } srflags_t;
 
 /**
- * A trap frame that stores the state of the CPU's registers.
+ * @brief A trap frame that stores the state of the CPU's registers.
  */
 typedef struct tframe {
     uint16_t    pc;     // program counter
@@ -54,19 +56,18 @@ typedef struct tframe {
 } tframe_t;
 
 /**
- * An addressing mode.
+ * @brief An addressing mode.
  */
 typedef struct addrmode {
 
     /**
-    * Gets a pointer to the value of the argument using this address mode.
+    * @brief Gets a pointer to the value of the argument using this address mode.
     */
-    const uint8_t *(*evaluate)(const tframe_t *frame, const uint8_t *mem, const uint8_t *args);
+    const vaddr_ptr_pair_t (*evaluate)(const tframe_t *frame, const addrspace_t *as, const uint8_t *args);
 
     /**
-    * The number of operator arguments (bytes) required by this address mode
-    * in order to obtain the address. Upon execution of an instruction, the
-    * program counter is incremented by 1 + this value.
+    * @brief The number of operator arguments (bytes) required by this address mode in order to
+    * obtain the address. Upon execution of an instruction, the program counter is incremented by 1 + this value.
     */
     const uint8_t argc;
 
@@ -75,19 +76,24 @@ typedef struct addrmode {
 typedef struct instruction {
 
     /**
-     * The name of the instruction.
+     * @brief The name of the instruction.
      */
     const char *name;
 
     /**
-     * Applies the instruction to the given address after it has been evaluated by its addressing mode.
+     * @brief Applies the instruction to the given address after it has been evaluated by its addressing mode.
      */
-    void (*apply)(tframe_t *frame, uint8_t *mem, uint8_t *value);
+    void (*apply)(tframe_t *frame, const addrspace_t *as, addr_t addr, uint8_t *value);
+
+    /**
+     * @brief Indicates whether the instruction is a jump instruction, in which case the program counter shouldn't increment after executing.
+     */
+    const bool jump;
 
 } instruction_t;
 
 /**
- * Opcodes are formatted in a pattern a-b-c where a and b are 3-bit numbers
+ * @brief Opcodes are formatted in a pattern a-b-c where a and b are 3-bit numbers
  * and c is a 2-bit number. This organises the instructions so that the type of
  * instruction and address mode can be extracted more easily.
  */
@@ -100,7 +106,7 @@ typedef struct opcode {
 } opcode_t;
 
 /**
- * A union to convert raw byte values into opcodes and vice versa.
+ * @brief A union to convert raw byte values into opcodes and vice versa.
  */
 typedef union opcode_converter {
     opcode_t    opcode;
@@ -108,8 +114,8 @@ typedef union opcode_converter {
 } opcode_converter_t;
 
 /**
- * A single CPU operation that contains an instruction along with the address mode
- * that will be used to process the argument(s) to this instruction.
+ * @brief A single CPU operation that contains an instruction along with the
+ * address mode that will be used to process the argument(s) to this instruction.
  */
 typedef struct operation {
 
@@ -147,11 +153,11 @@ uint16_t word(uint8_t low, uint8_t high);
 /**
  * @brief Fetches the next instruction from memory without advancing the program counter.
  * 
- * @param frame The CPU state.
- * @param mem The memory.
+ * @param frame The CPU's state.
+ * @param as The CPU's address space.
  * @return A pointer to the next instruction.
  */
-uint8_t *fetch(const tframe_t *frame, uint8_t *mem);
+uint8_t *fetch(const tframe_t *frame, const addrspace_t *as);
 
 /**
  * @brief Decodes the given instruction.
@@ -164,10 +170,10 @@ operation_t decode(const uint8_t *insptr);
 /**
  * @brief Executes an instruction. Advances the program counter after the instruction has been executed.
  * 
- * @param frame The CPU state.
- * @param mem The memory.
+ * @param frame The CPU's state.
+ * @param as The CPU's address space.
  * @param op The instruction to execute.
  */
-void execute(tframe_t *frame, uint8_t *mem, operation_t op);
+void execute(tframe_t *frame, const addrspace_t *as, operation_t op);
 
 #endif

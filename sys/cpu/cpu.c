@@ -1,5 +1,4 @@
-#include "cpu.h"
-
+#include <cpu.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -7,8 +6,8 @@ uint16_t word(uint8_t low, uint8_t high) {
     return (high << 8) + low;
 }
 
-uint8_t *fetch(const tframe_t *frame, uint8_t *mem) {
-    return mem + frame->pc;
+uint8_t *fetch(const tframe_t *frame, const addrspace_t *as) {
+    return vaddr_to_ptr(as, frame->pc);
 }
 
 operation_t decode(const uint8_t *insptr) {
@@ -35,7 +34,7 @@ operation_t decode(const uint8_t *insptr) {
     return result;
 }
 
-void execute(tframe_t *frame, uint8_t *mem, operation_t op) {
+void execute(tframe_t *frame, const addrspace_t *as, operation_t op) {
     // If the instruction hasn't been implemented, then print an error and terminate.
     if (op.instruction->apply == NULL) {
         printf("Instruction %s not implemented. Program terminated.\n", op.instruction->name);
@@ -43,11 +42,13 @@ void execute(tframe_t *frame, uint8_t *mem, operation_t op) {
     }
 
     // Evaluate the value of the instruction's argument(s) using the correct address mode.
-    uint8_t *value = (uint8_t *)op.addr_mode->evaluate(frame, mem, op.args);
-
-    // Advance the program counter first to make jumping instructions easier.
-    frame->pc += op.addr_mode->argc + 1;
+    const vaddr_ptr_pair_t pair = op.addr_mode->evaluate(frame, as, op.args);
 
     // Execute the instruction.
-    op.instruction->apply(frame, mem, value);
+    op.instruction->apply(frame, as, pair.vaddr, pair.ptr);
+
+    // Advance the program counter (unless the instruction is a jump instruction).
+    if (!op.instruction->jump) {
+        frame->pc += op.addr_mode->argc + 1;
+    }
 }

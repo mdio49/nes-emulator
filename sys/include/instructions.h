@@ -1,7 +1,7 @@
 #ifndef INSTRUCTIONS_H
 #define INSTRUCTIONS_H
 
-#include "cpu.h"
+#include <cpu.h>
 
 // Load, store and transfer instructions.
 

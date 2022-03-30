@@ -1,12 +1,7 @@
 #ifndef ADDR_H
 #define ADDR_H
 
-#include "cpu.h"
-
-/**
- * Memory addresses are 16-bit ranging from 0x00 to 0xFF.
- */
-typedef uint16_t addr_t;
+#include <cpu.h>
 
 /**
  * There are a wide range of addresisng modes, and not all instructions use every one.

@@ -18,6 +18,7 @@ int main(int argc, char *argv[]) {
     // Setup CPU.
     tframe_t frame = { 0 };
     uint8_t memory[MEM_SIZE] = { 0 };
+    addrspace_t as = { memory };
     frame.sr.flags.ign = 1;
     frame.sp = 0xFF;
 
@@ -29,10 +30,10 @@ int main(int argc, char *argv[]) {
     // Execute program.
     frame.pc = AS_PROG;
     while (frame.sr.flags.brk == 0) {
-        uint8_t *insptr = fetch(&frame, memory);
+        uint8_t *insptr = fetch(&frame, &as);
         operation_t ins = decode(insptr);
         print_ins(ins);
-        execute(&frame, memory, ins);
+        execute(&frame, &as, ins);
     }
 
     // Dump state.

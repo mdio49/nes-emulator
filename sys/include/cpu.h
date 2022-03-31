@@ -66,8 +66,9 @@ typedef struct addrmode {
     const vaddr_ptr_pair_t (*evaluate)(const tframe_t *frame, const addrspace_t *as, const uint8_t *args);
 
     /**
-    * @brief The number of operator arguments (bytes) required by this address mode in order to
-    * obtain the address. Upon execution of an instruction, the program counter is incremented by 1 + this value.
+    * @brief The number of operator arguments (bytes) required by this address mode in
+    * order to obtain the address. Upon execution of an instruction, the program counter
+    * is incremented by 1 + this value.
     */
     const uint8_t argc;
 

@@ -32,6 +32,7 @@ int main(int argc, char *argv[]) {
     while (frame.sr.flags.brk == 0) {
         uint8_t *insptr = fetch(&frame, &as);
         operation_t ins = decode(insptr);
+        printf("0x%.4x: ", frame.pc);
         print_ins(ins);
         execute(&frame, &as, ins);
     }

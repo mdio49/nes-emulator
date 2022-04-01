@@ -2,15 +2,52 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-uint16_t word(uint8_t low, uint8_t high) {
+uint16_t bytes_to_word(uint8_t low, uint8_t high) {
     return (high << 8) + low;
 }
 
-uint8_t *fetch(const tframe_t *frame, const addrspace_t *as) {
-    return vaddr_to_ptr(as, frame->pc);
+cpu_t *cpu_create(void) {
+    // Create CPU struct.
+    cpu_t *cpu = malloc(sizeof(struct cpu));
+
+    // Clear registers.
+    cpu->frame.ac = 0;
+    cpu->frame.pc = 0;
+    cpu->frame.sr.bits = 0;
+    cpu->frame.sr.flags.ign = 1;
+    cpu->frame.x = 0;
+    cpu->frame.y = 0;
+
+    // Setup memory.
+    cpu->wmem = malloc(sizeof(uint8_t) * UINT16_MAX);
+
+    // Setup stack.
+    cpu->frame.sp = 0xFF;
+    cpu->stack = cpu->wmem + STACK_START;
+
+    // Setup address space.
+    cpu->as = as_create();
+    cpu->as->mem = cpu->wmem;
+
+    return cpu;
 }
 
-operation_t decode(const uint8_t *insptr) {
+void cpu_destroy(cpu_t *cpu) {
+    // Destroy address space.
+    as_destroy(cpu->as);
+
+    // Free memory.
+    free(cpu->wmem);
+
+    // Free CPU.
+    free(cpu);
+}
+
+uint8_t *cpu_fetch(const cpu_t *cpu) {
+    return vaddr_to_ptr(cpu->as, cpu->frame.pc);
+}
+
+operation_t cpu_decode(const uint8_t *insptr) {
     // Get the opcode and args from the instruction pointer.
     const uint8_t opc = *insptr;
     const uint8_t *args = insptr + 1;
@@ -34,7 +71,7 @@ operation_t decode(const uint8_t *insptr) {
     return result;
 }
 
-void execute(tframe_t *frame, const addrspace_t *as, operation_t op) {
+void cpu_execute(cpu_t *cpu, operation_t op) {
     // If the instruction hasn't been implemented, then print an error and terminate.
     if (op.instruction->apply == NULL) {
         printf("Instruction %s not implemented. Program terminated.\n", op.instruction->name);
@@ -42,13 +79,13 @@ void execute(tframe_t *frame, const addrspace_t *as, operation_t op) {
     }
 
     // Evaluate the value of the instruction's argument(s) using the correct address mode.
-    const vaddr_ptr_pair_t pair = op.addr_mode->evaluate(frame, as, op.args);
+    const vaddr_ptr_pair_t pair = op.addr_mode->evaluate(&cpu->frame, cpu->as, op.args);
 
     // Execute the instruction.
-    op.instruction->apply(frame, as, pair.vaddr, pair.ptr);
+    op.instruction->apply(&cpu->frame, cpu->as, pair.vaddr, pair.ptr);
 
     // Advance the program counter (unless the instruction is a jump instruction).
     if (!op.instruction->jump) {
-        frame->pc += op.addr_mode->argc + 1;
+        cpu->frame.pc += op.addr_mode->argc + 1;
     }
 }

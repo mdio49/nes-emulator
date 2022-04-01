@@ -36,7 +36,7 @@ static void push_word(tframe_t *frame, const addrspace_t *as, uint16_t value) {
 static uint16_t pull_word(tframe_t *frame, const addrspace_t *as) {
     uint8_t low = pull(frame, as);
     uint8_t high = pull(frame, as);
-    return word(low, high);
+    return bytes_to_word(low, high);
 }
 
 /**

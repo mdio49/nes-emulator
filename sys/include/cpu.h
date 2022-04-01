@@ -7,7 +7,7 @@
 
 #define PAGE_MASK       0x00FF
 #define PAGE_SIZE       0x0100
-#define MEM_SIZE        0xFFFF
+#define WMEM_SIZE       0x0800
 
 #define AS_CPU          0x0000
 #define AS_IO           0x2000
@@ -54,6 +54,18 @@ typedef struct tframe {
     srflags_t   sr;     // status register
     uint8_t     sp;     // stack pointer
 } tframe_t;
+
+/**
+ * @brief A CPU struct that contains all data needed to emulate the CPU.
+ */
+typedef struct cpu {
+
+    tframe_t        frame;      // The CPU's registers.
+    addrspace_t     *as;        // The CPU's address space.
+    uint8_t         *wmem;      // The CPU's working memory.
+    uint8_t         *stack;     // A pointer to the bottom of the stack (increment by stack pointer register to get current value in stack).
+
+} cpu_t;
 
 /**
  * @brief An addressing mode.
@@ -149,16 +161,29 @@ const instruction_t *get_instruction(opcode_t opc);
  * @param high The most significant byte.
  * @return The resultant 16-bit word.
  */
-uint16_t word(uint8_t low, uint8_t high);
+uint16_t bytes_to_word(uint8_t low, uint8_t high);
+
+/**
+ * @brief Creates a new instance of an emulated CPU.
+ * 
+ * @return The CPU struct that holds the CPU data.
+ */
+cpu_t *cpu_create(void);
+
+/**
+ * @brief Frees the memory associated with the given CPU, including the underlying address space.
+ * 
+ * @param cpu The CPU to destroy.
+ */
+void cpu_destroy(cpu_t *cpu);
 
 /**
  * @brief Fetches the next instruction from memory without advancing the program counter.
  * 
- * @param frame The CPU's state.
- * @param as The CPU's address space.
+ * @param cpu The CPU's state.
  * @return A pointer to the next instruction.
  */
-uint8_t *fetch(const tframe_t *frame, const addrspace_t *as);
+uint8_t *cpu_fetch(const cpu_t *cpu);
 
 /**
  * @brief Decodes the given instruction.
@@ -166,15 +191,14 @@ uint8_t *fetch(const tframe_t *frame, const addrspace_t *as);
  * @param insptr The instruction pointer.
  * @return A struct containing the decoded instruction.
  */
-operation_t decode(const uint8_t *insptr);
+operation_t cpu_decode(const uint8_t *insptr);
 
 /**
  * @brief Executes an instruction. Advances the program counter after the instruction has been executed.
  * 
- * @param frame The CPU's state.
- * @param as The CPU's address space.
+ * @param cpu The CPU's state.
  * @param op The instruction to execute.
  */
-void execute(tframe_t *frame, const addrspace_t *as, operation_t op);
+void cpu_execute(cpu_t *cpu, operation_t op);
 
 #endif

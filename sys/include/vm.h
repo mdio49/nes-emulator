@@ -54,6 +54,20 @@ typedef struct addrspace {
 } addrspace_t;
 
 /**
+ * @brief Creates an empty address space.
+ * 
+ * @return The resultant address space.
+ */
+addrspace_t *as_create();
+
+/**
+ * @brief Destroys the given address space. Does not free any underlying memory that this address space references.
+ * 
+ * @param as The address space to destroy.
+ */
+void as_destroy(addrspace_t *as);
+
+/**
  * @brief Maps a virtual address from the given address space into a "physical" memory location.
  * 
  * @param as The address space.

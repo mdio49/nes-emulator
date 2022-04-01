@@ -13,7 +13,7 @@ test: test.o
 test.o: test.c main.o
 	$(CC) $(CFLAGS) -c test.c
 
-main.o: main.c cpu.o
+main.o: main.c cpu.o prog.o
 	$(CC) $(CFLAGS) -c main.c
 
 cpu.o: sys/cpu/*.c memory.o
@@ -21,6 +21,9 @@ cpu.o: sys/cpu/*.c memory.o
 
 memory.o: sys/memory/*.c
 	$(CC) $(CFLAGS) -c sys/memory/*.c
+
+prog.o: sys/prog/*.c
+	$(CC) $(CFLAGS) -c sys/prog/*.c
 
 clean:
 	rm *.o *.exe -rf

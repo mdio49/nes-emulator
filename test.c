@@ -10,15 +10,8 @@ void test_compare(tframe_t *frame, const addrspace_t *as, uint8_t *reg, const in
 void test_branch(tframe_t *frame, const addrspace_t *as, const instruction_t *branch, uint8_t mask, unsigned int true_val);
 
 int main() {
-    // Setup CPU.
-    tframe_t frame = { 0 };
-    uint8_t memory[MEM_SIZE] = { 0 };
-    addrspace_t as = { memory };
-    frame.sr.flags.ign = 1;
-    frame.sp = 0xFF;
-
-    test_instructions(&frame, &as);
-
+    cpu_t *cpu = cpu_create();
+    test_instructions(&cpu->frame, cpu->as);
     printf("All tests passed successfully!\n");
 }
 
@@ -735,8 +728,8 @@ void test_instructions(tframe_t *frame, const addrspace_t *as) {
      */
 
     tframe_t prev = *frame;
-    uint8_t oldmem[MEM_SIZE];
-    for (int i = 0; i < MEM_SIZE; i++) {
+    uint8_t oldmem[UINT16_MAX];
+    for (int i = 0; i < UINT16_MAX; i++) {
         oldmem[i] = *vaddr_to_ptr(as, i);
     }
 
@@ -748,7 +741,7 @@ void test_instructions(tframe_t *frame, const addrspace_t *as) {
     assert(prev.sp == frame->sp);
     assert(prev.x == frame->x);
     assert(prev.y == frame->y);
-    for (int i = 0; i < MEM_SIZE; i++) {
+    for (int i = 0; i < UINT16_MAX; i++) {
         assert(oldmem[i] == *vaddr_to_ptr(as, i));
     }
 }

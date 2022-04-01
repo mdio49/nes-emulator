@@ -36,17 +36,17 @@ static const vaddr_ptr_pair_t addrm_zpgy(const tframe_t *frame, const addrspace_
 }
 
 static const vaddr_ptr_pair_t addrm_abs(const tframe_t *frame, const addrspace_t *as, const uint8_t *args) {
-    addr_t addr = word(args[0], args[1]);
+    addr_t addr = bytes_to_word(args[0], args[1]);
     return pair_from_vaddr(as, addr);
 }
 
 static const vaddr_ptr_pair_t addrm_absx(const tframe_t *frame, const addrspace_t *as, const uint8_t *args) {
-    addr_t addr = word(args[0], args[1]) + frame->x;
+    addr_t addr = bytes_to_word(args[0], args[1]) + frame->x;
     return pair_from_vaddr(as, addr);
 }
 
 static const vaddr_ptr_pair_t addrm_absy(const tframe_t *frame, const addrspace_t *as, const uint8_t *args) {
-    addr_t addr = word(args[0], args[1]) + frame->y;
+    addr_t addr = bytes_to_word(args[0], args[1]) + frame->y;
     return pair_from_vaddr(as, addr);
 }
 
@@ -56,10 +56,10 @@ static const vaddr_ptr_pair_t addrm_rel(const tframe_t *frame, const addrspace_t
 }
 
 static const vaddr_ptr_pair_t addrm_ind(const tframe_t *frame, const addrspace_t *as, const uint8_t *args) {
-    uint16_t addr = word(args[0], args[1]);
+    uint16_t addr = bytes_to_word(args[0], args[1]);
     uint8_t *low = vaddr_to_ptr(as, addr);
     uint8_t *high = vaddr_to_ptr(as, addr+1);
-    addr_t target = word(*low, *high);
+    addr_t target = bytes_to_word(*low, *high);
     return pair_from_vaddr(as, target);
 }
 

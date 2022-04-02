@@ -28,30 +28,11 @@ typedef struct vaddr_ptr_pair {
 
 } vaddr_ptr_pair_t;
 
-/**
- * @brief A range of virtual memory that maps to an emulator virtual address.
- */
-typedef struct addrange {
-    
-    addr_t      start;              // The start of the address range.
-    addr_t      end;                // The end of the address range.
-
-    uint8_t (*map)(addr_t vaaddr);  // The function that maps a virtual address in this address range to an actual value in the emulator's memory.
-
-} addrange_t;
 
 /**
  * @brief An area of addressable memory that maps a virtual memory address to a "physical" memory location (i.e. am emulator virtual memory address).
  */
-typedef struct addrspace {
-
-#ifdef DUMB_VM
-    uint8_t     *mem;               // Simplest case, we have one pointer of contiguous memory.
-#else
-    // TODO
-#endif
-
-} addrspace_t;
+typedef struct addrspace addrspace_t;
 
 /**
  * @brief Creates an empty address space.
@@ -59,6 +40,26 @@ typedef struct addrspace {
  * @return The resultant address space.
  */
 addrspace_t *as_create();
+
+/**
+ * @brief Adds a segment of memory to the given address space.
+ * 
+ * @param as The address space to modify.
+ * @param start The start address.
+ * @param size The size of the segment.
+ * @param target The target memory that the segment points to.
+ */
+void as_add_segment(addrspace_t *as, addr_t start, size_t size, uint8_t *target);
+
+/**
+ * @brief Traverses the address space, placing any memory found into a new array.
+ * 
+ * @param as The address space to traverse.
+ * @param start The virtual address to start at.
+ * @param nbytes The number of bytes to traverse.
+ * @return An array corresponding to each byte of the traversal.
+ */
+uint8_t *as_traverse(addrspace_t *as, addr_t start, size_t nbytes);
 
 /**
  * @brief Destroys the given address space. Does not free any underlying memory that this address space references.

@@ -3,18 +3,11 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "vm.h"
+#include <vm.h>
 
 #define PAGE_MASK       0x00FF
 #define PAGE_SIZE       0x0100
 #define WMEM_SIZE       0x0800
-
-#define AS_CPU          0x0000
-#define AS_IO           0x2000
-#define AS_EXP          0x4020
-#define AS_SAVE         0x6000
-#define AS_PROG         0x8000
-
 #define STACK_START     0x0100
 
 #define SR_CARRY        0x01
@@ -68,6 +61,9 @@ typedef struct cpu {
     addrspace_t     *as;        // The CPU's address space.
     uint8_t         *wmem;      // The CPU's working memory.
     uint8_t         *stack;     // A pointer to the bottom of the stack (increment by stack pointer register to get current value in stack).
+
+    uint8_t         ppu_reg[8];         // PPU registers (stored here until PPU is implemented).
+    uint8_t         apu_io_reg[32];     // APU and I/O registers (stored here until implemented).
 
 } cpu_t;
 
@@ -136,9 +132,9 @@ typedef union opcode_converter {
  */
 typedef struct operation {
 
-    const addrmode_t      *addr_mode;     // The address mode to use.
-    const instruction_t   *instruction;   // The instruction to execute.
-    const uint8_t         *args;          // The arguments of the instruction.
+    const addrmode_t        *addr_mode;         // The address mode to use.
+    const instruction_t     *instruction;       // The instruction to execute.
+    uint8_t                 args[2];            // The arguments of the instruction (may be up to 2).
 
 } operation_t;
 
@@ -199,10 +195,11 @@ uint8_t *cpu_fetch(const cpu_t *cpu);
 /**
  * @brief Decodes the given instruction.
  * 
+ * @param cpu The CPU's state.
  * @param insptr The instruction pointer.
  * @return A struct containing the decoded instruction.
  */
-operation_t cpu_decode(const uint8_t *insptr);
+operation_t cpu_decode(const cpu_t *cpu, const uint8_t *insptr);
 
 /**
  * @brief Executes an instruction. Advances the program counter after the instruction has been executed.

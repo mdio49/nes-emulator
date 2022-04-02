@@ -19,7 +19,7 @@ cpu_t *cpu_create(void) {
     cpu->frame.y = 0;
 
     // Setup memory.
-    cpu->wmem = malloc(sizeof(uint8_t) * UINT16_MAX);
+    cpu->wmem = malloc(sizeof(uint8_t) * WMEM_SIZE);
 
     // Setup stack.
     cpu->frame.sp = 0xFF;
@@ -27,7 +27,13 @@ cpu_t *cpu_create(void) {
 
     // Setup address space.
     cpu->as = as_create();
-    cpu->as->mem = cpu->wmem;
+    for (int i = 0; i < 4; i++) {
+        as_add_segment(cpu->as, i * WMEM_SIZE, WMEM_SIZE, cpu->wmem);
+    }
+    for (int i = 0x2000; i < 0x4000; i += 8) {
+        as_add_segment(cpu->as, i, 8, cpu->ppu_reg);
+    }
+    as_add_segment(cpu->as, 0x4000, 0x0020, cpu->apu_io_reg);
 
     return cpu;
 }
@@ -53,10 +59,9 @@ uint8_t *cpu_fetch(const cpu_t *cpu) {
     return vaddr_to_ptr(cpu->as, cpu->frame.pc);
 }
 
-operation_t cpu_decode(const uint8_t *insptr) {
+operation_t cpu_decode(const cpu_t *cpu, const uint8_t *insptr) {
     // Get the opcode and args from the instruction pointer.
     const uint8_t opc = *insptr;
-    const uint8_t *args = insptr + 1;
 
     // Convert the raw data into an opcode_t.
     opcode_converter_t decoder;
@@ -66,7 +71,10 @@ operation_t cpu_decode(const uint8_t *insptr) {
     operation_t result;
     result.instruction = get_instruction(decoder.opcode);
     result.addr_mode = get_address_mode(decoder.opcode);
-    result.args = args;
+
+    // Get the arguments.
+    result.args[0] = *vaddr_to_ptr(cpu->as, cpu->frame.pc + 1);
+    result.args[1] = *vaddr_to_ptr(cpu->as, cpu->frame.pc + 2);
 
     // If the instruction is invalid, then print an error and terminate.
     if (result.instruction == NULL) {

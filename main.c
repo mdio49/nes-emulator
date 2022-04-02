@@ -50,13 +50,19 @@ void exit_handler() {
         return;
 
     // Print history.
-    printf("----------\n");
+    bool printed_top = false;
     for (int i = 0; i < HIST_LEN; i++) {
         if (history[i].instruction != NULL) {
+            if (!printed_top) {
+                printf("----------\n");
+                printed_top = true;
+            }
             print_ins(history[i]);
         }
     }
-    printf("----------\n");
+    if (printed_top) {
+        printf("----------\n");
+    }
 
     // Dump state.
     printf("pc: $%.4x, a: %d. x: %d, y: %d, sp: $%.2x, sr: ", cpu->frame.pc, cpu->frame.ac, cpu->frame.x, cpu->frame.y, cpu->frame.sp);
@@ -86,15 +92,6 @@ void keyboard_interupt_handler(int signum) {
         else if (strprefix(buffer, "quit")) {
             exit(0);
         }
-        else if (strprefix(buffer, "print")) {
-            char c;
-            int i = 0x6004;
-            while ((c = *vaddr_to_ptr(cpu->as, i)) != '\0') {
-                putchar(c);
-                i++;
-            }
-            putchar('\n');
-        }
         else if (strprefix(buffer, "resume")) {
             interrupted = false;
         }
@@ -118,17 +115,20 @@ void run_bin(const char *path) {
         exit(1);
     }
 
-    // Load the ROM into memory.
-    for (int i = 0; i < prog->header.prg_rom_size * INES_PRG_ROM_UNIT; i++) {
-        *vaddr_to_ptr(cpu->as, i + AS_PROG) = prog->prg_rom[i];
-    }
+    // Setup address space for program.
+    uint8_t mapper[0x1FE0];
+    uint8_t prg_ram[0x2000];
+    as_add_segment(cpu->as, 0x4020, 0x1FE0, mapper);
+    as_add_segment(cpu->as, 0x6000, 0x2000, prg_ram);
+    as_add_segment(cpu->as, 0x8000, 0x4000, (uint8_t*)prog->prg_rom);
+    as_add_segment(cpu->as, 0xC000, 0x4000, (uint8_t*)prog->prg_rom + 0x4000);
 
     // Execute program.
     cpu_reset(cpu);
     while (true) {
         while (interrupted) { }
         uint8_t *insptr = cpu_fetch(cpu);
-        operation_t ins = cpu_decode(insptr);
+        operation_t ins = cpu_decode(cpu, insptr);
         printf("$%.4x: ", cpu->frame.pc);
         print_ins(ins);
         cpu_execute(cpu, ins);
@@ -147,10 +147,13 @@ void run_test(const char *path) {
         exit(1);
     }
 
-    // Load the ROM into memory.
-    for (int i = 0; i < prog->header.prg_rom_size * INES_PRG_ROM_UNIT; i++) {
-        *vaddr_to_ptr(cpu->as, i + AS_PROG) = prog->prg_rom[i];
-    }
+    // Setup address space for program.
+    uint8_t mapper[0x1FE0];
+    uint8_t prg_ram[0x2000];
+    as_add_segment(cpu->as, 0x4020, 0x1FE0, mapper);
+    as_add_segment(cpu->as, 0x6000, 0x2000, prg_ram);
+    as_add_segment(cpu->as, 0x8000, 0x4000, (uint8_t*)prog->prg_rom);
+    as_add_segment(cpu->as, 0xC000, 0x4000, (uint8_t*)prog->prg_rom + 0x4000);
 
     // Execute program.
     int msg_ptr = 0x6004;
@@ -158,7 +161,7 @@ void run_test(const char *path) {
     while (true) {
         // Execute the next instruction.
         uint8_t *insptr = cpu_fetch(cpu);
-        operation_t ins = cpu_decode(insptr);
+        operation_t ins = cpu_decode(cpu, insptr);
         cpu_execute(cpu, ins);
 
         // Update history.
@@ -166,7 +169,7 @@ void run_test(const char *path) {
             history[i] = history[i + 1];
         }
         history[HIST_LEN - 1] = ins;
-
+        
         // Display a message if available.
         char *msg = (char *)vaddr_to_ptr(cpu->as, msg_ptr);
         if (*msg != '\0') {
@@ -177,21 +180,33 @@ void run_test(const char *path) {
 }
 
 void run_hex(int argc, char *bytes[]) {
+    // Starting address; consistent with easy 6502.
+    const addr_t start = 0x0600;
+
+    // Setup an address space that uses a single 64KB segment.
+    uint8_t mem[65536];
+    addrspace_t *as = as_create();
+    as_add_segment(as, 0, 65536, mem);
+    cpu->as = as;
+
     // Load program from input.
     for (int i = 0; i < argc; i++) {
-        *vaddr_to_ptr(cpu->as, AS_PROG + i) = strtol(bytes[i], NULL, 16);
+        *vaddr_to_ptr(cpu->as, start + i) = strtol(bytes[i], NULL, 16);
     }
 
     // Execute program.
-    cpu->frame.pc = AS_PROG;
+    addr_t prev_pc = 0;
+    cpu->frame.pc = start;
     while (cpu->frame.sr.flags.brk == 0) {
+        prev_pc = cpu->frame.pc;
         uint8_t *insptr = cpu_fetch(cpu);
-        operation_t ins = cpu_decode(insptr);
+        operation_t ins = cpu_decode(cpu, insptr);
         printf("$%.4x: ", cpu->frame.pc);
         print_ins(ins);
         cpu_execute(cpu, ins);
     }
 
+    cpu->frame.pc = prev_pc + 1;
     printf("Program halted.\n");
 }
 

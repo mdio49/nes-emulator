@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 void test_address_modes(tframe_t *frame);
-void test_instructions(tframe_t *frame, const addrspace_t *as);
+void test_instructions(tframe_t *frame);
 
 void test_load_store(tframe_t *frame, const addrspace_t *as, uint8_t *reg, const instruction_t *load, const instruction_t *store);
 void test_inc_dec(tframe_t *frame, const addrspace_t *as, uint8_t *value, const instruction_t *inc, const instruction_t *dec);
@@ -12,9 +12,9 @@ void test_compare(tframe_t *frame, const addrspace_t *as, uint8_t *reg, const in
 void test_branch(tframe_t *frame, const addrspace_t *as, const instruction_t *branch, uint8_t mask, unsigned int true_val);
 
 int main() {
-    cpu_t *cpu = cpu_create();
-    test_address_modes(&cpu->frame);
-    test_instructions(&cpu->frame, cpu->as);
+    tframe_t frame;
+    test_address_modes(&frame);
+    test_instructions(&frame);
     printf("All tests passed successfully!\n");
 }
 
@@ -22,9 +22,9 @@ void test_address_modes(tframe_t *frame) {
     uint8_t args[3];
     uint8_t mem[1024];
 
-    // Set up a very simple address space.
+    // Set up a very simple 1KB address space.
     addrspace_t *as = as_create();
-    as->mem = mem;
+    as_add_segment(as, 0, 1024, mem);
 
     // Immediate.
     args[0] = 0xFF;
@@ -85,10 +85,17 @@ void test_address_modes(tframe_t *frame) {
     mem[0x010C] = 0xAF;
     assert(*AM_INDIRECT.evaluate(frame, as, args).ptr == 0xAF);
     assert(AM_INDIRECT.evaluate(frame, as, args).vaddr == 0x010C);
+
+    as_destroy(as);
 }
 
-void test_instructions(tframe_t *frame, const addrspace_t *as) {
+void test_instructions(tframe_t *frame) {
     uint8_t value;
+    uint8_t mem[65536];
+
+    // Set up a simple address space that uses a single 64KB segment.
+    addrspace_t *as = as_create();
+    as_add_segment(as, 0, 65536, mem);
 
     /**
      * Test load store.
@@ -770,7 +777,7 @@ void test_instructions(tframe_t *frame, const addrspace_t *as) {
      * Test jumps and subroutines.
      */
 
-    const uint16_t pc_start = AS_PROG;
+    const uint16_t pc_start = 1024;
     const uint16_t pc_target = pc_start + 500;
 
     frame->pc = pc_start;
@@ -816,6 +823,8 @@ void test_instructions(tframe_t *frame, const addrspace_t *as) {
     for (int i = 0; i < UINT16_MAX; i++) {
         assert(oldmem[i] == *vaddr_to_ptr(as, i));
     }
+
+    as_destroy(as);
 }
 
 void test_load_store(tframe_t *frame, const addrspace_t *as, uint8_t *reg, const instruction_t *load, const instruction_t *store) {
@@ -986,19 +995,20 @@ void test_compare(tframe_t *frame, const addrspace_t *as, uint8_t *reg, const in
 }
 
 void test_branch(tframe_t *frame, const addrspace_t *as, const instruction_t *branch, uint8_t mask, unsigned int true_val) {
-    addr_t target = AS_PROG + 5;
-    frame->pc = AS_PROG;
+    addr_t start = 1024;
+    addr_t target = start + 5;
+    frame->pc = start;
 
     frame->sr.bits = !true_val ? mask : 0x00;
     branch->apply(frame, as, target, NULL);
-    assert(frame->pc == AS_PROG);
+    assert(frame->pc == start);
 
     frame->sr.bits = true_val ? mask : 0x00;
     branch->apply(frame, as, target, NULL);
     assert(frame->pc == target);
 
-    frame->pc = AS_PROG;
-    target = AS_PROG - 5;
+    frame->pc = start;
+    target = start - 5;
 
     frame->sr.bits = true_val ? mask : 0x00;
     branch->apply(frame, as, target, NULL);

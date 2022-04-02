@@ -1,5 +1,6 @@
 #include <instructions.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 /**
  * Helper functions.
@@ -357,50 +358,50 @@ const instruction_t INS_CPY = { "CPY", cmy_apply, false };
  * Conditional branch instructions.
  */
 
-static void branch(tframe_t *frame, int8_t offset, bool condition) {
+static void branch(tframe_t *frame, addr_t target, bool condition) {
     if (condition) {
-        frame->pc += offset;
+        frame->pc = target;
     }
 }
 
 // Branch on carry clear.
 static void bcc_apply(tframe_t *frame, const addrspace_t *as, addr_t addr, uint8_t *value) {
-    branch(frame, *value, frame->sr.flags.carry == 0);
+    branch(frame, addr, frame->sr.flags.carry == 0);
 }
 
 // Branch on carry set.
 static void bcs_apply(tframe_t *frame, const addrspace_t *as, addr_t addr, uint8_t *value) {
-    branch(frame, *value, frame->sr.flags.carry == 1);
+    branch(frame, addr, frame->sr.flags.carry == 1);
 }
 
 // Branch on result zero.
 static void beq_apply(tframe_t *frame, const addrspace_t *as, addr_t addr, uint8_t *value) {
-    branch(frame, *value, frame->sr.flags.zero == 1);
+    branch(frame, addr, frame->sr.flags.zero == 1);
 }
 
 // Branch on result minus (negative).
 static void bmi_apply(tframe_t *frame, const addrspace_t *as, addr_t addr, uint8_t *value) {
-    branch(frame, *value, frame->sr.flags.neg == 1);
+    branch(frame, addr, frame->sr.flags.neg == 1);
 }
 
 // Branch on result not zero.
 static void bne_apply(tframe_t *frame, const addrspace_t *as, addr_t addr, uint8_t *value) {
-    branch(frame, *value, frame->sr.flags.zero == 0);
+    branch(frame, addr, frame->sr.flags.zero == 0);
 }
 
 // Branch on result plus (positive).
 static void bpl_apply(tframe_t *frame, const addrspace_t *as, addr_t addr, uint8_t *value) {
-    branch(frame, *value, frame->sr.flags.neg == 0);
+    branch(frame, addr, frame->sr.flags.neg == 0);
 }
 
 // Branch on overflow clear.
 static void bvc_apply(tframe_t *frame, const addrspace_t *as, addr_t addr, uint8_t *value) {
-    branch(frame, *value, frame->sr.flags.vflow == 0);
+    branch(frame, addr, frame->sr.flags.vflow == 0);
 }
 
 // Branch on overflow set.
 static void bvs_apply(tframe_t *frame, const addrspace_t *as, addr_t addr, uint8_t *value) {
-    branch(frame, *value, frame->sr.flags.vflow == 1);
+    branch(frame, addr, frame->sr.flags.vflow == 1);
 }
 
 const instruction_t INS_BCC = { "BCC", bcc_apply, false };
@@ -438,9 +439,15 @@ const instruction_t INS_RTS = { "RTS", rts_apply, true };
  */
 
 static void brk_apply(tframe_t *frame, const addrspace_t *as, addr_t addr, uint8_t *value) {
+    // Push PC and status register.
     frame->sr.flags.brk = 1;
     push_word(frame, as, frame->pc + 2);
     push(frame, as, frame->sr.bits);
+
+    // Jump to interrupt handler.
+    uint8_t low = *vaddr_to_ptr(as, IRQ_VECTOR);
+    uint8_t high = *vaddr_to_ptr(as, IRQ_VECTOR + 1);
+    frame->pc = bytes_to_word(low, high);
 }
 
 static void rti_apply(tframe_t *frame, const addrspace_t *as, addr_t addr, uint8_t *value) {
@@ -448,7 +455,7 @@ static void rti_apply(tframe_t *frame, const addrspace_t *as, addr_t addr, uint8
     frame->pc = pull_word(frame, as);
 }
 
-const instruction_t INS_BRK = { "BRK", brk_apply, false };
+const instruction_t INS_BRK = { "BRK", brk_apply, true };
 const instruction_t INS_RTI = { "RTI", rti_apply, true };
 
 /**

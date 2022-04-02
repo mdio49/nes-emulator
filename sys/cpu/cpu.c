@@ -43,6 +43,12 @@ void cpu_destroy(cpu_t *cpu) {
     free(cpu);
 }
 
+void cpu_reset(cpu_t *cpu) {
+    uint8_t low = *vaddr_to_ptr(cpu->as, RES_VECTOR);
+    uint8_t high = *vaddr_to_ptr(cpu->as, RES_VECTOR + 1);
+    cpu->frame.pc = bytes_to_word(low, high);
+}
+
 uint8_t *cpu_fetch(const cpu_t *cpu) {
     return vaddr_to_ptr(cpu->as, cpu->frame.pc);
 }
@@ -64,7 +70,7 @@ operation_t cpu_decode(const uint8_t *insptr) {
 
     // If the instruction is invalid, then print an error and terminate.
     if (result.instruction == NULL) {
-        printf("Invalid instruction: %d. Program terminated.\n", decoder.raw);
+        printf("Invalid instruction: $%.2x. Program terminated.\n", decoder.raw);
         exit(1);
     }
 

@@ -26,6 +26,10 @@
 #define SR_OVERFLOW     0x40
 #define SR_NEGATIVE     0x80
 
+#define NMI_VECTOR      0xFFFA
+#define RES_VECTOR      0xFFFC
+#define IRQ_VECTOR      0xFFFE
+
 /**
  * @brief The flags for each bit in the status register.
  */
@@ -176,6 +180,13 @@ cpu_t *cpu_create(void);
  * @param cpu The CPU to destroy.
  */
 void cpu_destroy(cpu_t *cpu);
+
+/**
+ * @brief Invokes a RESET interrupt on the CPU (similar to pressing the reset button on the console).
+ * 
+ * @param cpu The CPU to reset.
+ */
+void cpu_reset(cpu_t *cpu);
 
 /**
  * @brief Fetches the next instruction from memory without advancing the program counter.

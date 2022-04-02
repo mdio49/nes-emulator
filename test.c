@@ -1,7 +1,9 @@
 #include <assert.h>
+#include <addrmodes.h>
 #include <instructions.h>
 #include <stdio.h>
 
+void test_address_modes(tframe_t *frame);
 void test_instructions(tframe_t *frame, const addrspace_t *as);
 
 void test_load_store(tframe_t *frame, const addrspace_t *as, uint8_t *reg, const instruction_t *load, const instruction_t *store);
@@ -11,8 +13,78 @@ void test_branch(tframe_t *frame, const addrspace_t *as, const instruction_t *br
 
 int main() {
     cpu_t *cpu = cpu_create();
+    test_address_modes(&cpu->frame);
     test_instructions(&cpu->frame, cpu->as);
     printf("All tests passed successfully!\n");
+}
+
+void test_address_modes(tframe_t *frame) {
+    uint8_t args[3];
+    uint8_t mem[1024];
+
+    // Set up a very simple address space.
+    addrspace_t *as = as_create();
+    as->mem = mem;
+
+    // Immediate.
+    args[0] = 0xFF;
+    assert(*AM_IMMEDIATE.evaluate(frame, as, args).ptr == 0xFF);
+
+    // Accumulator.
+    frame->ac = 0x04;
+    assert(*AM_ACCUMULATOR.evaluate(frame, as, args).ptr == 0x04);
+
+    // Zero page.
+    args[0] = 0x08;
+    mem[0x08] = 0x80;
+    assert(*AM_ZEROPAGE.evaluate(frame, as, args).ptr == 0x80);
+    assert(AM_ZEROPAGE.evaluate(frame, as, args).vaddr == 0x08);
+
+    // Zero page X.
+    args[0] = 0x08;
+    frame->x = 0x10;
+    frame->y = 0x00;
+    mem[0x18] = 0x40;
+    assert(*AM_ZEROPAGE_X.evaluate(frame, as, args).ptr == 0x40);
+    assert(AM_ZEROPAGE_X.evaluate(frame, as, args).vaddr == 0x18);
+
+    args[0] = 0xFF;
+    frame->x = 0x01;
+    frame->y = 0x00;
+    mem[0x00] = 0x02;
+    assert(*AM_ZEROPAGE_X.evaluate(frame, as, args).ptr == 0x02);
+    assert(AM_ZEROPAGE_X.evaluate(frame, as, args).vaddr == 0x00);
+
+    // Zero page Y.
+    args[0] = 0x08;
+    frame->x = 0x00;
+    frame->y = 0x10;
+    mem[0x18] = 0x20;
+    assert(*AM_ZEROPAGE_Y.evaluate(frame, as, args).ptr == 0x20);
+    assert(AM_ZEROPAGE_Y.evaluate(frame, as, args).vaddr == 0x18);
+
+    args[0] = 0xFF;
+    frame->x = 0x00;
+    frame->y = 0x01;
+    mem[0x00] = 0x04;
+    assert(*AM_ZEROPAGE_Y.evaluate(frame, as, args).ptr == 0x04);
+    assert(AM_ZEROPAGE_Y.evaluate(frame, as, args).vaddr == 0x00);
+
+    // Absolute.
+    args[0] = 0xFF;
+    args[1] = 0x01;
+    mem[0x01FF] = 0x05;
+    assert(*AM_ABSOLUTE.evaluate(frame, as, args).ptr == 0x05);
+    assert(AM_ABSOLUTE.evaluate(frame, as, args).vaddr == 0x01FF);
+
+    // Indirect.
+    args[0] = 0x10;
+    args[1] = 0x02;
+    mem[0x0210] = 0x0C;
+    mem[0x0211] = 0x01;
+    mem[0x010C] = 0xAF;
+    assert(*AM_INDIRECT.evaluate(frame, as, args).ptr == 0xAF);
+    assert(AM_INDIRECT.evaluate(frame, as, args).vaddr == 0x010C);
 }
 
 void test_instructions(tframe_t *frame, const addrspace_t *as) {
@@ -914,21 +986,21 @@ void test_compare(tframe_t *frame, const addrspace_t *as, uint8_t *reg, const in
 }
 
 void test_branch(tframe_t *frame, const addrspace_t *as, const instruction_t *branch, uint8_t mask, unsigned int true_val) {
-    uint8_t value = 5;
+    addr_t target = AS_PROG + 5;
     frame->pc = AS_PROG;
 
     frame->sr.bits = !true_val ? mask : 0x00;
-    branch->apply(frame, as, 0, &value);
+    branch->apply(frame, as, target, NULL);
     assert(frame->pc == AS_PROG);
 
     frame->sr.bits = true_val ? mask : 0x00;
-    branch->apply(frame, as, 0, &value);
-    assert(frame->pc == AS_PROG + 5);
+    branch->apply(frame, as, target, NULL);
+    assert(frame->pc == target);
 
     frame->pc = AS_PROG;
-    value = -5;
+    target = AS_PROG - 5;
 
     frame->sr.bits = true_val ? mask : 0x00;
-    branch->apply(frame, as, 0, &value);
-    assert(frame->pc == AS_PROG - 5);
+    branch->apply(frame, as, target, NULL);
+    assert(frame->pc == target);
 }

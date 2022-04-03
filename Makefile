@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -g -Wall -I sys/include
+CFLAGS = -g -Wall -I sys/include -g
 TARGET = emu
 MAIN = main.o test.o
 OBJECTS = $(filter-out $(MAIN), $(wildcard *.o))

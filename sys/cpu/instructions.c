@@ -17,14 +17,14 @@ static void transfer(tframe_t *frame, uint8_t *dest, uint8_t value) {
 }
 
 static void push(tframe_t *frame, const addrspace_t *as, uint8_t value) {
-    uint8_t *stack_ptr = vaddr_to_ptr(as, STACK_START + frame->sp);
+    uint8_t *stack_ptr = as_resolve(as, STACK_START + frame->sp);
     *stack_ptr = value;
     frame->sp--;
 }
 
 static uint8_t pull(tframe_t *frame, const addrspace_t *as) {
     frame->sp++;
-    uint8_t *value = vaddr_to_ptr(as, STACK_START + frame->sp);
+    uint8_t *value = as_resolve(as, STACK_START + frame->sp);
     update_sign_flags(frame, *value);
     return *value;
 }
@@ -49,7 +49,7 @@ static void store(const addrspace_t *as, addr_t addr, uint8_t *dest, uint8_t val
         *dest = value;
     }
     else {
-        uint8_t *ptr = vaddr_to_ptr(as, addr);
+        uint8_t *ptr = as_resolve(as, addr);
         *ptr = value;
     }
 }
@@ -445,8 +445,8 @@ static void brk_apply(tframe_t *frame, const addrspace_t *as, addr_t addr, uint8
     push(frame, as, frame->sr.bits);
 
     // Jump to interrupt handler.
-    uint8_t low = *vaddr_to_ptr(as, IRQ_VECTOR);
-    uint8_t high = *vaddr_to_ptr(as, IRQ_VECTOR + 1);
+    uint8_t low = *as_resolve(as, IRQ_VECTOR);
+    uint8_t high = *as_resolve(as, IRQ_VECTOR + 1);
     frame->pc = bytes_to_word(low, high);
 }
 

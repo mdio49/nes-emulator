@@ -3,6 +3,7 @@
 #include <instructions.h>
 #include <stdio.h>
 
+void test_virtual_memory(void);
 void test_address_modes(tframe_t *frame);
 void test_instructions(tframe_t *frame);
 
@@ -13,9 +14,74 @@ void test_branch(tframe_t *frame, const addrspace_t *as, const instruction_t *br
 
 int main() {
     tframe_t frame;
+    test_virtual_memory();
     test_address_modes(&frame);
     test_instructions(&frame);
     printf("All tests passed successfully!\n");
+}
+
+void test_virtual_memory() {
+    addrspace_t *as;
+
+    uint8_t a[1024] = { 0 };
+    uint8_t b[512] = { 0 };
+    //uint8_t c[512] = { 0 };
+
+    /* Test a single segment of memory. */
+    as = as_create();
+    as_add_segment(as, 256, 1024, a);
+
+    a[0] = 5;
+    a[100] = 40;
+    a[500] = 90;
+    a[1023] = 100;
+
+    assert(*as_resolve(as, 256) == 5);
+    assert(*as_resolve(as, 256 + 100) == 40);
+    assert(*as_resolve(as, 256 + 500) == 90);
+    assert(*as_resolve(as, 256 + 1023) == 100);
+
+    *as_resolve(as, 256 + 10) = 10;
+    *as_resolve(as, 256 + 900) = 20;
+    *as_resolve(as, 256 + 1023) = 30;
+
+    assert(a[10] == 10);
+    assert(a[900] == 20);
+    assert(a[1023] == 30);
+
+    /* Now add another segmnet before and after. */
+    as_add_segment(as, 0, 256, b);
+    as_add_segment(as, 1280, 256, b + 256);
+
+    b[0] = 1;
+    b[64] = 2;
+    b[255] = 3;
+    b[256] = 4;
+    b[400] = 5;
+    b[511] = 6;
+
+    assert(*as_resolve(as, 0) == 1);
+    assert(*as_resolve(as, 64) == 2);
+    assert(*as_resolve(as, 255) == 3);
+    assert(*as_resolve(as, 1280) == 4);
+    assert(*as_resolve(as, 1280 + 144) == 5);
+    assert(*as_resolve(as, 1280 + 255) == 6);
+
+    *as_resolve(as, 10) = 7;
+    *as_resolve(as, 100) = 8;
+    *as_resolve(as, 255) = 9;
+    *as_resolve(as, 1280) = 10;
+    *as_resolve(as, 1280 + 94) = 11;
+    *as_resolve(as, 1280 + 255) = 12;
+
+    assert(b[10] == 7);
+    assert(b[100] == 8);
+    assert(b[255] == 9);
+    assert(b[256] == 10);
+    assert(b[350] == 11);
+    assert(b[511] == 12);
+
+    as_destroy(as);
 }
 
 void test_address_modes(tframe_t *frame) {
@@ -807,9 +873,9 @@ void test_instructions(tframe_t *frame) {
      */
 
     tframe_t prev = *frame;
-    uint8_t oldmem[UINT16_MAX];
-    for (int i = 0; i < UINT16_MAX; i++) {
-        oldmem[i] = *vaddr_to_ptr(as, i);
+    uint8_t oldmem[65536];
+    for (int i = 0; i < 65536; i++) {
+        oldmem[i] = *as_resolve(as, i);
     }
 
     INS_NOP.apply(frame, as, 0, NULL);
@@ -820,8 +886,8 @@ void test_instructions(tframe_t *frame) {
     assert(prev.sp == frame->sp);
     assert(prev.x == frame->x);
     assert(prev.y == frame->y);
-    for (int i = 0; i < UINT16_MAX; i++) {
-        assert(oldmem[i] == *vaddr_to_ptr(as, i));
+    for (int i = 0; i < 65536; i++) {
+        assert(oldmem[i] == *as_resolve(as, i));
     }
 
     as_destroy(as);
@@ -843,7 +909,7 @@ void test_load_store(tframe_t *frame, const addrspace_t *as, uint8_t *reg, const
     assert(frame->sr.flags.zero == 0);
 
     store->apply(frame, as, 0x20, NULL);
-    assert(*vaddr_to_ptr(as, 0x20) == 0x05);
+    assert(*as_resolve(as, 0x20) == 0x05);
 
     value = 0xF9;
     load->apply(frame, as, 0x20, &value);
@@ -852,7 +918,7 @@ void test_load_store(tframe_t *frame, const addrspace_t *as, uint8_t *reg, const
     assert(frame->sr.flags.zero == 0);
 
     store->apply(frame, as, 0x21, NULL);
-    assert(*vaddr_to_ptr(as, 0x21) == 0xF9);
+    assert(*as_resolve(as, 0x21) == 0xF9);
 }
 
 void test_inc_dec(tframe_t *frame, const addrspace_t *as, uint8_t *value, const instruction_t *inc, const instruction_t *dec) {

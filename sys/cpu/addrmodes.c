@@ -6,7 +6,7 @@ static const vaddr_ptr_pair_t vaddr_ptr_pair(const addr_t vaddr, const uint8_t *
 }
 
 static vaddr_ptr_pair_t pair_from_vaddr(const addrspace_t *as, const addr_t addr) {
-    return vaddr_ptr_pair(addr, vaddr_to_ptr(as, addr));
+    return vaddr_ptr_pair(addr, as_resolve(as, addr));
 }
 
 static const vaddr_ptr_pair_t addrm_impl(const tframe_t *frame, const addrspace_t *as, const uint8_t *args) {
@@ -57,8 +57,8 @@ static const vaddr_ptr_pair_t addrm_rel(const tframe_t *frame, const addrspace_t
 
 static const vaddr_ptr_pair_t addrm_ind(const tframe_t *frame, const addrspace_t *as, const uint8_t *args) {
     uint16_t addr = bytes_to_word(args[0], args[1]);
-    uint8_t *low = vaddr_to_ptr(as, addr);
-    uint8_t *high = vaddr_to_ptr(as, addr+1);
+    uint8_t *low = as_resolve(as, addr);
+    uint8_t *high = as_resolve(as, addr + 1);
     addr_t target = bytes_to_word(*low, *high);
     return pair_from_vaddr(as, target);
 }

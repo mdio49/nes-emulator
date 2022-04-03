@@ -1,8 +1,6 @@
 #ifndef VM_H
 #define VM_H
 
-#define DUMB_VM 1
-
 #include <stdint.h>
 
 /**
@@ -28,9 +26,9 @@ typedef struct vaddr_ptr_pair {
 
 } vaddr_ptr_pair_t;
 
-
 /**
- * @brief An area of addressable memory that maps a virtual memory address to a "physical" memory location (i.e. am emulator virtual memory address).
+ * @brief An area of addressable memory that maps a virtual memory address to a "physical" memory
+ * location (i.e. am emulator virtual memory address).
  */
 typedef struct addrspace addrspace_t;
 
@@ -42,7 +40,8 @@ typedef struct addrspace addrspace_t;
 addrspace_t *as_create();
 
 /**
- * @brief Adds a segment of memory to the given address space.
+ * @brief Adds a segment of memory to the given address space. If the segment overlaps with any
+ * existing segments, then those segments will be resized in order to fit the new segment.
  * 
  * @param as The address space to modify.
  * @param start The start address.
@@ -52,7 +51,19 @@ addrspace_t *as_create();
 void as_add_segment(addrspace_t *as, addr_t start, size_t size, uint8_t *target);
 
 /**
- * @brief Traverses the address space, placing any memory found into a new array.
+ * @brief Resolves a virtual address from the given address space into a "physical" memory location. 
+ * If the address space does not have a segment that contains the given virtual address, then this
+ * method will produce a segmentation error.
+ * 
+ * @param as The address space.
+ * @param vaddr The virtual address.
+ * @return A pointer that corresponds to the mapped location of the virtual address. 
+ */
+uint8_t *as_resolve(const addrspace_t *as, addr_t vaddr);
+
+/**
+ * @brief Traverses the address space, copying any memory found into a new array. Any memory that is
+ * not present in the address space will not be filled into the array.
  * 
  * @param as The address space to traverse.
  * @param start The virtual address to start at.
@@ -67,14 +78,5 @@ uint8_t *as_traverse(addrspace_t *as, addr_t start, size_t nbytes);
  * @param as The address space to destroy.
  */
 void as_destroy(addrspace_t *as);
-
-/**
- * @brief Maps a virtual address from the given address space into a "physical" memory location.
- * 
- * @param as The address space.
- * @param vaddr The virtual address.
- * @return A pointer that corresponds to the mapped location of the virtual address.
- */
-uint8_t *vaddr_to_ptr(const addrspace_t *as, addr_t vaddr);
 
 #endif

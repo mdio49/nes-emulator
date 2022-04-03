@@ -171,7 +171,7 @@ void run_test(const char *path) {
         history[HIST_LEN - 1] = ins;
         
         // Display a message if available.
-        char *msg = (char *)vaddr_to_ptr(cpu->as, msg_ptr);
+        char *msg = (char *)as_resolve(cpu->as, msg_ptr);
         if (*msg != '\0') {
             printf("%s\n", msg);
             msg_ptr += strlen(msg);
@@ -191,7 +191,7 @@ void run_hex(int argc, char *bytes[]) {
 
     // Load program from input.
     for (int i = 0; i < argc; i++) {
-        *vaddr_to_ptr(cpu->as, start + i) = strtol(bytes[i], NULL, 16);
+        *as_resolve(cpu->as, start + i) = strtol(bytes[i], NULL, 16);
     }
 
     // Execute program.

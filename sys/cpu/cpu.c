@@ -50,13 +50,13 @@ void cpu_destroy(cpu_t *cpu) {
 }
 
 void cpu_reset(cpu_t *cpu) {
-    uint8_t low = *vaddr_to_ptr(cpu->as, RES_VECTOR);
-    uint8_t high = *vaddr_to_ptr(cpu->as, RES_VECTOR + 1);
+    uint8_t low = *as_resolve(cpu->as, RES_VECTOR);
+    uint8_t high = *as_resolve(cpu->as, RES_VECTOR + 1);
     cpu->frame.pc = bytes_to_word(low, high);
 }
 
 uint8_t *cpu_fetch(const cpu_t *cpu) {
-    return vaddr_to_ptr(cpu->as, cpu->frame.pc);
+    return as_resolve(cpu->as, cpu->frame.pc);
 }
 
 operation_t cpu_decode(const cpu_t *cpu, const uint8_t *insptr) {
@@ -73,8 +73,8 @@ operation_t cpu_decode(const cpu_t *cpu, const uint8_t *insptr) {
     result.addr_mode = get_address_mode(decoder.opcode);
 
     // Get the arguments.
-    result.args[0] = *vaddr_to_ptr(cpu->as, cpu->frame.pc + 1);
-    result.args[1] = *vaddr_to_ptr(cpu->as, cpu->frame.pc + 2);
+    result.args[0] = *as_resolve(cpu->as, cpu->frame.pc + 1);
+    result.args[1] = *as_resolve(cpu->as, cpu->frame.pc + 2);
 
     // If the instruction is invalid, then print an error and terminate.
     if (result.instruction == NULL) {

@@ -126,7 +126,7 @@ static void pha_apply(tframe_t *frame, const addrspace_t *as, addr_t addr, uint8
 }
 
 static void php_apply(tframe_t *frame, const addrspace_t *as, addr_t addr, uint8_t *value) {
-    push(frame, as, frame->sr.bits);
+    push(frame, as, frame->sr.bits | SR_BREAK | SR_IGNORED);
 }
 
 static void pla_apply(tframe_t *frame, const addrspace_t *as, addr_t addr, uint8_t *value) {
@@ -134,7 +134,9 @@ static void pla_apply(tframe_t *frame, const addrspace_t *as, addr_t addr, uint8
 }
 
 static void plp_apply(tframe_t *frame, const addrspace_t *as, addr_t addr, uint8_t *value) {
-    frame->sr.bits = pull(frame, as);
+    uint8_t bits = pull(frame, as);
+    uint8_t mask = SR_BREAK | SR_IGNORED;
+    frame->sr.bits = (bits & ~mask) | (frame->sr.bits & mask);
 }
 
 const instruction_t INS_PHA = { "PHA", pha_apply, false };

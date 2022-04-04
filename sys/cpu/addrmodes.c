@@ -65,14 +65,14 @@ static const vaddr_ptr_pair_t addrm_ind(const tframe_t *frame, const addrspace_t
 
 static const vaddr_ptr_pair_t addrm_indx(const tframe_t *frame, const addrspace_t *as, const uint8_t *args) {
     addr_t addr = addrm_zpgx(frame, as, args).vaddr;
-    uint8_t args1[2] = { addr & (1 << 7), addr >> 7 };
+    uint8_t args1[2] = { addr & 0xFF, addr >> 8 };
     return addrm_ind(frame, as, args1);
 }
 
 static const vaddr_ptr_pair_t addrm_indy(const tframe_t *frame, const addrspace_t *as, const uint8_t *args) {
     uint8_t args1[2] = { args[0], 0 };
     addr_t addr = addrm_ind(frame, as, args1).vaddr;
-    uint8_t args2[2] = { addr & (1 << 7), addr >> 7 };
+    uint8_t args2[2] = { addr & 0xFF, addr >> 8 };
     return addrm_absy(frame, as, args2);
 }
 
@@ -86,7 +86,7 @@ const addrmode_t AM_ZEROPAGE_Y = { addrm_zpgy, 1 };
 
 const addrmode_t AM_ABSOLUTE = { addrm_abs, 2 };
 const addrmode_t AM_ABSOLUTE_X = { addrm_absx, 2 };
-const addrmode_t AM_ABSOLUTE_Y = { addrm_absx, 2 };
+const addrmode_t AM_ABSOLUTE_Y = { addrm_absy, 2 };
 
 const addrmode_t AM_RELATIVE = { addrm_rel, 1 };
 

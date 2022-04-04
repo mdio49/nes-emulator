@@ -57,7 +57,7 @@ void exit_handler() {
         return;
 
     // Print history.
-    bool printed_top = false;
+    /*bool printed_top = false;
     for (int i = 0; i < HIST_LEN; i++) {
         if (history[i].op.instruction != NULL) {
             if (!printed_top) {
@@ -70,7 +70,7 @@ void exit_handler() {
     }
     if (printed_top) {
         printf("----------\n");
-    }
+    }*/
 
     // Memory dump (around PC).
     /*printf("$%.4x:", cpu->frame.pc - 7);
@@ -80,7 +80,7 @@ void exit_handler() {
     printf("\n");*/
 
     // Dump state.
-    printf("pc: $%.4x, a: %d. x: %d, y: %d, sp: $%.2x, sr: ", cpu->frame.pc, cpu->frame.ac, cpu->frame.x, cpu->frame.y, cpu->frame.sp);
+    /*printf("pc: $%.4x, a: %d. x: %d, y: %d, sp: $%.2x, sr: ", cpu->frame.pc, cpu->frame.ac, cpu->frame.x, cpu->frame.y, cpu->frame.sp);
     printf(cpu->frame.sr.flags.neg ? "n" : "-");
     printf(cpu->frame.sr.flags.vflow ? "v" : "-");
     printf(cpu->frame.sr.flags.ign ? "-" : "-");
@@ -88,7 +88,7 @@ void exit_handler() {
     printf(cpu->frame.sr.flags.dec ? "d" : "-");
     printf(cpu->frame.sr.flags.irq ? "i" : "-");
     printf(cpu->frame.sr.flags.zero ? "z" : "-");
-    printf(cpu->frame.sr.flags.carry ? "c" : "-");
+    printf(cpu->frame.sr.flags.carry ? "c" : "-");*/
 
     // Destroy CPU.
     cpu_destroy(cpu);
@@ -193,7 +193,7 @@ void run_test(const char *path) {
         // Display a message if available.
         char *msg = (char *)as_resolve(cpu->as, msg_ptr);
         if (*msg != '\0') {
-            printf("%s\n", msg);
+            printf("%s", msg);
             msg_ptr += strlen(msg);
         }
 
@@ -210,7 +210,7 @@ void run_test(const char *path) {
                     //cpu_reset(cpu);
                     break;
                 default:
-                    printf("Test completed with result code %d\n.", new_status);
+                    printf("Test completed with result code %d.\n", new_status);
                     break;
             }
             status = new_status;
@@ -247,6 +247,17 @@ void run_hex(int argc, char *bytes[]) {
 
     cpu->frame.pc = prev_pc + 1;
     printf("Program halted.\n");
+
+    // Dump state.
+    printf("pc: $%.4x, a: %d. x: %d, y: %d, sp: $%.2x, sr: ", cpu->frame.pc, cpu->frame.ac, cpu->frame.x, cpu->frame.y, cpu->frame.sp);
+    printf(cpu->frame.sr.flags.neg ? "n" : "-");
+    printf(cpu->frame.sr.flags.vflow ? "v" : "-");
+    printf(cpu->frame.sr.flags.ign ? "-" : "-");
+    printf(cpu->frame.sr.flags.brk ? "b" : "-");
+    printf(cpu->frame.sr.flags.dec ? "d" : "-");
+    printf(cpu->frame.sr.flags.irq ? "i" : "-");
+    printf(cpu->frame.sr.flags.zero ? "z" : "-");
+    printf(cpu->frame.sr.flags.carry ? "c" : "-");
 }
 
 const char *load_rom(const char *path) {

@@ -143,6 +143,24 @@ void test_address_modes(tframe_t *frame) {
     assert(*AM_ABSOLUTE.evaluate(frame, as, args).ptr == 0x05);
     assert(AM_ABSOLUTE.evaluate(frame, as, args).vaddr == 0x01FF);
 
+    // Absolute-X.
+    args[0] = 0x05;
+    args[1] = 0x01;
+    frame->x = 0x01;
+    frame->y = 0x00;
+    mem[0x0106] = 0x06;
+    assert(*AM_ABSOLUTE_X.evaluate(frame, as, args).ptr == 0x06);
+    assert(AM_ABSOLUTE_X.evaluate(frame, as, args).vaddr == 0x0106);
+
+    // Absolute-Y.
+    args[0] = 0x05;
+    args[1] = 0x01;
+    frame->x = 0x00;
+    frame->y = 0x03;
+    mem[0x0108] = 0x0A;
+    assert(*AM_ABSOLUTE_Y.evaluate(frame, as, args).ptr == 0x0A);
+    assert(AM_ABSOLUTE_Y.evaluate(frame, as, args).vaddr == 0x0108);
+
     // Indirect.
     args[0] = 0x10;
     args[1] = 0x02;
@@ -151,6 +169,35 @@ void test_address_modes(tframe_t *frame) {
     mem[0x010C] = 0xAF;
     assert(*AM_INDIRECT.evaluate(frame, as, args).ptr == 0xAF);
     assert(AM_INDIRECT.evaluate(frame, as, args).vaddr == 0x010C);
+
+    // Indirect-X.
+    args[0] = 0x10;
+    frame->x = 0x02;
+    frame->y = 0x00;
+    mem[0x12] = 0x0A;
+    mem[0x13] = 0x01;
+    mem[0x010A] = 0x0B;
+    assert(*AM_INDIRECT_X.evaluate(frame, as, args).ptr == 0x0B);
+    assert(AM_INDIRECT_X.evaluate(frame, as, args).vaddr == 0x010A);
+
+    args[0] = 0xFF;
+    frame->x = 0x01;
+    frame->y = 0x00;
+    mem[0x00] = 0x0B;
+    mem[0x01] = 0x02;
+    mem[0x020B] = 0x0C;
+    assert(*AM_INDIRECT_X.evaluate(frame, as, args).ptr == 0x0C);
+    assert(AM_INDIRECT_X.evaluate(frame, as, args).vaddr == 0x020B);
+
+    // Indirect-Y.
+    args[0] = 0x20;
+    frame->x = 0x00;
+    frame->y = 0x04;
+    mem[0x20] = 0x04;
+    mem[0x21] = 0x01;
+    mem[0x0108] = 0x0F;
+    assert(*AM_INDIRECT_Y.evaluate(frame, as, args).ptr == 0x0F);
+    assert(AM_INDIRECT_Y.evaluate(frame, as, args).vaddr == 0x0108);
 
     as_destroy(as);
 }

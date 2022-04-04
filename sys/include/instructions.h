@@ -97,4 +97,29 @@ extern const instruction_t INS_RTI;
 extern const instruction_t INS_BIT;
 extern const instruction_t INS_NOP;
 
+// Illegal instructions.
+
+extern const instruction_t INS_ALR;
+extern const instruction_t INS_ANC;
+extern const instruction_t INS_ANE;
+extern const instruction_t INS_ARR;
+extern const instruction_t INS_DCP;
+extern const instruction_t INS_ISC;
+extern const instruction_t INS_LAS;
+extern const instruction_t INS_LAX;
+extern const instruction_t INS_LXA;
+extern const instruction_t INS_RLA;
+extern const instruction_t INS_RRA;
+extern const instruction_t INS_SAX;
+extern const instruction_t INS_SBX;
+extern const instruction_t INS_SHA;
+extern const instruction_t INS_SHX;
+extern const instruction_t INS_SHY;
+extern const instruction_t INS_SLO;
+extern const instruction_t INS_SRE;
+extern const instruction_t INS_TAS;
+extern const instruction_t INS_USBC;
+extern const instruction_t INS_JAM;
+
+
 #endif

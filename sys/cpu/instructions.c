@@ -209,7 +209,7 @@ static void adc_apply(tframe_t *frame, const addrspace_t *as, addr_t addr, uint8
     update_sign_flags(frame, frame->ac);
 }
 
-static void sdc_apply(tframe_t *frame, const addrspace_t *as, addr_t addr, uint8_t *value) {
+static void sbc_apply(tframe_t *frame, const addrspace_t *as, addr_t addr, uint8_t *value) {
     uint8_t carry = frame->sr.flags.carry ^ 0x01;
     if (frame->sr.flags.dec == 0) {
         // Standard binary arithmetic.
@@ -230,7 +230,7 @@ static void sdc_apply(tframe_t *frame, const addrspace_t *as, addr_t addr, uint8
 }
 
 const instruction_t INS_ADC = { "ADC", adc_apply, false };
-const instruction_t INS_SBC = { "SBC", sdc_apply, false };
+const instruction_t INS_SBC = { "SBC", sbc_apply, false };
 
 /**
  * Logical operators.
@@ -475,3 +475,53 @@ static void nop_apply(tframe_t *frame, const addrspace_t *as, addr_t addr, uint8
 
 const instruction_t INS_BIT = { "BIT", bit_apply, false };
 const instruction_t INS_NOP = { "NOP", nop_apply, false };
+
+/**
+ * Illegal instructions.
+ */
+
+/*static void anc_apply(tframe_t *frame, const addrspace_t *as, addr_t addr, uint8_t *value) {
+    uint8_t result = frame->ac & *value;
+    frame->sr.flags.carry = ((result & 0x80) == 0x80);
+    update_sign_flags(frame, result);
+}
+
+static void isc_apply(tframe_t *frame, const addrspace_t *as, addr_t addr, uint8_t *value) {
+    inc_apply(frame, as, addr, value);
+    sbc_apply(frame, as, addr, value);
+}
+
+static void sha_apply(tframe_t *frame, const addrspace_t *as, addr_t addr, uint8_t *value) {
+    store(as, addr, value, frame->ac & frame->x & ((addr + 1) >> 8));
+}
+
+static void slo_apply(tframe_t *frame, const addrspace_t *as, addr_t addr, uint8_t *value) {
+    asl_apply(frame, as, addr, value);
+    ora_apply(frame, as, addr, value);
+}
+
+static void jam_apply(tframe_t *frame, const addrspace_t *as, addr_t addr, uint8_t *value) {
+    while (true) {}
+}*/
+
+const instruction_t INS_ALR = { "ALR", NULL, false };
+const instruction_t INS_ANC = { "ANC", NULL, false };
+const instruction_t INS_ANE = { "ANE", NULL, false };
+const instruction_t INS_ARR = { "ARR", NULL, false };
+const instruction_t INS_DCP = { "DCP", NULL, false };
+const instruction_t INS_ISC = { "ISC", NULL, false };
+const instruction_t INS_LAS = { "LAS", NULL, false };
+const instruction_t INS_LAX = { "LAX", NULL, false };
+const instruction_t INS_LXA = { "LXA", NULL, false };
+const instruction_t INS_RLA = { "RLA", NULL, false };
+const instruction_t INS_RRA = { "RRA", NULL, false };
+const instruction_t INS_SAX = { "SAX", NULL, false };
+const instruction_t INS_SBX = { "SBX", NULL, false };
+const instruction_t INS_SHA = { "SHA", NULL, false };
+const instruction_t INS_SHX = { "SHX", NULL, false };
+const instruction_t INS_SHY = { "SHY", NULL, false };
+const instruction_t INS_SLO = { "SLO", NULL, false };
+const instruction_t INS_SRE = { "SRE", NULL, false };
+const instruction_t INS_TAS = { "TAS", NULL, false };
+const instruction_t INS_USBC = { "USBC", NULL, false };
+const instruction_t INS_JAM = { "JAM", NULL, false };

@@ -9,6 +9,13 @@
 
 #define HIST_LEN 50
 
+typedef struct history {
+
+    operation_t     op;
+    uint16_t        pc;
+
+} history_t;
+
 void exit_handler(void);
 void keyboard_interupt_handler(int signum);
 
@@ -23,7 +30,7 @@ bool strprefix(const char *str, const char *pre);
 
 static cpu_t *cpu = NULL;
 static bool interrupted = false;
-static operation_t history[HIST_LEN] = { 0 };
+static history_t history[HIST_LEN] = { 0 };
 
 int main(int argc, char *argv[]) {
     // Setup signal handlers.
@@ -52,17 +59,25 @@ void exit_handler() {
     // Print history.
     bool printed_top = false;
     for (int i = 0; i < HIST_LEN; i++) {
-        if (history[i].instruction != NULL) {
+        if (history[i].op.instruction != NULL) {
             if (!printed_top) {
                 printf("----------\n");
                 printed_top = true;
             }
-            print_ins(history[i]);
+            printf("$%.4x: ", history[i].pc);
+            print_ins(history[i].op);
         }
     }
     if (printed_top) {
         printf("----------\n");
     }
+
+    // Memory dump (around PC).
+    /*printf("$%.4x:", cpu->frame.pc - 7);
+    for (int i = cpu->frame.pc - 7; i <= cpu->frame.pc + 8; i++) {
+        printf(" $%.2x", *as_resolve(cpu->as, i));
+    }
+    printf("\n");*/
 
     // Dump state.
     printf("pc: $%.4x, a: %d. x: %d, y: %d, sp: $%.2x, sr: ", cpu->frame.pc, cpu->frame.ac, cpu->frame.x, cpu->frame.y, cpu->frame.sp);
@@ -156,25 +171,49 @@ void run_test(const char *path) {
     as_add_segment(cpu->as, 0xC000, 0x4000, (uint8_t*)prog->prg_rom + 0x4000);
 
     // Execute program.
+    bool started = false;
+    int status = 0x00;
     int msg_ptr = 0x6004;
     cpu_reset(cpu);
-    while (true) {
-        // Execute the next instruction.
+    while (!started || status >= 0x80) {
+        // Fetch and decode the next instruction.
         uint8_t *insptr = cpu_fetch(cpu);
         operation_t ins = cpu_decode(cpu, insptr);
-        cpu_execute(cpu, ins);
 
         // Update history.
         for (int i = 0; i < HIST_LEN - 1; i++) {
             history[i] = history[i + 1];
         }
-        history[HIST_LEN - 1] = ins;
+        history[HIST_LEN - 1].pc = cpu->frame.pc;
+        history[HIST_LEN - 1].op = ins;
+
+        // Execute the instruction.
+        cpu_execute(cpu, ins);
         
         // Display a message if available.
         char *msg = (char *)as_resolve(cpu->as, msg_ptr);
         if (*msg != '\0') {
             printf("%s\n", msg);
             msg_ptr += strlen(msg);
+        }
+
+        // Update status of test.
+        int new_status = *as_resolve(cpu->as, 0x6000);
+        if (new_status != status) {
+            switch (new_status) {
+                case 0x80:
+                    printf("Test running...\n");
+                    started = true;
+                    break;
+                case 0x81:
+                    printf("Reset required.\n");
+                    //cpu_reset(cpu);
+                    break;
+                default:
+                    printf("Test completed with result code %d\n.", new_status);
+                    break;
+            }
+            status = new_status;
         }
     }
 }
@@ -263,7 +302,7 @@ void print_ins(operation_t ins) {
     else if (ins.addr_mode == &AM_INDIRECT_X) {
         printf(" ($%.2x,X)", ins.args[0]);
     }
-    else if (ins.addr_mode == &AM_INDIRECT_X) {
+    else if (ins.addr_mode == &AM_INDIRECT_Y) {
         printf(" ($%.2x),Y", ins.args[0]);
     }
     printf("\n");

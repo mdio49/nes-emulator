@@ -25,7 +25,10 @@ void run_test(const char *path);
 
 const char *load_rom(const char *path);
 
+void dump_state();
+void print_hist();
 void print_ins(operation_t ins);
+
 bool strprefix(const char *str, const char *pre);
 
 static cpu_t *cpu = NULL;
@@ -34,6 +37,7 @@ static history_t history[HIST_LEN] = { 0 };
 
 int main(int argc, char *argv[]) {
     // Setup signal handlers.
+    signal(SIGINT, keyboard_interupt_handler);
     atexit(exit_handler);
 
     // Setup CPU.
@@ -53,45 +57,10 @@ int main(int argc, char *argv[]) {
 }
 
 void exit_handler() {
-    if (cpu == NULL)
-        return;
-
-    // Print history.
-    /*bool printed_top = false;
-    for (int i = 0; i < HIST_LEN; i++) {
-        if (history[i].op.instruction != NULL) {
-            if (!printed_top) {
-                printf("----------\n");
-                printed_top = true;
-            }
-            printf("$%.4x: ", history[i].pc);
-            print_ins(history[i].op);
-        }
-    }
-    if (printed_top) {
-        printf("----------\n");
-    }*/
-
-    // Memory dump (around PC).
-    /*printf("$%.4x:", cpu->frame.pc - 7);
-    for (int i = cpu->frame.pc - 7; i <= cpu->frame.pc + 8; i++) {
-        printf(" $%.2x", *as_resolve(cpu->as, i));
-    }
-    printf("\n");*/
-
-    // Dump state.
-    /*printf("pc: $%.4x, a: %d. x: %d, y: %d, sp: $%.2x, sr: ", cpu->frame.pc, cpu->frame.ac, cpu->frame.x, cpu->frame.y, cpu->frame.sp);
-    printf(cpu->frame.sr.flags.neg ? "n" : "-");
-    printf(cpu->frame.sr.flags.vflow ? "v" : "-");
-    printf(cpu->frame.sr.flags.ign ? "-" : "-");
-    printf(cpu->frame.sr.flags.brk ? "b" : "-");
-    printf(cpu->frame.sr.flags.dec ? "d" : "-");
-    printf(cpu->frame.sr.flags.irq ? "i" : "-");
-    printf(cpu->frame.sr.flags.zero ? "z" : "-");
-    printf(cpu->frame.sr.flags.carry ? "c" : "-");*/
-
     // Destroy CPU.
-    cpu_destroy(cpu);
+    if (cpu != NULL) {
+        cpu_destroy(cpu);
+    }
 }
 
 void keyboard_interupt_handler(int signum) {
@@ -100,14 +69,20 @@ void keyboard_interupt_handler(int signum) {
     while (interrupted) {
         printf("> ");
         scanf("%49s", buffer);
-        if (strprefix(buffer, "reset")) {
+        if (strcmp(buffer, "reset") == 0) {
             cpu_reset(cpu);
             interrupted = false;
         }
-        else if (strprefix(buffer, "quit")) {
+        else if (strcmp(buffer, "quit") == 0) {
             exit(0);
         }
-        else if (strprefix(buffer, "resume")) {
+        else if (strcmp(buffer, "history") == 0) {
+            print_hist(history, HIST_LEN);
+        }
+        else if (strcmp(buffer, "state") == 0) {
+            dump_state(cpu);
+        }
+        else if (strcmp(buffer, "continue") == 0) {
             interrupted = false;
         }
         else {
@@ -119,9 +94,6 @@ void keyboard_interupt_handler(int signum) {
 }
 
 void run_bin(const char *path) {
-    // Setup signal handlers.
-    signal(SIGINT, keyboard_interupt_handler);
-
     // Load the program.
     const char *src = load_rom(path);
     prog_t *prog = prog_create(src);
@@ -176,6 +148,9 @@ void run_test(const char *path) {
     int msg_ptr = 0x6004;
     cpu_reset(cpu);
     while (!started || status >= 0x80) {
+        // Spin while an interrupt is taking place.
+        while (interrupted) { }
+
         // Fetch and decode the next instruction.
         uint8_t *insptr = cpu_fetch(cpu);
         operation_t ins = cpu_decode(cpu, insptr);
@@ -207,7 +182,6 @@ void run_test(const char *path) {
                     break;
                 case 0x81:
                     printf("Reset required.\n");
-                    //cpu_reset(cpu);
                     break;
                 default:
                     printf("Test completed with result code %d.\n", new_status);
@@ -279,6 +253,33 @@ const char *load_rom(const char *path) {
     fclose(fp);
 
     return src;
+}
+
+void dump_state(cpu_t *cpu) {
+    printf("pc: $%.4x, a: %d. x: %d, y: %d, sp: $%.2x, sr: ", cpu->frame.pc, cpu->frame.ac, cpu->frame.x, cpu->frame.y, cpu->frame.sp);
+    printf(cpu->frame.sr.flags.neg ? "n" : "-");
+    printf(cpu->frame.sr.flags.vflow ? "v" : "-");
+    printf(cpu->frame.sr.flags.ign ? "-" : "-");
+    printf(cpu->frame.sr.flags.brk ? "b" : "-");
+    printf(cpu->frame.sr.flags.dec ? "d" : "-");
+    printf(cpu->frame.sr.flags.irq ? "i" : "-");
+    printf(cpu->frame.sr.flags.zero ? "z" : "-");
+    printf(cpu->frame.sr.flags.carry ? "c" : "-");
+    printf("\n");
+}
+
+void print_hist(history_t *hist, int nhist) {
+    bool printed = false;
+    for (int i = 0; i < HIST_LEN; i++) {
+        if (history[i].op.instruction != NULL) {
+            printf("$%.4x: ", history[i].pc);
+            print_ins(history[i].op);
+            printed = true;
+        }
+    }
+    if (!printed) {
+        printf("No instructions to display.\n");
+    }
 }
 
 void print_ins(operation_t ins) {

@@ -1,6 +1,8 @@
 #ifndef PROG_H
 #define PROG_H
 
+#include <cpu.h>
+#include <ppu.h>
 #include <ines.h>
 
 /**
@@ -31,5 +33,10 @@ prog_t *prog_create(const char *src);
  * @param prog The program to destroy.
  */
 void prog_destroy(prog_t *prog);
+
+/**
+ * @brief Executes the given NES program.
+ */
+void prog_execute(prog_t *prog, cpu_t *cpu, ppu_t *ppu)
 
 #endif

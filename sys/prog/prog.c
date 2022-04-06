@@ -126,3 +126,61 @@ void prog_destroy(prog_t *prog) {
         free((void*)prog->prom);
     free(prog);
 }
+
+void prog_execute(prog_t *prog, cpu_t *cpu, ppu_t *ppu) {
+    uint8_t prg_ram[0x2000];
+
+    // TODO: Make the mapper responsible for this.
+    //  |
+    //  |
+    // \|/
+     
+    // Setup CPU address space.
+    as_add_segment(cpu->as, 0x6000, 0x2000, prg_ram);
+    as_add_segment(cpu->as, 0x8000, 0x4000, (uint8_t*)prog->prg_rom);
+    as_add_segment(cpu->as, 0xC000, 0x4000, (uint8_t*)prog->prg_rom + 0x4000);
+
+    // Setup PPU address space.
+    as_add_segment(ppu->as, 0x0000, 0x2000, prog->chr_rom);
+    as_add_segment(ppu->as, 0x2000, 0x0400, ppu->vram);
+    as_add_segment(ppu->as, 0x3000, 0x0400, ppu->vram);
+    if (prog->header.mirroring == 1) {
+        // Vertical mirroring.
+        as_add_segment(ppu->as, 0x2400, 0x0400, ppu->vram + 0x0400);
+        as_add_segment(ppu->as, 0x2800, 0x0400, ppu->vram);
+        as_add_segment(ppu->as, 0x2C00, 0x0400, ppu->vram + 0x0400);
+
+        as_add_segment(ppu->as, 0x3400, 0x0400, ppu->vram + 0x0400);
+        as_add_segment(ppu->as, 0x3800, 0x0400, ppu->vram);
+        as_add_segment(ppu->as, 0x3C00, 0x0300, ppu->vram + 0x0400);
+    }
+    else {
+        // Horizontal mirroring.
+        as_add_segment(ppu->as, 0x2400, 0x0400, ppu->vram);
+        as_add_segment(ppu->as, 0x2800, 0x0400, ppu->vram + 0x0400);
+        as_add_segment(ppu->as, 0x2C00, 0x0400, ppu->vram + 0x0400);
+
+        as_add_segment(ppu->as, 0x3400, 0x0400, ppu->vram);
+        as_add_segment(ppu->as, 0x3800, 0x0400, ppu->vram + 0x0400);
+        as_add_segment(ppu->as, 0x3C00, 0x0300, ppu->vram + 0x0400);
+    }
+
+    // Palette memory.
+    for (int i = 0; i < 8; i++) {
+        addr_t offset = 0x3F00 + (i * 0x0020);
+        as_add_segment(ppu->as, offset, 1, &ppu->bkg_color);
+        for (int j = 0; j < N_PALETTES; j++) {
+            as_add_segment(ppu->as, offset + 1 + j * 4, 3, (uint8_t*)&ppu->palettes[j]);
+            as_add_segment(ppu->as, offset + (j + 1) * 4, 1, &ppu->bkg_color);
+        }
+    }
+
+    // Execute program (loops forever unless interrupted).
+    cpu_reset(cpu);
+    while (true) {
+        // Execute the next instruction.
+        uint8_t *insptr = cpu_fetch(cpu);
+        operation_t ins = cpu_decode(cpu, insptr);
+        cpu_execute(cpu, ins);
+    }
+}

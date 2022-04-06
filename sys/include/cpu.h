@@ -27,7 +27,7 @@
  * @brief The flags for each bit in the status register.
  */
 typedef union sr_flags {
-    struct flags {
+    struct {
         unsigned carry : 1;     // Carry flag.
         unsigned zero  : 1;     // Zero flag.
         unsigned irq   : 1;     // Interrupt flag (IRQ disable).

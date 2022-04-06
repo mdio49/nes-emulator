@@ -12,7 +12,7 @@
 #define INES_PROM_SIZE      16
 
 typedef union ines_flag6 {
-    struct flags6 {
+    struct {
         unsigned    mirroring   : 1;
         unsigned    prg_ram     : 1;
         unsigned    trainer     : 1;
@@ -23,7 +23,7 @@ typedef union ines_flag6 {
 } ines_flag6_t;
 
 typedef union ines_flag7 {
-    struct flags7 {
+    struct {
         unsigned    vs_unisys       : 1;
         unsigned    playchoice_10   : 1;
         unsigned    format          : 2;
@@ -33,14 +33,14 @@ typedef union ines_flag7 {
 } ines_flag7_t;
 
 typedef union ines_flag8 {
-    struct flags8 {
+    struct {
         unsigned    prg_ram_size    : 8;
     } flags;
     uint8_t bits;
 } ines_flag8_t;
 
 typedef union ines_flag9 {
-    struct flags9 {
+    struct {
         unsigned    tv_sys  : 1;
         unsigned            : 7;
     } flags;

@@ -200,6 +200,7 @@ void run_hex(int argc, char *bytes[]) {
     uint8_t mem[65536];
     addrspace_t *as = as_create();
     as_add_segment(as, 0, 65536, mem);
+    as_destroy(cpu->as);
     cpu->as = as;
 
     // Load program from input.
@@ -223,16 +224,8 @@ void run_hex(int argc, char *bytes[]) {
     printf("Program halted.\n");
 
     // Dump state.
-    printf("pc: $%.4x, a: %d. x: %d, y: %d, sp: $%.2x, sr: ", cpu->frame.pc, cpu->frame.ac, cpu->frame.x, cpu->frame.y, cpu->frame.sp);
-    printf(cpu->frame.sr.flags.neg ? "n" : "-");
-    printf(cpu->frame.sr.flags.vflow ? "v" : "-");
-    printf(cpu->frame.sr.flags.ign ? "-" : "-");
-    printf(cpu->frame.sr.flags.brk ? "b" : "-");
-    printf(cpu->frame.sr.flags.dec ? "d" : "-");
-    printf(cpu->frame.sr.flags.irq ? "i" : "-");
-    printf(cpu->frame.sr.flags.zero ? "z" : "-");
-    printf(cpu->frame.sr.flags.carry ? "c" : "-");
-}
+    dump_state(cpu);
+} 
 
 const char *load_rom(const char *path) {
     // Open the ROM.

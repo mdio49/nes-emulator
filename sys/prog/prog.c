@@ -141,7 +141,7 @@ void prog_execute(prog_t *prog, cpu_t *cpu, ppu_t *ppu) {
     as_add_segment(cpu->as, 0xC000, 0x4000, (uint8_t*)prog->prg_rom + 0x4000);
 
     // Setup PPU address space.
-    as_add_segment(ppu->as, 0x0000, 0x2000, prog->chr_rom);
+    as_add_segment(ppu->as, 0x0000, 0x2000, (uint8_t*)prog->chr_rom);
     as_add_segment(ppu->as, 0x2000, 0x0400, ppu->vram);
     as_add_segment(ppu->as, 0x3000, 0x0400, ppu->vram);
     if (prog->header.mirroring == 1) {

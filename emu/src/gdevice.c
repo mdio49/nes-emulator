@@ -9,6 +9,8 @@ static GLFWwindow *window = NULL;
 static int vao, vbo;
 static int shader;
 
+static int pixel_data[256 * 256] = { 0 };
+
 static const float vertices[] = {
     0.0f, 0.0f, 0.0f,
     1.0f, 0.0f, 0.0f,
@@ -87,6 +89,9 @@ bool gdevice_create() {
 
 void gdevice_draw() {
     glClear(GL_COLOR_BUFFER_BIT);
+
+	int data = glGetUniformLocation(shader, "data");
+	glUniform1iv(data, 256 * 256, pixel_data);
 
     glBindVertexArray(vao);
     glDrawArrays(GL_TRIANGLES, 0, 6);

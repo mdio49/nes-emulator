@@ -1,23 +1,24 @@
 CC = gcc
-CFLAGS = -g -Wall -I sys/include -g
+CFLAGS = -g -Wall $(foreach d, $(INCLUDE), -I $d)
 TARGET = emu
 MAIN = main.o test.o
+INCLUDE = emu/include sys/include
 OBJECTS = $(filter-out $(MAIN), $(wildcard *.o))
 
 main: main.o
-	$(CC) $(CFLAGS) $(OBJECTS) main.o -o $(TARGET).exe
+	$(CC) $(CFLAGS) $(OBJECTS) main.o -o $(TARGET).exe -L emu/bin/*.a
 
 test: test.o
 	$(CC) $(CFLAGS) $(OBJECTS) test.o -o $(TARGET)_test.exe 
 
-test.o: test.c main.o
-	$(CC) $(CFLAGS) -c test.c
+main.o: emu/main.c cpu.o prog.o
+	$(CC) $(CFLAGS) -c emu/main.c
 
-main.o: main.c cpu.o prog.o
-	$(CC) $(CFLAGS) -c main.c
+test.o: test.c main.o
+	$(CC) $(CFLAGS) -c emu/test.c
 
 cpu.o: sys/cpu/*.c memory.o
-	$(CC) $(CFLAGS) -c sys/cpu/*.c 
+	$(CC) $(CFLAGS) -c sys/cpu/*.c
 
 memory.o: sys/memory/*.c
 	$(CC) $(CFLAGS) -c sys/memory/*.c

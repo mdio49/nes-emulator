@@ -37,6 +37,6 @@ void prog_destroy(prog_t *prog);
 /**
  * @brief Executes the given NES program.
  */
-void prog_execute(prog_t *prog, cpu_t *cpu, ppu_t *ppu)
+void prog_execute(prog_t *prog, cpu_t *cpu, ppu_t *ppu);
 
 #endif

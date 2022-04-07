@@ -10,8 +10,8 @@ typedef struct shader {
 
 } shader_t;
 
-shader_t *shader_create(unsigned char type, const char *src);
+shader_t *shader_create(GLuint64 type, const char *src);
 void shader_compile(shader_t *shader);
 void shader_destroy(shader_t *shader);
 
-shader_t *shader_fromfile(const char *path);
+shader_t *shader_fromfile(GLuint64 type, const char *path);

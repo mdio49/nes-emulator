@@ -1,6 +1,7 @@
 #include "shader.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 shader_t *shader_create(GLuint64 type, const char *src) {
     shader_t shader = {
@@ -43,7 +44,7 @@ void shader_destroy(shader_t *shader) {
     free(shader);
 }
 
-shader_t *shader_fromfile(GLuint type, const char *path) {
+shader_t *shader_fromfile(GLuint64 type, const char *path) {
     // Open the file.
 	FILE *fp = fopen(path, "r");
     if (fp == NULL) {

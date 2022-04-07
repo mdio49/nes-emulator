@@ -6,16 +6,22 @@ INCLUDE = emu/include sys/include
 OBJECTS = $(filter-out $(MAIN), $(wildcard *.o))
 
 main: main.o
-	$(CC) $(CFLAGS) $(OBJECTS) main.o -o $(TARGET).exe -L emu/bin/*.a
+	$(CC) $(CFLAGS) $(OBJECTS) main.o -o $(TARGET).exe
 
 test: test.o
 	$(CC) $(CFLAGS) $(OBJECTS) test.o -o $(TARGET)_test.exe 
 
-main.o: emu/main.c cpu.o prog.o
-	$(CC) $(CFLAGS) -c emu/main.c
+test.o: emu/src/test.c main.o
+	$(CC) $(CFLAGS) -c emu/src/test.c
 
-test.o: test.c main.o
-	$(CC) $(CFLAGS) -c emu/test.c
+main.o: emu/src/main.c cpu.o prog.o
+	$(CC) $(CFLAGS) -c emu/src/main.c 
+
+gdevice.o: emu/src/gdevice.c glad.o
+	$(CC) $(CFLAGS) -c emu/src/shader.c emu/src/gdevice.c
+
+glad.o: emu/src/glad.c
+	$(CC) $(CFLAGS) -c emu/src/glad.c
 
 cpu.o: sys/cpu/*.c memory.o
 	$(CC) $(CFLAGS) -c sys/cpu/*.c

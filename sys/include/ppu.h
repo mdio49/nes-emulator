@@ -51,4 +51,3 @@ typedef struct ppu {
 ppu_t *ppu_create(void);
 
 void ppu_destroy(ppu_t *ppu);
-

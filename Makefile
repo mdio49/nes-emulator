@@ -1,30 +1,42 @@
+# Compiler and target.
 CC = gcc
-CFLAGS = -g -Wall $(foreach d, $(INCLUDE), -I $d)
 TARGET = emu
+
+# Paths.
+INC_PATHS = sys/include SDL2/include
+LIB_PATHS = SDL2/lib
+SRC_PATH = .
+
+# Flags
+LIB_FLAGS = $(foreach d, $(LIB_PATHS),-L $d)
+INC_FLAGS = $(foreach d, $(INC_PATHS),-I $d)
+CFLAGS = -g -Wall $(INC_FLAGS)
+
+# Linker.
+LINKER_INPUT = SDL2 SDL2main
+LINKER_FLAGS = $(foreach d, $(LINKER_INPUT),-l $d)
+
+# Object files (excluding main).
 MAIN = main.o test.o
-INCLUDE = emu/include sys/include
 OBJECTS = $(filter-out $(MAIN), $(wildcard *.o))
 
 main: main.o
-	$(CC) $(CFLAGS) $(OBJECTS) main.o -o $(TARGET).exe
+	$(CC) $(CFLAGS) $(OBJECTS) main.o -o $(TARGET) $(LIB_FLAGS) $(LINKER_FLAGS)
 
 test: test.o
-	$(CC) $(CFLAGS) $(OBJECTS) test.o -o $(TARGET)_test.exe 
+	$(CC) $(CFLAGS) $(OBJECTS) test.o -o $(TARGET)_test 
 
-test.o: emu/src/test.c main.o
-	$(CC) $(CFLAGS) -c emu/src/test.c
+test.o: test.c
+	$(CC) $(CFLAGS) -c test.c
 
-main.o: emu/src/main.c cpu.o prog.o
-	$(CC) $(CFLAGS) -c emu/src/main.c 
-
-gdevice.o: emu/src/gdevice.c glad.o
-	$(CC) $(CFLAGS) -c emu/src/shader.c emu/src/gdevice.c
-
-glad.o: emu/src/glad.c
-	$(CC) $(CFLAGS) -c emu/src/glad.c
+main.o: main.c cpu.o ppu.o prog.o
+	$(CC) $(CFLAGS) -c main.c 
 
 cpu.o: sys/cpu/*.c memory.o
 	$(CC) $(CFLAGS) -c sys/cpu/*.c
+
+ppu.o: sys/ppu/*.c memory.o
+	$(CC) $(CFLAGS) -c sys/ppu/*.c
 
 memory.o: sys/memory/*.c
 	$(CC) $(CFLAGS) -c sys/memory/*.c

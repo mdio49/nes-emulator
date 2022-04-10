@@ -1,12 +1,10 @@
 #include <addrmodes.h>
-#include <cpu.h>
-#include <ppu.h>
-#include <prog.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <sys.h>
 
 // Include SDL.
 #define SDL_MAIN_HANDLED
@@ -21,12 +19,15 @@ typedef struct history {
 
 } history_t;
 
-void run_bin(const char *path, bool test);
-void run_hex(int argc, char *argv[]);
-
 bool init();
 void exit_handler(void);
 void keyboard_interupt_handler(int signum);
+
+void run_bin(const char *path, bool test);
+void run_hex(int argc, char *argv[]);
+
+void test_mode_before_execute(operation_t ins);
+void test_mode_after_execute(operation_t ins);
 
 const char *load_rom(const char *path);
 
@@ -36,25 +37,23 @@ void print_ins(operation_t ins);
 
 bool strprefix(const char *str, const char *pre);
 
-static SDL_Window *mainWindow = NULL;
-static SDL_Surface *mainSurface = NULL;
-static SDL_Renderer *mainRenderer = NULL;
+SDL_Window *mainWindow = NULL;
+SDL_Surface *mainSurface = NULL;
+SDL_Renderer *mainRenderer = NULL;
 
-static cpu_t *cpu = NULL;
-static ppu_t *ppu = NULL;
-static bool interrupted = false;
-static history_t history[HIST_LEN] = { 0 };
+history_t history[HIST_LEN] = { 0 };
+handlers_t handlers = { .interrupted = false };
+
+int status = 0x00;
+int msg_ptr = 0x6004;
 
 int main(int argc, char *argv[]) {
     // Setup signal handlers.
     signal(SIGINT, keyboard_interupt_handler);
     atexit(exit_handler);
 
-    // Setup CPU.
-    cpu = cpu_create();
-
-    // Setup PPU.
-    ppu = ppu_create();
+    // Turn on the system.
+    sys_poweron();
 
     // Parse CL arguments.
     bool test = false;
@@ -92,147 +91,6 @@ int main(int argc, char *argv[]) {
 
     run_bin(path, test);
     return EXIT_SUCCESS;
-}
-
-void run_bin(const char *path, bool test) {
-    uint8_t mapper_regs[0x1FE0];
-    uint8_t prg_ram[0x2000];
-
-    bool started = false;
-    int status = 0x00;
-    int msg_ptr = 0x6004;
-
-    // Load the program.
-    const char *src = load_rom(path);
-    prog_t *prog = prog_create(src);
-    if (prog == NULL) {
-        fprintf(stderr, "Unable to load ROM.");
-        exit(1);
-    }
-
-    // Setup CPU address space.
-    as_add_segment(cpu->as, 0x4020, 0x1FE0, mapper_regs);
-    as_add_segment(cpu->as, 0x6000, 0x2000, prg_ram);
-    as_add_segment(cpu->as, 0x8000, 0x4000, (uint8_t*)prog->prg_rom);
-    as_add_segment(cpu->as, 0xC000, 0x4000, (uint8_t*)prog->prg_rom + 0x4000);
-
-    // Setup PPU address space.
-    as_add_segment(ppu->as, 0x0000, 0x2000, (uint8_t*)prog->chr_rom);
-    as_add_segment(ppu->as, 0x2000, 0x0400, ppu->vram);
-    as_add_segment(ppu->as, 0x3000, 0x0400, ppu->vram);
-    if (prog->header.mirroring == 1) {
-        // Vertical mirroring.
-        as_add_segment(ppu->as, 0x2400, 0x0400, ppu->vram + 0x0400);
-        as_add_segment(ppu->as, 0x2800, 0x0400, ppu->vram);
-        as_add_segment(ppu->as, 0x2C00, 0x0400, ppu->vram + 0x0400);
-
-        as_add_segment(ppu->as, 0x3400, 0x0400, ppu->vram + 0x0400);
-        as_add_segment(ppu->as, 0x3800, 0x0400, ppu->vram);
-        as_add_segment(ppu->as, 0x3C00, 0x0300, ppu->vram + 0x0400);
-    }
-    else {
-        // Horizontal mirroring.
-        as_add_segment(ppu->as, 0x2400, 0x0400, ppu->vram);
-        as_add_segment(ppu->as, 0x2800, 0x0400, ppu->vram + 0x0400);
-        as_add_segment(ppu->as, 0x2C00, 0x0400, ppu->vram + 0x0400);
-
-        as_add_segment(ppu->as, 0x3400, 0x0400, ppu->vram);
-        as_add_segment(ppu->as, 0x3800, 0x0400, ppu->vram + 0x0400);
-        as_add_segment(ppu->as, 0x3C00, 0x0300, ppu->vram + 0x0400);
-    }
-
-    // Palette memory.
-    for (int i = 0; i < 8; i++) {
-        addr_t offset = 0x3F00 + (i * 0x0020);
-        as_add_segment(ppu->as, offset, 1, &ppu->bkg_color);
-        for (int j = 0; j < N_PALETTES; j++) {
-            as_add_segment(ppu->as, offset + 1 + j * 4, 3, (uint8_t*)&ppu->palettes[j]);
-            as_add_segment(ppu->as, offset + (j + 1) * 4, 1, &ppu->bkg_color);
-        }
-    }
-
-    // Execute program.
-    cpu_reset(cpu);
-    while (!started || status >= 0x80) {
-        // Spin while an interrupt is taking place.
-        while (interrupted) { }
-
-        // Fetch and decode the next instruction.
-        uint8_t *insptr = cpu_fetch(cpu);
-        operation_t ins = cpu_decode(cpu, insptr);
-
-        // Update history.
-        for (int i = 0; i < HIST_LEN - 1; i++) {
-            history[i] = history[i + 1];
-        }
-        history[HIST_LEN - 1].pc = cpu->frame.pc;
-        history[HIST_LEN - 1].op = ins;
-
-        // Execute the instruction.
-        cpu_execute(cpu, ins);
-        
-        if (test) {
-            // Display a message if available.
-            char *msg = (char *)as_resolve(cpu->as, msg_ptr);
-            if (*msg != '\0') {
-                printf("%s", msg);
-                msg_ptr += strlen(msg);
-            }
-
-            // Update status of test.
-            int new_status = *as_resolve(cpu->as, 0x6000);
-            if (new_status != status) {
-                switch (new_status) {
-                    case 0x80:
-                        printf("Test running...\n");
-                        started = true;
-                        break;
-                    case 0x81:
-                        printf("Reset required.\n");
-                        break;
-                    default:
-                        printf("Test completed with result code %d.\n", new_status);
-                        break;
-                }
-                status = new_status;
-            }
-        }
-    }
-}
-
-void run_hex(int argc, char *bytes[]) {
-    // Starting address; consistent with easy 6502.
-    const addr_t start = 0x0600;
-
-    // Setup an address space that uses a single 64KB segment.
-    uint8_t mem[65536];
-    addrspace_t *as = as_create();
-    as_add_segment(as, 0, 65536, mem);
-    as_destroy(cpu->as);
-    cpu->as = as;
-
-    // Load program from input.
-    for (int i = 0; i < argc; i++) {
-        *as_resolve(cpu->as, start + i) = strtol(bytes[i], NULL, 16);
-    }
-
-    // Execute program.
-    addr_t prev_pc = 0;
-    cpu->frame.pc = start;
-    while (cpu->frame.sr.flags.brk == 0) {
-        prev_pc = cpu->frame.pc;
-        uint8_t *insptr = cpu_fetch(cpu);
-        operation_t ins = cpu_decode(cpu, insptr);
-        printf("$%.4x: ", cpu->frame.pc);
-        print_ins(ins);
-        cpu_execute(cpu, ins);
-    }
-
-    cpu->frame.pc = prev_pc + 1;
-    printf("Program halted.\n");
-
-    // Dump state.
-    dump_state(cpu);
 }
 
 bool init(void) {
@@ -292,13 +150,13 @@ void exit_handler() {
 
 void keyboard_interupt_handler(int signum) {
     char buffer[50];
-    interrupted = true;
-    while (interrupted) {
+    handlers.interrupted = true;
+    while (handlers.interrupted) {
         printf("> ");
         scanf("%49s", buffer);
         if (strcmp(buffer, "reset") == 0) {
-            cpu_reset(cpu);
-            interrupted = false;
+            sys_reset();
+            handlers.interrupted = false;
         }
         else if (strcmp(buffer, "quit") == 0) {
             exit(0);
@@ -310,7 +168,7 @@ void keyboard_interupt_handler(int signum) {
             dump_state(cpu);
         }
         else if (strcmp(buffer, "continue") == 0) {
-            interrupted = false;
+            handlers.interrupted = false;
         }
         else {
             printf("Invalid command.\n");
@@ -318,6 +176,97 @@ void keyboard_interupt_handler(int signum) {
     }
 
     signal(SIGINT, keyboard_interupt_handler);
+}
+
+void run_bin(const char *path, bool test) {
+    // Load the program.
+    const char *src = load_rom(path);
+    prog_t *prog = prog_create(src);
+    if (prog == NULL) {
+        fprintf(stderr, "Unable to load ROM.");
+        exit(1);
+    }
+
+    // Attach the program to the system.
+    sys_insert(prog);
+
+    // Setup the handlers.
+    handlers.before_execute = test ? test_mode_before_execute : NULL;
+    handlers.after_execute = test ? test_mode_after_execute : NULL;
+
+    // Run the system.
+    sys_run(&handlers);
+}
+
+void run_hex(int argc, char *bytes[]) {
+    // Starting address; consistent with easy 6502.
+    const addr_t start = 0x0600;
+
+    // Setup a simple address space that uses a single 64KB segment.
+    uint8_t mem[65536];
+    addrspace_t *as = as_create();
+    as_add_segment(as, 0, 65536, mem);
+    as_destroy(cpu->as);
+    cpu->as = as;
+
+    // Load program from input.
+    for (int i = 0; i < argc; i++) {
+        *as_resolve(cpu->as, start + i) = strtol(bytes[i], NULL, 16);
+    }
+
+    // Execute program.
+    addr_t prev_pc = 0;
+    cpu->frame.pc = start;
+    while (cpu->frame.sr.flags.brk == 0) {
+        prev_pc = cpu->frame.pc;
+        uint8_t *insptr = cpu_fetch(cpu);
+        operation_t ins = cpu_decode(cpu, insptr);
+        printf("$%.4x: ", cpu->frame.pc);
+        print_ins(ins);
+        cpu_execute(cpu, ins);
+    }
+
+    cpu->frame.pc = prev_pc + 1;
+    printf("Program halted.\n");
+
+    // Dump state.
+    dump_state(cpu);
+}
+
+void test_mode_before_execute(operation_t ins) {
+    // Update history.
+    for (int i = 0; i < HIST_LEN - 1; i++) {
+        history[i] = history[i + 1];
+    }
+    history[HIST_LEN - 1].pc = cpu->frame.pc;
+    history[HIST_LEN - 1].op = ins;
+}
+
+void test_mode_after_execute(operation_t ins) {
+    // Display a message if available.
+    char *msg = (char *)as_resolve(cpu->as, msg_ptr);
+    if (*msg != '\0') {
+        printf("%s", msg);
+        msg_ptr += strlen(msg);
+    }
+
+    // Update status of test.
+    int new_status = *as_resolve(cpu->as, 0x6000);
+    if (new_status != status) {
+        switch (new_status) {
+            case 0x80:
+                printf("Test running...\n");
+                break;
+            case 0x81:
+                printf("Reset required.\n");
+                break;
+            default:
+                printf("Test completed with result code %d.\n", new_status);
+                exit(new_status);
+                break;
+        }
+        status = new_status;
+    }
 }
 
 const char *load_rom(const char *path) {

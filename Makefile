@@ -29,8 +29,11 @@ test: test.o
 test.o: test.c
 	$(CC) $(CFLAGS) -c test.c
 
-main.o: main.c cpu.o ppu.o prog.o
-	$(CC) $(CFLAGS) -c main.c 
+main.o: main.c sys.o
+	$(CC) $(CFLAGS) -c main.c
+
+sys.o: cpu.o ppu.o prog.o
+	$(CC) $(CFLAGS) -c sys/nes/*.c
 
 cpu.o: sys/cpu/*.c memory.o
 	$(CC) $(CFLAGS) -c sys/cpu/*.c

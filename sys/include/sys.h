@@ -7,7 +7,7 @@
 #include <stdbool.h>
 
 #define SCREEN_WIDTH    256
-#define SCREEN_HEIGHT   240 
+#define SCREEN_HEIGHT   240
 
 typedef struct handlers {
 
@@ -16,6 +16,8 @@ typedef struct handlers {
 
     void        (*before_execute)(operation_t ins);
     void        (*after_execute)(operation_t ins);
+    
+    void        (*update_screen)(const char *data);
 
 } handlers_t;
 

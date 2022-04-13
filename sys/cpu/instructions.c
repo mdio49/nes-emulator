@@ -494,8 +494,8 @@ const instruction_t INS_RTI = { "RTI", rti_apply, true };
 static void bit_apply(tframe_t *frame, const addrspace_t *as, mem_loc_t loc) {
     uint8_t value = load(as, loc);
     uint8_t result = frame->ac & value;
-    frame->sr.neg = ((value & 0x80) == 0x80);
-    frame->sr.vflow = ((value & 0x40) == 0x40);
+    frame->sr.neg = ((value & 0x80) > 0);
+    frame->sr.vflow = ((value & 0x40) > 0);
     frame->sr.zero = (result == 0);
 }
 

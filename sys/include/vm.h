@@ -3,6 +3,9 @@
 
 #include <stdint.h>
 
+#define AS_READ     0x01
+#define AS_WRITE    0x02
+
 /**
  * @brief Memory addresses are 16-bit ranging from 0x0000 to 0xFFFF.
  */
@@ -13,6 +16,16 @@ typedef uint16_t addr_t;
  * location (i.e. an emulator virtual memory address).
  */
 typedef struct addrspace addrspace_t;
+
+/**
+ * @brief An update rule (occurs whenever an address is read from or written to).
+ * 
+ * @param as The address space that was updated.
+ * @param vaddr The virtual address that was updated.
+ * @param value The value at the address after the update.
+ * @param mode Whether the update was a read or a write.
+ */
+typedef void (*update_rule_t)(const addrspace_t *as, addr_t vaddr, uint8_t value, uint8_t mode);
 
 /**
  * @brief Creates an empty address space.
@@ -31,6 +44,15 @@ addrspace_t *as_create();
  * @param target The target memory that the segment points to.
  */
 void as_add_segment(addrspace_t *as, addr_t start, size_t size, uint8_t *target);
+
+/**
+ * @brief Sets the update rule that is called whenever a memory address in the given address
+ * space is accessed (i.e. read from or written to).
+ * 
+ * @param as The address space.
+ * @param rule The update rule (or `NULL` to clear the rule).
+ */
+void as_set_update_rule(addrspace_t *as, update_rule_t rule);
 
 /**
  * @brief Reads the value at the memory location corresponding to the given virtual address. If
@@ -63,7 +85,9 @@ void as_write(const addrspace_t *as, addr_t vaddr, uint8_t value);
  * @param nbytes The number of bytes to traverse.
  * @return An array corresponding to each byte of the traversal.
  */
-uint8_t *as_traverse(addrspace_t *as, addr_t start, size_t nbytes);
+uint8_t *as_traverse(const addrspace_t *as, addr_t start, size_t nbytes);
+
+void as_print(const addrspace_t *as);
 
 /**
  * @brief Destroys the given address space. Does not free any underlying memory that this address space references.

@@ -2,6 +2,8 @@
 #define PPU_H
 
 #include <stdint.h>
+#include <stdbool.h>
+#include <time.h>
 #include <vm.h>
 
 #define N_PALETTES  8
@@ -17,6 +19,8 @@
 #define PPU_DATA    0x2007
 #define OAM_DMA     0x4014
 
+#define TIME_STEP   0.05 * CLOCKS_PER_SEC
+
 typedef struct palette {
 
     uint8_t         col1;
@@ -24,6 +28,16 @@ typedef struct palette {
     uint8_t         col3;
 
 } palette_t;
+
+typedef union io_flags {
+    struct {
+        unsigned    read    : 1;
+        unsigned    write   : 1;
+        unsigned    low     : 1;
+        unsigned            : 5;
+    };
+    uint8_t value;
+} io_flags_t;
 
 /**
  * @brief A PPU struct that contains all data needed to emulate the PPU.
@@ -104,6 +118,20 @@ typedef struct ppu {
     // PPUDATA
     uint8_t     ppu_data;
 
+    io_flags_t  ppustatus_flags;
+    io_flags_t  oamaddr_flags;
+    io_flags_t  oamdata_flags;
+    io_flags_t  ppuaddr_flags;
+    io_flags_t  ppudata_flags;
+
+    const char  *out;
+
+    /* temporary until cycling is done correctly */
+
+    clock_t last_time;
+    clock_t frame_counter;
+    bool    flush_flag;
+
 } ppu_t;
 
 #endif
@@ -112,9 +140,4 @@ ppu_t *ppu_create(void);
 
 void ppu_destroy(ppu_t *ppu);
 
-/**
- * @brief Flushes the data from the PPU onto the screen. This function's implementation is
- * dependent on the graphic API used and takes in an array of pixels.
- * 
- */
-void ppu_flush(const char *data);
+void ppu_render(ppu_t *ppu, int cycles);

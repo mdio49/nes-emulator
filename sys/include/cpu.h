@@ -207,6 +207,13 @@ void cpu_destroy(cpu_t *cpu);
 void cpu_reset(cpu_t *cpu);
 
 /**
+ * @brief Invokes a non-maskable interrupt on the CPU.
+ * 
+ * @param cpu The CPU to interrupt.
+ */
+void cpu_nmi(cpu_t *cpu);
+
+/**
  * @brief Fetches the next instruction from memory without advancing the program counter.
  * 
  * @param cpu The CPU's state.

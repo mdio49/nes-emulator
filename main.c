@@ -31,6 +31,8 @@ void run_hex(int argc, char *argv[]);
 void test_mode_before_execute(operation_t ins);
 void test_mode_after_execute(operation_t ins);
 
+void update_screen(const char *data);
+
 const char *load_rom(const char *path);
 
 void dump_state();
@@ -45,7 +47,10 @@ SDL_Renderer *mainRenderer = NULL;
 SDL_Texture *screen = NULL;
 
 history_t history[HIST_LEN] = { 0 };
-handlers_t handlers = { .interrupted = false };
+handlers_t handlers = {
+    .update_screen = update_screen,
+    .interrupted = false
+};
 
 int status = 0x00;
 int msg_ptr = 0x6004;
@@ -59,6 +64,7 @@ int main(int argc, char *argv[]) {
 
     // Turn on the system.
     sys_poweron();
+    ppu->out = pixels;
 
     // Parse CL arguments.
     bool test = false;
@@ -242,8 +248,6 @@ void test_mode_before_execute(operation_t ins) {
 }
 
 void test_mode_after_execute(operation_t ins) {
-    ppu_flush(pixels);
-
     // Display a message if available.
     char msg = as_read(cpu->as, msg_ptr);
     if (msg != '\0') {
@@ -270,7 +274,8 @@ void test_mode_after_execute(operation_t ins) {
     }
 }
 
-void ppu_flush(const char *data) {
+void update_screen(const char *data) {
+    // Poll events.
     SDL_Event e;
     while (SDL_PollEvent(&e) != 0) {
         switch (e.type) {

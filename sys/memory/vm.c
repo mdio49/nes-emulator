@@ -20,13 +20,12 @@ typedef struct mem_seg {
     uint8_t         *target;        // The target emulator address that the start of this segment points to.
     struct mem_seg  *next;          // A pointer to the next segment.
 
-    //uint8_t (*map)(addr_t vaaddr);  // The function that maps a virtual address in this address range to an actual value in the emulator's memory.
-
 } mem_seg_t;
 
 struct addrspace {
 
     mem_seg_t       *segs[N_SEGS];  // A pointer to the head of the list of segments for each 2KB block.
+    update_rule_t   update_rule;    // The update rule that is called whenever a virtual address is accessed.
 
 };
 
@@ -51,7 +50,7 @@ static uint8_t *as_resolve(const addrspace_t *as, addr_t vaddr) {
     }
 
     if (result == NULL) {
-        printf("Segmentation fault.\n");
+        printf("Segmentation fault ($%.4x).\n", vaddr);
         exit(1);
     }
 
@@ -63,6 +62,7 @@ addrspace_t *as_create() {
     for (int i = 0; i < N_SEGS; i++) {
         as->segs[i] = NULL;
     }
+    as->update_rule = NULL;
     return as;
 }
 
@@ -140,15 +140,26 @@ void as_add_segment(addrspace_t *as, addr_t start, size_t size, uint8_t *target)
     }
 }
 
+void as_set_update_rule(addrspace_t *as, update_rule_t rule) {
+    as->update_rule = rule;
+}
+
 uint8_t as_read(const addrspace_t *as, addr_t vaddr) {
-    return *as_resolve(as, vaddr);
+    uint8_t value = *as_resolve(as, vaddr);
+    if (as->update_rule != NULL) {
+        as->update_rule(as, vaddr, value, AS_READ);
+    }
+    return value;
 }
 
 void as_write(const addrspace_t *as, addr_t vaddr, uint8_t value) {
     *as_resolve(as, vaddr) = value;
+    if (as->update_rule != NULL) {
+        as->update_rule(as, vaddr, value, AS_WRITE);
+    }
 }
 
-uint8_t *as_traverse(addrspace_t *as, addr_t start, size_t nbytes) {
+uint8_t *as_traverse(const addrspace_t *as, addr_t start, size_t nbytes) {
     uint8_t *result = calloc(nbytes, sizeof(uint8_t));
     const uint32_t end = start + nbytes;
     for (int i = start / SEG_SIZE; i <= (end - 1) / SEG_SIZE; i++) {
@@ -159,6 +170,15 @@ uint8_t *as_traverse(addrspace_t *as, addr_t start, size_t nbytes) {
         }
     }
     return result;
+}
+
+void as_print(const addrspace_t *as) {
+    for (int i = 0; i < N_SEGS; i++) {
+        const mem_seg_t *head = as->segs[i];
+        for (const mem_seg_t *seg = head; seg != NULL; seg = seg->next) {
+            printf("$%.4x - $%.4x -> 0x%p\n", seg->start, seg->end, seg->target);
+        }
+    }
 }
 
 void as_destroy(addrspace_t *as) {

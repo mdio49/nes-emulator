@@ -47,6 +47,12 @@ void cpu_reset(cpu_t *cpu) {
     cpu->frame.pc = bytes_to_word(low, high);
 }
 
+void cpu_nmi(cpu_t *cpu) {
+    uint8_t low = as_read(cpu->as, NMI_VECTOR);
+    uint8_t high = as_read(cpu->as, NMI_VECTOR + 1);
+    cpu->frame.pc = bytes_to_word(low, high);
+}
+
 uint8_t cpu_fetch(const cpu_t *cpu) {
     return as_read(cpu->as, cpu->frame.pc);
 }

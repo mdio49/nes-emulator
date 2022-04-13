@@ -1,5 +1,8 @@
 #include <sys.h>
+#include <stdio.h>
 #include <stdlib.h>
+
+static void cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t value, uint8_t mode);
 
 cpu_t *cpu = NULL;
 ppu_t *ppu = NULL;
@@ -18,9 +21,13 @@ void sys_poweron(void) {
         as_add_segment(cpu->as, i * WMEM_SIZE, WMEM_SIZE, cpu->wmem);
     }
     for (int i = 0x2000; i < 0x4000; i += 8) {
-        as_add_segment(cpu->as, i, 8, (uint8_t*)&ppu->controller);
+        as_add_segment(cpu->as, i, 1, &ppu->controller.value);
+        as_add_segment(cpu->as, i + 1, 1, &ppu->mask.value);
+        as_add_segment(cpu->as, i + 2, 1, &ppu->status.value);
+        as_add_segment(cpu->as, i + 3, 5, &ppu->oam_addr);
     }
     as_add_segment(cpu->as, 0x4000, 0x0020, cpu->apu_io_reg);
+    as_set_update_rule(cpu->as, cpu_update_rule);
 }
 
 void sys_poweroff(void) {
@@ -108,7 +115,48 @@ void sys_run(handlers_t *handlers) {
             handlers->after_execute(ins);
         }
 
+        // Cycle the PPU.
+        ppu_render(ppu, 1);
+        if (ppu->flush_flag) {
+            ppu->flush_flag = false;
+            handlers->update_screen(ppu->out);
+            if (ppu->controller.nmi) {
+                cpu_nmi(cpu);
+            }
+        }
+
         // Spin while an interrupt is taking place.
         while (handlers->interrupted);
+    }
+}
+
+static void cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t value, uint8_t mode) {
+    bool read = mode & AS_READ;
+    bool write = mode & AS_WRITE;
+    switch (vaddr) {
+        case PPU_STATUS:
+            if (read) {
+                ppu->ppustatus_flags.read = 1;
+                if (ppu->status.value == 128) {
+                    //printf("r: $%.4x - %d - %d\n", vaddr, value, ppu->status.value);
+                }
+            }
+            break;
+        case PPU_ADDR:
+            if (write) {
+                ppu->ppuaddr_flags.write = 1;
+                //printf("w: $%.4x - %.2x\n", vaddr, value);
+            }
+            break;
+        case PPU_DATA:
+            if (read) {
+                ppu->ppudata_flags.read = 1;
+                //printf("r: $%.4x - %.2x\n", vaddr, value);
+            }
+            if (write) {
+                ppu->ppudata_flags.write = 1;
+                //printf("w: $%.4x - %.2x\n", vaddr, value);
+            }
+            break;
     }
 }

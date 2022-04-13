@@ -10,6 +10,8 @@
 #define SDL_MAIN_HANDLED
 #include <sdl.h>
 
+#define SCREEN_SCALE 3
+
 #define HIST_LEN 50
 
 typedef struct history {
@@ -40,12 +42,15 @@ bool strprefix(const char *str, const char *pre);
 SDL_Window *mainWindow = NULL;
 SDL_Surface *mainSurface = NULL;
 SDL_Renderer *mainRenderer = NULL;
+SDL_Texture *screen = NULL;
 
 history_t history[HIST_LEN] = { 0 };
 handlers_t handlers = { .interrupted = false };
 
 int status = 0x00;
 int msg_ptr = 0x6004;
+
+char pixels[SCREEN_WIDTH * SCREEN_HEIGHT * 3] = { 0 };
 
 int main(int argc, char *argv[]) {
     // Setup signal handlers.
@@ -101,7 +106,7 @@ bool init(void) {
 	}
 
     // Create the main window.
-	mainWindow = SDL_CreateWindow("NES Emulator", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 254, 240, SDL_WINDOW_SHOWN);
+	mainWindow = SDL_CreateWindow("NES Emulator", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH * SCREEN_SCALE, SCREEN_HEIGHT * SCREEN_SCALE, SDL_WINDOW_SHOWN);
 	if (mainWindow == NULL) {
 		printf("Window could not be created! SDL_Error: %s\n", SDL_GetError());
 		return false;
@@ -116,27 +121,20 @@ bool init(void) {
     // Set the blend mode.
 	SDL_SetRenderDrawBlendMode(mainRenderer, SDL_BLENDMODE_BLEND);
 
-	// Clear the rendering surface.
-	SDL_SetRenderDrawColor(mainRenderer, 0, 0, 0, 255);
-	SDL_RenderClear(mainRenderer);
+    // Create a texture for the screen.
+    screen = SDL_CreateTexture(mainRenderer, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_TARGET, SCREEN_WIDTH, SCREEN_HEIGHT);
 
-    // Present the rendering surface.
-	SDL_RenderSetScale(mainRenderer, 1, 1);
-	SDL_RenderPresent(mainRenderer);
+    pixels[0] = 255;
+    pixels[3] = 255;
+    pixels[6] = 255;
+    pixels[9] = 255;
 
     return true;
 }
 
 void exit_handler() {
-    // Destroy CPU.
-    if (cpu != NULL) {
-        cpu_destroy(cpu);
-    }
-
-    // Destroy PPU.
-    if (ppu != NULL) {
-        ppu_destroy(ppu);
-    }
+    // Turn off the system.
+    sys_poweroff();
 
     // Destroy the window and renderer.
     if (mainRenderer != NULL)
@@ -159,7 +157,8 @@ void keyboard_interupt_handler(int signum) {
             handlers.interrupted = false;
         }
         else if (strcmp(buffer, "quit") == 0) {
-            exit(0);
+            handlers.running = false;
+            handlers.interrupted = false;
         }
         else if (strcmp(buffer, "history") == 0) {
             print_hist(history, HIST_LEN);
@@ -211,16 +210,16 @@ void run_hex(int argc, char *bytes[]) {
 
     // Load program from input.
     for (int i = 0; i < argc; i++) {
-        *as_resolve(cpu->as, start + i) = strtol(bytes[i], NULL, 16);
+        as_write(cpu->as, start + i, strtol(bytes[i], NULL, 16));
     }
 
     // Execute program.
     addr_t prev_pc = 0;
     cpu->frame.pc = start;
-    while (cpu->frame.sr.flags.brk == 0) {
+    while (cpu->frame.sr.brk == 0) {
         prev_pc = cpu->frame.pc;
-        uint8_t *insptr = cpu_fetch(cpu);
-        operation_t ins = cpu_decode(cpu, insptr);
+        uint8_t opc = cpu_fetch(cpu);
+        operation_t ins = cpu_decode(cpu, opc);
         printf("$%.4x: ", cpu->frame.pc);
         print_ins(ins);
         cpu_execute(cpu, ins);
@@ -243,15 +242,17 @@ void test_mode_before_execute(operation_t ins) {
 }
 
 void test_mode_after_execute(operation_t ins) {
+    ppu_flush(pixels);
+
     // Display a message if available.
-    char *msg = (char *)as_resolve(cpu->as, msg_ptr);
-    if (*msg != '\0') {
-        printf("%s", msg);
-        msg_ptr += strlen(msg);
+    char msg = as_read(cpu->as, msg_ptr);
+    if (msg != '\0') {
+        putchar(msg);
+        msg_ptr++;
     }
 
     // Update status of test.
-    int new_status = *as_resolve(cpu->as, 0x6000);
+    int new_status = as_read(cpu->as, 0x6000);
     if (new_status != status) {
         switch (new_status) {
             case 0x80:
@@ -262,11 +263,35 @@ void test_mode_after_execute(operation_t ins) {
                 break;
             default:
                 printf("Test completed with result code %d.\n", new_status);
-                exit(new_status);
+                handlers.running = false;
                 break;
         }
         status = new_status;
     }
+}
+
+void ppu_flush(const char *data) {
+    SDL_Event e;
+    while (SDL_PollEvent(&e) != 0) {
+        switch (e.type) {
+            case SDL_QUIT:
+                exit(0);
+                break;
+        }
+    }
+
+    // Clear the rendering surface.
+    SDL_SetRenderDrawColor(mainRenderer, 0, 0, 0, 0);
+    SDL_RenderClear(mainRenderer);
+
+    // Update and copy the texture to the surface.
+    SDL_Rect rect = { 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT };
+    SDL_UpdateTexture(screen, NULL, data, 3 * SCREEN_WIDTH);
+    SDL_RenderCopy(mainRenderer, screen, NULL, &rect);
+
+    // Present the rendering surface.
+    SDL_RenderSetScale(mainRenderer, SCREEN_SCALE, SCREEN_SCALE);
+    SDL_RenderPresent(mainRenderer);
 }
 
 const char *load_rom(const char *path) {
@@ -292,14 +317,14 @@ const char *load_rom(const char *path) {
 
 void dump_state(cpu_t *cpu) {
     printf("pc: $%.4x, a: %d. x: %d, y: %d, sp: $%.2x, sr: ", cpu->frame.pc, cpu->frame.ac, cpu->frame.x, cpu->frame.y, cpu->frame.sp);
-    printf(cpu->frame.sr.flags.neg ? "n" : "-");
-    printf(cpu->frame.sr.flags.vflow ? "v" : "-");
-    printf(cpu->frame.sr.flags.ign ? "-" : "-");
-    printf(cpu->frame.sr.flags.brk ? "b" : "-");
-    printf(cpu->frame.sr.flags.dec ? "d" : "-");
-    printf(cpu->frame.sr.flags.irq ? "i" : "-");
-    printf(cpu->frame.sr.flags.zero ? "z" : "-");
-    printf(cpu->frame.sr.flags.carry ? "c" : "-");
+    printf(cpu->frame.sr.neg ? "n" : "-");
+    printf(cpu->frame.sr.vflow ? "v" : "-");
+    printf(cpu->frame.sr.ign ? "-" : "-");
+    printf(cpu->frame.sr.brk ? "b" : "-");
+    printf(cpu->frame.sr.dec ? "d" : "-");
+    printf(cpu->frame.sr.irq ? "i" : "-");
+    printf(cpu->frame.sr.zero ? "z" : "-");
+    printf(cpu->frame.sr.carry ? "c" : "-");
     printf("\n");
 }
 

@@ -25,6 +25,9 @@ typedef struct palette {
 
 } palette_t;
 
+/**
+ * @brief A PPU struct that contains all data needed to emulate the PPU.
+ */
 typedef struct ppu {
     
     uint16_t        v : 15;         // Current VRAM address.
@@ -41,8 +44,65 @@ typedef struct ppu {
     addrspace_t     *as;            // The PPU's address space.
     uint8_t         *vram;          // 2KB of memory.
 
-    uint8_t         bkg_color;              // The universal background color;   
-    palette_t       palettes[N_PALETTES];   
+    uint8_t         bkg_color;              // The universal background color.
+    palette_t       palettes[N_PALETTES];
+
+    /* memory mapped registers (stored contiguously) */
+    
+    // PPUCTRL
+    union ppu_ctrl {
+        struct {
+            unsigned    nt_addr     : 2;    // Base nametable address (0: $2000; 1: $2400; 2: $2800; 3: $2C00).
+            unsigned    vram_inc    : 1;    // VRAM address increment per CPU read/write of PPU data (0: add 1; 1: add 32).
+            unsigned    spt_addr    : 1;    // Sprite pattern table address (0: $0000; 1: $1000; ignored in 8x16 mode).
+            unsigned    bpt_addr    : 1;    // Background pattern table address (0: $0000; 1: $1000).
+            unsigned    spr_size    : 1;    // Sprite size (0: 8x8; 1: 8x16).
+            unsigned    m_slave     : 1;    // PPU master/slave select.
+            unsigned    nmi         : 1;    // Generate NMI at start of vblank.
+        };
+        uint8_t value;
+    } controller;
+
+    // PPUMASK
+    union ppu_mask {
+        struct {
+            unsigned    grayscale   : 1;    // Enable greyscale.
+            unsigned    bkg_left    : 1;    // Show background in leftmost 8 pixels of screen.
+            unsigned    spr_left    : 1;    // Show sprites in leftmost 8 pixels of screen.
+            unsigned    background  : 1;    // Show background.
+            unsigned    sprites     : 1;    // Show sprites.
+            unsigned    em_red      : 1;    // Emphasize red (green on PAL).
+            unsigned    em_green    : 1;    // Emphasize green (red on PAL).
+            unsigned    em_blue     : 1;    // Emphasize blue.
+        };
+        uint8_t value;
+    } mask;
+
+    // PPUSTATUS
+    union ppu_status {
+        struct {
+            unsigned                : 5;
+            unsigned    overflow    : 1;    // Sprite overflow.
+            unsigned    hit         : 1;    // Sprite 0 hit.
+            unsigned    vblank      : 1;    // Vertical blank.
+        };
+        uint8_t value;
+    } status;
+
+    // OAMADDR
+    uint8_t     oam_addr;
+
+    // OAMDATA
+    uint8_t     oam_data;
+
+    // PPUSCROLL
+    uint8_t     scroll; 
+
+    // PPUADDR
+    uint8_t     ppu_addr;
+
+    // PPUDATA
+    uint8_t     ppu_data;
 
 } ppu_t;
 
@@ -51,3 +111,10 @@ typedef struct ppu {
 ppu_t *ppu_create(void);
 
 void ppu_destroy(ppu_t *ppu);
+
+/**
+ * @brief Flushes the data from the PPU onto the screen. This function's implementation is
+ * dependent on the graphic API used and takes in an array of pixels.
+ * 
+ */
+void ppu_flush(const char *data);

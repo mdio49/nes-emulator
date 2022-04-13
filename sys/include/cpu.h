@@ -36,7 +36,7 @@ typedef union sr_flags {
         unsigned ign   : 1;     // Ignored flag (unused).
         unsigned vflow : 1;     // Overflow flag.
         unsigned neg   : 1;     // Negative/sign flag.
-    } flags;
+    };
     uint8_t bits;
 } srflags_t;
 
@@ -62,10 +62,28 @@ typedef struct cpu {
     uint8_t         *wmem;      // The CPU's working memory.
     uint8_t         *stack;     // A pointer to the bottom of the stack (increment by stack pointer register to get current value in stack).
 
-    uint8_t         ppu_reg[8];         // PPU registers (stored here until PPU is implemented).
     uint8_t         apu_io_reg[32];     // APU and I/O registers (stored here until implemented).
 
 } cpu_t;
+
+/**
+ * @brief A memory location that may either reference a virtual address from an address space, or a "physical"
+ * address from the emulator's virtual address space (i.e. a CPU register or immediate value).
+ */
+typedef struct mem_loc {
+
+    /**
+     * @brief The virtual memory address that points to somewhere in an address space.
+     */
+    addr_t      vaddr;
+
+    /**
+     * @brief A pointer to a "physical" memory location (i.e. an emulator virtual memory address). If
+     * this is `NULL`, then `vaddr` is used instead.
+     */
+    uint8_t     *ptr;
+
+} mem_loc_t;
 
 /**
  * @brief An addressing mode.
@@ -73,9 +91,9 @@ typedef struct cpu {
 typedef struct addrmode {
 
     /**
-    * @brief Gets a pointer to the value of the argument using this address mode.
+    * @brief Resolves the memory location that the argument refers to using this address mode.
     */
-    const vaddr_ptr_pair_t (*evaluate)(const tframe_t *frame, const addrspace_t *as, const uint8_t *args);
+    const mem_loc_t (*resolve)(const tframe_t *frame, const addrspace_t *as, const uint8_t *args);
 
     /**
     * @brief The number of operator arguments (bytes) required by this address mode in
@@ -95,8 +113,12 @@ typedef struct instruction {
 
     /**
      * @brief Applies the instruction to the given address after it has been evaluated by its addressing mode.
+     * 
+     * @param frame The CPU's registers.
+     * @param as The CPU's address space.
+     * @param loc The memory location that the instruction's argument refers to.
      */
-    void (*apply)(tframe_t *frame, const addrspace_t *as, addr_t addr, uint8_t *value);
+    void (*apply)(tframe_t *frame, const addrspace_t *as, mem_loc_t loc);
 
     /**
      * @brief Indicates whether the instruction is a jump instruction, in which case the program counter shouldn't increment after executing.
@@ -188,18 +210,18 @@ void cpu_reset(cpu_t *cpu);
  * @brief Fetches the next instruction from memory without advancing the program counter.
  * 
  * @param cpu The CPU's state.
- * @return A pointer to the next instruction.
+ * @return The resultant raw opcode.
  */
-uint8_t *cpu_fetch(const cpu_t *cpu);
+uint8_t cpu_fetch(const cpu_t *cpu);
 
 /**
  * @brief Decodes the given instruction.
  * 
  * @param cpu The CPU's state.
- * @param insptr The instruction pointer.
+ * @param opc The raw opcode.
  * @return A struct containing the decoded instruction.
  */
-operation_t cpu_decode(const cpu_t *cpu, const uint8_t *insptr);
+operation_t cpu_decode(const cpu_t *cpu, const uint8_t opc);
 
 /**
  * @brief Executes an instruction. Advances the program counter after the instruction has been executed.

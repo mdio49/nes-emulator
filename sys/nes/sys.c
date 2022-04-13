@@ -9,8 +9,18 @@ static uint8_t mapper_regs[0x1FE0];
 static uint8_t prg_ram[0x2000];
 
 void sys_poweron(void) {
+    // Create CPU and PPU.
     cpu = cpu_create();
     ppu = ppu_create();
+
+    // Setup CPU address space.
+    for (int i = 0; i < 4; i++) {
+        as_add_segment(cpu->as, i * WMEM_SIZE, WMEM_SIZE, cpu->wmem);
+    }
+    for (int i = 0x2000; i < 0x4000; i += 8) {
+        as_add_segment(cpu->as, i, 8, (uint8_t*)&ppu->controller);
+    }
+    as_add_segment(cpu->as, 0x4000, 0x0020, cpu->apu_io_reg);
 }
 
 void sys_poweroff(void) {
@@ -79,13 +89,11 @@ void sys_run(handlers_t *handlers) {
     sys_reset();
 
     // Run the program.
-    while (curprog != NULL) {
-        // Spin while an interrupt is taking place.
-        while (handlers->interrupted);
-
+    handlers->running = true;
+    while (handlers->running) {
         // Fetch and decode the next instruction.
-        uint8_t *insptr = cpu_fetch(cpu);
-        operation_t ins = cpu_decode(cpu, insptr);
+        uint8_t opc = cpu_fetch(cpu);
+        operation_t ins = cpu_decode(cpu, opc);
 
         // Handle any events that occur before the instruction is executed.
         if (handlers->before_execute != NULL) {
@@ -99,5 +107,8 @@ void sys_run(handlers_t *handlers) {
         if (handlers->after_execute != NULL) {
             handlers->after_execute(ins);
         }
+
+        // Spin while an interrupt is taking place.
+        while (handlers->interrupted);
     }
 }

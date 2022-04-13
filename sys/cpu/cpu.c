@@ -13,8 +13,7 @@ cpu_t *cpu_create(void) {
     // Clear registers.
     cpu->frame.ac = 0;
     cpu->frame.pc = 0;
-    cpu->frame.sr.bits = 0;
-    cpu->frame.sr.flags.ign = 1;
+    cpu->frame.sr.bits = SR_IGNORED;
     cpu->frame.x = 0;
     cpu->frame.y = 0;
 
@@ -25,15 +24,8 @@ cpu_t *cpu_create(void) {
     cpu->frame.sp = 0xFF;
     cpu->stack = cpu->wmem + STACK_START;
 
-    // Setup address space.
+    // Create address space.
     cpu->as = as_create();
-    for (int i = 0; i < 4; i++) {
-        as_add_segment(cpu->as, i * WMEM_SIZE, WMEM_SIZE, cpu->wmem);
-    }
-    for (int i = 0x2000; i < 0x4000; i += 8) {
-        as_add_segment(cpu->as, i, 8, cpu->ppu_reg);
-    }
-    as_add_segment(cpu->as, 0x4000, 0x0020, cpu->apu_io_reg);
 
     return cpu;
 }
@@ -50,19 +42,16 @@ void cpu_destroy(cpu_t *cpu) {
 }
 
 void cpu_reset(cpu_t *cpu) {
-    uint8_t low = *as_resolve(cpu->as, RES_VECTOR);
-    uint8_t high = *as_resolve(cpu->as, RES_VECTOR + 1);
+    uint8_t low = as_read(cpu->as, RES_VECTOR);
+    uint8_t high = as_read(cpu->as, RES_VECTOR + 1);
     cpu->frame.pc = bytes_to_word(low, high);
 }
 
-uint8_t *cpu_fetch(const cpu_t *cpu) {
-    return as_resolve(cpu->as, cpu->frame.pc);
+uint8_t cpu_fetch(const cpu_t *cpu) {
+    return as_read(cpu->as, cpu->frame.pc);
 }
 
-operation_t cpu_decode(const cpu_t *cpu, const uint8_t *insptr) {
-    // Get the opcode and args from the instruction pointer.
-    const uint8_t opc = *insptr;
-
+operation_t cpu_decode(const cpu_t *cpu, const uint8_t opc) {
     // Convert the raw data into an opcode_t.
     opcode_converter_t decoder;
     decoder.raw = opc;
@@ -73,8 +62,8 @@ operation_t cpu_decode(const cpu_t *cpu, const uint8_t *insptr) {
     result.addr_mode = get_address_mode(decoder.opcode);
 
     // Get the arguments.
-    result.args[0] = *as_resolve(cpu->as, cpu->frame.pc + 1);
-    result.args[1] = *as_resolve(cpu->as, cpu->frame.pc + 2);
+    result.args[0] = as_read(cpu->as, cpu->frame.pc + 1);
+    result.args[1] = as_read(cpu->as, cpu->frame.pc + 2);
 
     // If the instruction is invalid, then print an error and terminate.
     if (result.instruction == NULL) {
@@ -92,11 +81,11 @@ void cpu_execute(cpu_t *cpu, operation_t op) {
         exit(1);
     }
 
-    // Evaluate the value of the instruction's argument(s) using the correct address mode.
-    const vaddr_ptr_pair_t pair = op.addr_mode->evaluate(&cpu->frame, cpu->as, op.args);
+    // Determine the memory location of the instruction's argument using the correct address mode.
+    const mem_loc_t loc = op.addr_mode->resolve(&cpu->frame, cpu->as, op.args);
 
     // Execute the instruction.
-    op.instruction->apply(&cpu->frame, cpu->as, pair.vaddr, pair.ptr);
+    op.instruction->apply(&cpu->frame, cpu->as, loc);
 
     // Advance the program counter (unless the instruction is a jump instruction).
     if (!op.instruction->jump) {

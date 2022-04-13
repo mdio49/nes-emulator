@@ -39,6 +39,25 @@ static mem_seg_t *seg_create(uint32_t start, uint32_t end, uint8_t *target) {
     return node;
 }
 
+static uint8_t *as_resolve(const addrspace_t *as, addr_t vaddr) {
+    uint8_t *result = NULL;
+    const mem_seg_t *head = as->segs[vaddr / SEG_SIZE];
+    for (const mem_seg_t *seg = head; seg != NULL; seg = seg->next) {
+        if (vaddr >= seg->end)
+            continue;
+        if (vaddr < seg->start)
+            break;
+        result = seg->target + (vaddr - seg->start);
+    }
+
+    if (result == NULL) {
+        printf("Segmentation fault.\n");
+        exit(1);
+    }
+
+    return result;
+}
+
 addrspace_t *as_create() {
     addrspace_t *as = malloc(sizeof(struct addrspace));
     for (int i = 0; i < N_SEGS; i++) {
@@ -121,23 +140,12 @@ void as_add_segment(addrspace_t *as, addr_t start, size_t size, uint8_t *target)
     }
 }
 
-uint8_t *as_resolve(const addrspace_t *as, addr_t vaddr) {
-    uint8_t *result = NULL;
-    const mem_seg_t *head = as->segs[vaddr / SEG_SIZE];
-    for (const mem_seg_t *seg = head; seg != NULL; seg = seg->next) {
-        if (vaddr >= seg->end)
-            continue;
-        if (vaddr < seg->start)
-            break;
-        result = seg->target + (vaddr - seg->start);
-    }
+uint8_t as_read(const addrspace_t *as, addr_t vaddr) {
+    return *as_resolve(as, vaddr);
+}
 
-    if (result == NULL) {
-        printf("Segmentation fault.\n");
-        exit(1);
-    }
-
-    return result;
+void as_write(const addrspace_t *as, addr_t vaddr, uint8_t value) {
+    *as_resolve(as, vaddr) = value;
 }
 
 uint8_t *as_traverse(addrspace_t *as, addr_t start, size_t nbytes) {

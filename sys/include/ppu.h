@@ -19,7 +19,17 @@
 #define PPU_DATA    0x2007
 #define OAM_DMA     0x4014
 
-#define TIME_STEP   0.05 * CLOCKS_PER_SEC
+#define SCREEN_WIDTH    256
+#define SCREEN_HEIGHT   240
+
+#define NT_ROWS     30
+#define NT_COLS     32
+
+#define OUT_R       0x00
+#define OUT_G       0x01
+#define OUT_B       0x02
+
+#define TIME_STEP   1.0 / 30.0
 
 typedef struct palette {
 
@@ -29,15 +39,46 @@ typedef struct palette {
 
 } palette_t;
 
-typedef union io_flags {
-    struct {
-        unsigned    read    : 1;
-        unsigned    write   : 1;
-        unsigned    low     : 1;
-        unsigned            : 5;
-    };
-    uint8_t value;
+typedef struct {
+    unsigned    read    : 1;
+    unsigned    write   : 1;
+    unsigned            : 6;
 } io_flags_t;
+
+/**
+ * @brief A pattern table entry.
+ */
+typedef union pt_entry {
+    struct {
+        unsigned    fine_x  : 3;    // Fine X offset (column number within tile).
+        unsigned    fine_y  : 3;    // Fine Y offset (row number within tile).
+        unsigned    plane   : 1;    // Bit plane (0 = lower; 1 = upper).
+        unsigned    tile_x  : 4;    // Tile column.
+        unsigned    tile_y  : 4;    // Tile row.
+        unsigned    table   : 1;    // Table to use (0 = left; 1 = right).
+    };
+    struct {
+        unsigned            : 3;
+        unsigned    addr    : 13;   // The resolved address.
+    };
+} pt_entry_t;
+
+typedef struct nt_entry {
+    unsigned    cell_x  : 5;    // The x-coordinate of the cell along the nametable.
+    unsigned    cell_y  : 5;    // The y-coordinate of the cell along the nametable.
+    unsigned    nt_x    : 1;    // Nametable along x-direction (0: left; 1: right).
+    unsigned    nt_y    : 1;    // Nametable along y-direction (0: top; 1: bottom).
+    unsigned            : 4;
+} nt_entry_t;
+
+typedef struct vram_reg {
+    unsigned    coarse_x    : 5;
+    unsigned    coarse_y    : 5;
+    unsigned    nt_x        : 1;
+    unsigned    nt_y        : 1;
+    unsigned    fine_y      : 3;
+    unsigned                : 1;
+} vram_reg_t;
 
 /**
  * @brief A PPU struct that contains all data needed to emulate the PPU.
@@ -118,18 +159,20 @@ typedef struct ppu {
     // PPUDATA
     uint8_t     ppu_data;
 
+    io_flags_t  ppucontrol_flags;
     io_flags_t  ppustatus_flags;
     io_flags_t  oamaddr_flags;
     io_flags_t  oamdata_flags;
+    io_flags_t  ppuscroll_flags;
     io_flags_t  ppuaddr_flags;
     io_flags_t  ppudata_flags;
 
-    const char  *out;
+    char out[SCREEN_WIDTH * SCREEN_HEIGHT * 3];
 
     /* temporary until cycling is done correctly */
 
     clock_t last_time;
-    clock_t frame_counter;
+    double  frame_counter;
     bool    flush_flag;
 
 } ppu_t;

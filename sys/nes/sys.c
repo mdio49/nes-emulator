@@ -134,12 +134,22 @@ static void cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t value, 
     bool read = mode & AS_READ;
     bool write = mode & AS_WRITE;
     switch (vaddr) {
+        case PPU_CTRL:
+            if (write) {
+                ppu->ppustatus_flags.write = 1;
+            }
+            break;
         case PPU_STATUS:
             if (read) {
                 ppu->ppustatus_flags.read = 1;
                 if (ppu->status.value == 128) {
                     //printf("r: $%.4x - %d - %d\n", vaddr, value, ppu->status.value);
                 }
+            }
+            break;
+        case PPU_SCROLL:
+            if (write) {
+                ppu->ppuscroll_flags.write = 1;
             }
             break;
         case PPU_ADDR:

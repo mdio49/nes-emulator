@@ -6,9 +6,6 @@
 #include <prog.h>
 #include <stdbool.h>
 
-#define SCREEN_WIDTH    256
-#define SCREEN_HEIGHT   240
-
 typedef struct handlers {
 
     bool        interrupted;

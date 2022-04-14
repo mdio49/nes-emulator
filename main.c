@@ -55,8 +55,6 @@ handlers_t handlers = {
 int status = 0x00;
 int msg_ptr = 0x6004;
 
-char pixels[SCREEN_WIDTH * SCREEN_HEIGHT * 3] = { 0 };
-
 int main(int argc, char *argv[]) {
     // Setup signal handlers.
     signal(SIGINT, keyboard_interupt_handler);
@@ -64,7 +62,6 @@ int main(int argc, char *argv[]) {
 
     // Turn on the system.
     sys_poweron();
-    ppu->out = pixels;
 
     // Parse CL arguments.
     bool test = false;
@@ -129,11 +126,6 @@ bool init(void) {
 
     // Create a texture for the screen.
     screen = SDL_CreateTexture(mainRenderer, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_TARGET, SCREEN_WIDTH, SCREEN_HEIGHT);
-
-    pixels[0] = 255;
-    pixels[3] = 255;
-    pixels[6] = 255;
-    pixels[9] = 255;
 
     return true;
 }

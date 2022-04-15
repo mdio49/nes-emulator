@@ -33,9 +33,8 @@
 
 typedef struct palette {
 
-    uint8_t         col1;
-    uint8_t         col2;
-    uint8_t         col3;
+    uint8_t     cols[3];
+    uint8_t     bkg;
 
 } palette_t;
 
@@ -85,9 +84,8 @@ typedef struct vram_reg {
  */
 typedef struct ppu {
     
-    uint16_t        v : 15;         // Current VRAM address.
-    uint16_t        t : 15;         // Temporary VRAM address.
-    unsigned          : 2;
+    vram_reg_t      v;              // Current VRAM address.
+    vram_reg_t      t;              // Temporary VRAM address.
 
     uint8_t         x : 3;          // Fine X scroll.
     uint8_t         w : 1;          // First or second write toggle bit.
@@ -174,6 +172,10 @@ typedef struct ppu {
     clock_t last_time;
     double  frame_counter;
     bool    flush_flag;
+
+    /* temporary until interrupts are done correctly */
+
+    addr_t  vram_write_addr;
 
 } ppu_t;
 

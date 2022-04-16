@@ -22,12 +22,12 @@ static const mem_loc_t addrm_zpg(const tframe_t *frame, const addrspace_t *as, c
 }
 
 static const mem_loc_t addrm_zpgx(const tframe_t *frame, const addrspace_t *as, const uint8_t *args) {
-    addr_t addr = (args[0] + frame->x) % 256;
+    addr_t addr = (args[0] + frame->x) & 0xFF;
     return mem_loc(addr, NULL);
 }
 
 static const mem_loc_t addrm_zpgy(const tframe_t *frame, const addrspace_t *as, const uint8_t *args) {
-    addr_t addr = (args[0] + frame->y) % 256;
+    addr_t addr = (args[0] + frame->y) & 0xFF;
     return mem_loc(addr, NULL);
 }
 
@@ -52,9 +52,9 @@ static const mem_loc_t addrm_rel(const tframe_t *frame, const addrspace_t *as, c
 }
 
 static const mem_loc_t addrm_ind(const tframe_t *frame, const addrspace_t *as, const uint8_t *args) {
-    uint16_t addr = bytes_to_word(args[0], args[1]);
+    addr_t addr = bytes_to_word(args[0], args[1]);
     uint8_t low = as_read(as, addr);
-    uint8_t high = as_read(as, addr + 1);
+    uint8_t high = as_read(as, (addr & ~PAGE_MASK) | ((addr + 1) & PAGE_MASK));
     addr_t target = bytes_to_word(low, high);
     return mem_loc(target, NULL);
 }
@@ -66,10 +66,11 @@ static const mem_loc_t addrm_indx(const tframe_t *frame, const addrspace_t *as, 
 }
 
 static const mem_loc_t addrm_indy(const tframe_t *frame, const addrspace_t *as, const uint8_t *args) {
-    uint8_t args1[2] = { args[0], 0 };
-    addr_t addr = addrm_ind(frame, as, args1).vaddr;
-    uint8_t args2[2] = { addr & 0xFF, addr >> 8 };
-    return addrm_absy(frame, as, args2);
+    addr_t addr = args[0];
+    uint8_t low = as_read(as, addr);
+    uint8_t high = as_read(as, (addr + 1) & 0xFF);
+    uint8_t args1[2] = { low, high };
+    return addrm_absy(frame, as, args1);
 }
 
 const addrmode_t AM_IMPLIED = { addrm_impl, 0 };

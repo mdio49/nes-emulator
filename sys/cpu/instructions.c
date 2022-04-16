@@ -32,28 +32,23 @@ static uint8_t store(const addrspace_t *as, mem_loc_t loc, uint8_t value) {
     return value;
 }
 
-static void transfer(tframe_t *frame, uint8_t *dest, uint8_t value) {
-    *dest = value;
-    update_sign_flags(frame, value);
-}
-
 /**
  * Transfer instructions.
  */
 
 static void lda_apply(tframe_t *frame, const addrspace_t *as, mem_loc_t loc) {
-    uint8_t value = load(as, loc);
-    transfer(frame, &frame->ac, value);
+    frame->ac = load(as, loc);
+    update_sign_flags(frame, frame->ac);
 }
 
 static void ldx_apply(tframe_t *frame, const addrspace_t *as, mem_loc_t loc) {
-    uint8_t value = load(as, loc);
-    transfer(frame, &frame->x, value);
+    frame->x = load(as, loc);
+    update_sign_flags(frame, frame->x);
 }
 
 static void ldy_apply(tframe_t *frame, const addrspace_t *as, mem_loc_t loc) {
-    uint8_t value = load(as, loc);
-    transfer(frame, &frame->y, value);
+    frame->y = load(as, loc);
+    update_sign_flags(frame, frame->y);
 }
 
 static void sta_apply(tframe_t *frame, const addrspace_t *as, mem_loc_t loc) {
@@ -69,27 +64,32 @@ static void sty_apply(tframe_t *frame, const addrspace_t *as, mem_loc_t loc) {
 }
 
 static void tax_apply(tframe_t *frame, const addrspace_t *as, mem_loc_t loc) {
-    transfer(frame, &frame->x, frame->ac);
+    frame->x = frame->ac;
+    update_sign_flags(frame, frame->x);
 }
 
 static void tay_apply(tframe_t *frame, const addrspace_t *as, mem_loc_t loc) {
-    transfer(frame, &frame->y, frame->ac);
+    frame->y = frame->ac;
+    update_sign_flags(frame, frame->y);
 }
 
 static void tsx_apply(tframe_t *frame, const addrspace_t *as, mem_loc_t loc) {
-    transfer(frame, &frame->x, frame->sp);
+    frame->x = frame->sp;
+    update_sign_flags(frame, frame->x);
 }
 
 static void txa_apply(tframe_t *frame, const addrspace_t *as, mem_loc_t loc) {
-    transfer(frame, &frame->ac, frame->x);
+    frame->ac = frame->x;
+    update_sign_flags(frame, frame->ac);
 }
 
 static void txs_apply(tframe_t *frame, const addrspace_t *as, mem_loc_t loc) {
-    transfer(frame, &frame->sp, frame->x);
+    frame->sp = frame->x;
 }
 
 static void tya_apply(tframe_t *frame, const addrspace_t *as, mem_loc_t loc) {
-    transfer(frame, &frame->ac, frame->y);
+    frame->ac = frame->y;
+    update_sign_flags(frame, frame->ac);
 }
 
 const instruction_t INS_LDA = { "LDA", lda_apply, false };
@@ -268,29 +268,29 @@ const instruction_t INS_ORA = { "ORA", ora_apply, false };
 
 static void asl_apply(tframe_t *frame, const addrspace_t *as, mem_loc_t loc) {
     uint8_t value = load(as, loc);
-    frame->sr.carry = ((value & 0x80) == 0x80);
     uint8_t new_val = store(as, loc, value << 1);
+    frame->sr.carry = (value & 0x80) > 0;
     update_sign_flags(frame, new_val);
 }
 
 static void lsr_apply(tframe_t *frame, const addrspace_t *as, mem_loc_t loc) {
     uint8_t value = load(as, loc);
-    frame->sr.carry = ((value & 0x01) == 0x01);
     uint8_t new_val = store(as, loc, value >> 1);
+    frame->sr.carry = (value & 0x01) > 0;
     update_sign_flags(frame, new_val);
 }
 
 static void rol_apply(tframe_t *frame, const addrspace_t *as, mem_loc_t loc) {
     uint8_t value = load(as, loc);
-    frame->sr.carry = ((value & 0x80) == 0x80);
     uint8_t new_val = store(as, loc, (value << 1) | frame->sr.carry);
+    frame->sr.carry = (value & 0x80) > 0;
     update_sign_flags(frame, new_val);
 }
 
 static void ror_apply(tframe_t *frame, const addrspace_t *as, mem_loc_t loc) {
     uint8_t value = load(as, loc);
-    frame->sr.carry = ((value & 0x01) == 0x01);
     uint8_t new_val = store(as, loc, (value >> 1) | (frame->sr.carry << 7));
+    frame->sr.carry = (value & 0x01) > 0;
     update_sign_flags(frame, new_val);
 }
 

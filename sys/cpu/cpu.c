@@ -43,7 +43,7 @@ cpu_t *cpu_create(void) {
     cpu->wmem = malloc(sizeof(uint8_t) * WMEM_SIZE);
 
     // Setup stack.
-    cpu->frame.sp = 0xFF;
+    cpu->frame.sp = 0xFD;
     cpu->stack = cpu->wmem + STACK_START;
 
     // Create address space.

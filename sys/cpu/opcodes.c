@@ -71,7 +71,7 @@ const addrmode_t *get_address_mode(opcode_t opc) {
                 am = &AM_IMMEDIATE;
             }
             else {
-                am = &AM_INDIRECT;
+                am = &AM_INDIRECT_X;
             }
             break;
         case 0x01:

@@ -198,6 +198,16 @@ void test_address_modes(tframe_t *frame) {
     assert(vaddr == 0x010C);
     assert(as_read(as, vaddr) == 0xAF);
 
+    args[0] = 0xFF;
+    args[1] = 0x01;
+    mem[0x0100] = 0x01;
+    mem[0x01FF] = 0x0D;
+    mem[0x010D] = 0x8A;
+
+    vaddr = AM_INDIRECT.resolve(frame, as, args).vaddr;
+    assert(vaddr == 0x010D);
+    assert(as_read(as, vaddr) == 0x8A);
+
     // Indirect-X.
     args[0] = 0x10;
     frame->x = 0x02;
@@ -232,6 +242,17 @@ void test_address_modes(tframe_t *frame) {
     vaddr = AM_INDIRECT_Y.resolve(frame, as, args).vaddr;
     assert(vaddr == 0x0108);
     assert(as_read(as, vaddr) == 0x0F);
+
+    args[0] = 0xFF;
+    frame->x = 0x00;
+    frame->y = 0x01;
+    mem[0x00] = 0x01;
+    mem[0xFF] = 0x02;
+    mem[0x0103] = 0x8A;
+
+    vaddr = AM_INDIRECT_Y.resolve(frame, as, args).vaddr;
+    assert(vaddr == 0x0103);
+    assert(as_read(as, vaddr) == 0x8A);
 
     as_destroy(as);
 }
@@ -858,12 +879,14 @@ void test_instructions(tframe_t *frame) {
     assert(frame->sr.zero == 0);
 
     exec_ins(&INS_ROL, frame, as, 0, &frame->ac);
-    assert(frame->ac == 0x05);
+    assert(frame->ac == 0x04);
     assert(frame->sr.carry == 1);
     assert(frame->sr.neg == 0);
     assert(frame->sr.zero == 0);
 
     frame->ac = 0x00;
+    frame->sr.carry = 0;
+    
     exec_ins(&INS_ROL, frame, as, 0, &frame->ac);
     assert(frame->ac == 0x00);
     assert(frame->sr.carry == 0);
@@ -878,18 +901,20 @@ void test_instructions(tframe_t *frame) {
     frame->sr.zero = 0;
 
     exec_ins(&INS_ROR, frame, as, 0, &frame->ac);
-    assert(frame->ac == 0x82);
+    assert(frame->ac == 0x02);
     assert(frame->sr.carry == 1);
-    assert(frame->sr.neg == 1);
-    assert(frame->sr.zero == 0);
-
-    exec_ins(&INS_ROR, frame, as, 0, &frame->ac);
-    assert(frame->ac == 0x41);
-    assert(frame->sr.carry == 0);
     assert(frame->sr.neg == 0);
     assert(frame->sr.zero == 0);
 
+    exec_ins(&INS_ROR, frame, as, 0, &frame->ac);
+    assert(frame->ac == 0x81);
+    assert(frame->sr.carry == 0);
+    assert(frame->sr.neg == 1);
+    assert(frame->sr.zero == 0);
+
     frame->ac = 0x00;
+    frame->sr.carry = 0;
+
     exec_ins(&INS_ROR, frame, as, 0, &frame->ac);
     assert(frame->ac == 0x00);
     assert(frame->sr.carry == 0);

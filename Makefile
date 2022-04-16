@@ -26,7 +26,7 @@ main: main.o
 test: test.o
 	$(CC) $(CFLAGS) $(OBJECTS) test.o -o $(TARGET)_test 
 
-test.o: test.c
+test.o: test.c cpu.o
 	$(CC) $(CFLAGS) -c test.c
 
 main.o: main.c sys.o

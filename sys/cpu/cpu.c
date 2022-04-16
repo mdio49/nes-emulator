@@ -6,6 +6,28 @@ uint16_t bytes_to_word(uint8_t low, uint8_t high) {
     return (high << 8) + low;
 }
 
+void push(tframe_t *frame, const addrspace_t *as, uint8_t value) {
+    as_write(as, STACK_START + frame->sp, value);
+    frame->sp--;
+}
+
+uint8_t pull(tframe_t *frame, const addrspace_t *as) {
+    frame->sp++;
+    uint8_t value = as_read(as, STACK_START + frame->sp);
+    return value;
+}
+
+void push_word(tframe_t *frame, const addrspace_t *as, uint16_t value) {
+    push(frame, as, value >> 8);       // high
+    push(frame, as, value & 0x00FF);   // low
+}
+
+uint16_t pull_word(tframe_t *frame, const addrspace_t *as) {
+    uint8_t low = pull(frame, as);
+    uint8_t high = pull(frame, as);
+    return bytes_to_word(low, high);
+}
+
 cpu_t *cpu_create(void) {
     // Create CPU struct.
     cpu_t *cpu = malloc(sizeof(struct cpu));
@@ -26,6 +48,13 @@ cpu_t *cpu_create(void) {
 
     // Create address space.
     cpu->as = as_create();
+
+    // Other variables.
+    cpu->joypad1 = 0;
+    cpu->joypad2 = 0;
+    cpu->joypad1_t = 0;
+    cpu->joypad2_t = 0;
+    cpu->jp_strobe = 0;
 
     return cpu;
 }
@@ -48,6 +77,11 @@ void cpu_reset(cpu_t *cpu) {
 }
 
 void cpu_nmi(cpu_t *cpu) {
+    // Push PC and status register.
+    push_word(&cpu->frame, cpu->as, cpu->frame.pc + 2);
+    push(&cpu->frame, cpu->as, cpu->frame.sr.bits);
+    
+    // Jump to interrupt handler.
     uint8_t low = as_read(cpu->as, NMI_VECTOR);
     uint8_t high = as_read(cpu->as, NMI_VECTOR + 1);
     cpu->frame.pc = bytes_to_word(low, high);
@@ -63,7 +97,7 @@ operation_t cpu_decode(const cpu_t *cpu, const uint8_t opc) {
     decoder.raw = opc;
 
     // Decode the opcode to determine the instruction and address mode.
-    operation_t result;
+    operation_t result = { .opc = opc };
     result.instruction = get_instruction(decoder.opcode);
     result.addr_mode = get_address_mode(decoder.opcode);
 

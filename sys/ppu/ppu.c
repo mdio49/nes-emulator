@@ -4,14 +4,6 @@
 #include <stdlib.h>
 #include <time.h>
 
-/*static uint8_t get_palette_color(ppu_t *ppu, uint8_t tile_x, uint8_t tile_y, uint8_t fine_x, uint8_t fine_y) {
-    addr_t entry = (tile_y << 8) + (tile_x << 4) + fine_y;
-    uint8_t plane1 = as_read(ppu->as, entry);
-    uint8_t plane2 = as_read(ppu->as, entry + 0x08);
-    uint8_t mask = 0x80 >> fine_x;
-    return (plane1 & mask) | ((plane2 & mask) << 1);
-}*/
-
 /**
  * @brief Gets the address of the corresponding nametable entry.
  * 
@@ -70,6 +62,7 @@ ppu_t *ppu_create(void) {
     ppu->as = as_create();
     ppu->flush_flag = false;
     ppu->last_time = clock();
+    ppu->bkg_color = 0x0F;
     return ppu;
 }
 
@@ -154,10 +147,7 @@ void ppu_render(ppu_t *ppu, int cycles) {
         ppu->frame_counter -= TIME_STEP;
         ppu->flush_flag = true;
 
-        const color_t white = { 255, 255, 255 };
-        const color_t black = { 0, 0, 0 };
-
-        uint8_t p1, p2;
+        uint8_t p1, p2, attr;
         nt_entry_t nt;
         pt_entry_t pt;
         
@@ -173,6 +163,8 @@ void ppu_render(ppu_t *ppu, int cycles) {
             pt.fine_x = ppu->x;
             pt.fine_y = ppu->v.fine_y;
             fetch_tile_planes(ppu, pt, &p1, &p2);
+            addr_t attr_addr = get_at_addr(nt);
+            attr = as_read(ppu->as, attr_addr);
 
             // Move across the scanline.
             for (int x = 0; x < SCREEN_WIDTH; x++) {
@@ -183,7 +175,16 @@ void ppu_render(ppu_t *ppu, int cycles) {
                 uint8_t val = (b1 << 1) | b0;
 
                 // Output the pixel (black or white for now).
-                put_pixel(ppu, x, y, val > 0 ? white : black);
+                uint8_t index = attr;
+                if ((ppu->v.coarse_x & 0x02) > 0)
+                    index >>= 2;
+                if ((ppu->v.coarse_y & 0x02) > 0)
+                    index >>= 4;
+                index &= 0x03;
+
+                uint8_t col_index = val > 0 ? ppu->palette[index * 3 + val - 1] : ppu->bkg_color;
+                color_t col = color_resolve(col_index);
+                put_pixel(ppu, x, y, col);
 
                 // Increment x.
                 if (ppu->x < 7) {
@@ -205,6 +206,8 @@ void ppu_render(ppu_t *ppu, int cycles) {
                     pt.fine_x = ppu->x;
                     pt.fine_y = ppu->v.fine_y;
                     fetch_tile_planes(ppu, pt, &p1, &p2);
+                    addr_t attr_addr = get_at_addr(nt);
+                    attr = as_read(ppu->as, attr_addr);
                 }
             }
 

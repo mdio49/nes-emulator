@@ -28,16 +28,19 @@ void keyboard_interupt_handler(int signum);
 void run_bin(const char *path, bool test);
 void run_hex(int argc, char *argv[]);
 
-void test_mode_before_execute(operation_t ins);
-void test_mode_after_execute(operation_t ins);
+void before_execute(operation_t ins);
+void after_execute(operation_t ins);
 
 void update_screen(const char *data);
+uint8_t poll_input(void);
 
 const char *load_rom(const char *path);
 
 void dump_state();
+
 void print_hist();
-void print_ins(operation_t ins);
+void print_ins(FILE *fp, operation_t ins);
+void print_state(FILE *fp, cpu_t *cpu);
 
 bool strprefix(const char *str, const char *pre);
 
@@ -48,12 +51,14 @@ SDL_Texture *screen = NULL;
 
 history_t history[HIST_LEN] = { 0 };
 handlers_t handlers = {
-    .update_screen = update_screen,
     .interrupted = false
 };
 
 int status = 0x00;
 int msg_ptr = 0x6004;
+
+bool test = false;
+FILE *log_fp = NULL;
 
 int main(int argc, char *argv[]) {
     // Setup signal handlers.
@@ -64,7 +69,6 @@ int main(int argc, char *argv[]) {
     sys_poweron();
 
     // Parse CL arguments.
-    bool test = false;
     bool nogui = false;
     char *path = NULL;
     for (int i = 1; i < argc; i++) {
@@ -75,6 +79,9 @@ int main(int argc, char *argv[]) {
         }
         else if (strcmp(arg, "-t") == 0) {
             test = true;
+        }
+        else if (strcmp(arg, "-l") == 0) {
+            log_fp = fopen("emu.log", "w");
         }
         else if (strcmp(arg, "-nogui") == 0) {
             nogui = true;
@@ -131,6 +138,11 @@ bool init(void) {
 }
 
 void exit_handler() {
+    // Close log file pointer (if it exists).
+    if (log_fp != NULL) {
+        fclose(log_fp);
+    }
+
     // Turn off the system.
     sys_poweroff();
 
@@ -188,8 +200,10 @@ void run_bin(const char *path, bool test) {
     sys_insert(prog);
 
     // Setup the handlers.
-    handlers.before_execute = test ? test_mode_before_execute : NULL;
-    handlers.after_execute = test ? test_mode_after_execute : NULL;
+    handlers.before_execute = before_execute;
+    handlers.after_execute = after_execute;
+    handlers.update_screen = update_screen;
+    handlers.poll_input = poll_input;
 
     // Run the system.
     sys_run(&handlers);
@@ -219,7 +233,8 @@ void run_hex(int argc, char *bytes[]) {
         uint8_t opc = cpu_fetch(cpu);
         operation_t ins = cpu_decode(cpu, opc);
         printf("$%.4x: ", cpu->frame.pc);
-        print_ins(ins);
+        print_ins(stdout, ins);
+        printf("\n");
         cpu_execute(cpu, ins);
     }
 
@@ -230,40 +245,62 @@ void run_hex(int argc, char *bytes[]) {
     dump_state(cpu);
 }
 
-void test_mode_before_execute(operation_t ins) {
+void before_execute(operation_t ins) {
     // Update history.
     for (int i = 0; i < HIST_LEN - 1; i++) {
         history[i] = history[i + 1];
     }
     history[HIST_LEN - 1].pc = cpu->frame.pc;
     history[HIST_LEN - 1].op = ins;
+
+    // Write to the log.
+    if (log_fp != NULL) {
+        fprintf(log_fp, "$%.4x:", cpu->frame.pc);
+        fprintf(log_fp, " %.2X", ins.opc);
+        if (ins.addr_mode->argc > 0)
+            fprintf(log_fp, " %.2X", ins.args[0]);
+        else
+            fprintf(log_fp, "   ");
+        if (ins.addr_mode->argc > 1)
+            fprintf(log_fp, " %.2X", ins.args[1]);
+        else
+            fprintf(log_fp, "   ");
+        fprintf(log_fp, " \t|\t");
+        print_ins(log_fp, ins);
+        fprintf(log_fp, "\t|\t");
+        print_state(log_fp, cpu);
+        fprintf(log_fp, "\n");
+    }
 }
 
-void test_mode_after_execute(operation_t ins) {
-    // Display a message if available.
-    char msg = as_read(cpu->as, msg_ptr);
-    if (msg != '\0') {
-        putchar(msg);
-        msg_ptr++;
-    }
-
-    // Update status of test.
-    int new_status = as_read(cpu->as, 0x6000);
-    if (new_status != status) {
-        switch (new_status) {
-            case 0x80:
-                printf("Test running...\n");
-                break;
-            case 0x81:
-                printf("Reset required.\n");
-                break;
-            default:
-                printf("Test completed with result code %d.\n", new_status);
-                handlers.running = false;
-                break;
+void after_execute(operation_t ins) {
+    if (test) {
+        // Display a message if available.
+        char msg = as_read(cpu->as, msg_ptr);
+        if (msg != '\0') {
+            putchar(msg);
+            msg_ptr++;
         }
-        status = new_status;
+
+        // Update status of test.
+        int new_status = as_read(cpu->as, 0x6000);
+        if (new_status != status) {
+            switch (new_status) {
+                case 0x80:
+                    printf("Test running...\n");
+                    break;
+                case 0x81:
+                    printf("Reset required.\n");
+                    break;
+                default:
+                    printf("Test completed with result code %d.\n", new_status);
+                    handlers.running = false;
+                    break;
+            }
+            status = new_status;
+        }
     }
+    
 }
 
 void update_screen(const char *data) {
@@ -273,6 +310,11 @@ void update_screen(const char *data) {
         switch (e.type) {
             case SDL_QUIT:
                 exit(0);
+                break;
+            case SDL_KEYDOWN:
+                if (e.key.keysym.scancode == SDL_SCANCODE_ESCAPE) {
+                    exit(0);
+                }
                 break;
         }
     }
@@ -289,6 +331,28 @@ void update_screen(const char *data) {
     // Present the rendering surface.
     SDL_RenderSetScale(mainRenderer, SCREEN_SCALE, SCREEN_SCALE);
     SDL_RenderPresent(mainRenderer);
+}
+
+uint8_t poll_input(void) {
+    const uint8_t *keystate = SDL_GetKeyboardState(NULL);
+    uint8_t result = 0;
+    if (keystate[SDL_SCANCODE_SPACE])
+        result |= 0x01;
+    if (keystate[SDL_SCANCODE_LCTRL])
+        result |= 0x02;
+    if (keystate[SDL_SCANCODE_RSHIFT])
+        result |= 0x04;
+    if (keystate[SDL_SCANCODE_RETURN])
+        result |= 0x08;
+    if (keystate[SDL_SCANCODE_UP])
+        result |= 0x10;
+    if (keystate[SDL_SCANCODE_DOWN])
+        result |= 0x20;
+    if (keystate[SDL_SCANCODE_LEFT])
+        result |= 0x40;
+    if (keystate[SDL_SCANCODE_RIGHT])
+        result |= 0x80;
+    return result;
 }
 
 const char *load_rom(const char *path) {
@@ -313,15 +377,7 @@ const char *load_rom(const char *path) {
 }
 
 void dump_state(cpu_t *cpu) {
-    printf("pc: $%.4x, a: %d. x: %d, y: %d, sp: $%.2x, sr: ", cpu->frame.pc, cpu->frame.ac, cpu->frame.x, cpu->frame.y, cpu->frame.sp);
-    printf(cpu->frame.sr.neg ? "n" : "-");
-    printf(cpu->frame.sr.vflow ? "v" : "-");
-    printf(cpu->frame.sr.ign ? "-" : "-");
-    printf(cpu->frame.sr.brk ? "b" : "-");
-    printf(cpu->frame.sr.dec ? "d" : "-");
-    printf(cpu->frame.sr.irq ? "i" : "-");
-    printf(cpu->frame.sr.zero ? "z" : "-");
-    printf(cpu->frame.sr.carry ? "c" : "-");
+    print_state(stdout, cpu);
     printf("\n");
 }
 
@@ -330,7 +386,8 @@ void print_hist(history_t *hist, int nhist) {
     for (int i = 0; i < HIST_LEN; i++) {
         if (history[i].op.instruction != NULL) {
             printf("$%.4x: ", history[i].pc);
-            print_ins(history[i].op);
+            print_ins(stdout, history[i].op);
+            printf("\n");
             printed = true;
         }
     }
@@ -339,42 +396,56 @@ void print_hist(history_t *hist, int nhist) {
     }
 }
 
-void print_ins(operation_t ins) {
-    printf("%s", ins.instruction->name);
+void print_state(FILE *fp, cpu_t *cpu) {
+    fprintf(fp, "pc: $%.4x, a: $%.2x. x: $%.2x, y: $%.2x, sp: $%.2x, sr: ", cpu->frame.pc, cpu->frame.ac, cpu->frame.x, cpu->frame.y, cpu->frame.sp);
+    fprintf(fp, cpu->frame.sr.neg ? "n" : "-");
+    fprintf(fp, cpu->frame.sr.vflow ? "v" : "-");
+    fprintf(fp, cpu->frame.sr.ign ? "-" : "-");
+    fprintf(fp, cpu->frame.sr.brk ? "b" : "-");
+    fprintf(fp, cpu->frame.sr.dec ? "d" : "-");
+    fprintf(fp, cpu->frame.sr.irq ? "i" : "-");
+    fprintf(fp, cpu->frame.sr.zero ? "z" : "-");
+    fprintf(fp, cpu->frame.sr.carry ? "c" : "-");
+}
+
+void print_ins(FILE *fp, operation_t ins) {
+    fprintf(fp, "%s", ins.instruction->name);
     if (ins.addr_mode == &AM_IMMEDIATE) {
-        printf(" #$%.2x", ins.args[0]);
+        fprintf(fp, " #$%.2x     ", ins.args[0]);
     }
     else if (ins.addr_mode == &AM_ACCUMULATOR) {
-        printf(" A");
+        fprintf(fp, " A\t\t");
     }
     else if (ins.addr_mode == &AM_ZEROPAGE || ins.addr_mode == &AM_RELATIVE) {
-        printf(" $%.2x", ins.args[0]);
+        fprintf(fp, " $%.2x\t\t", ins.args[0]);
     }
     else if (ins.addr_mode == &AM_ZEROPAGE_X) {
-        printf(" $%.2x,X", ins.args[0]);
+        fprintf(fp, " $%.2x,X\t", ins.args[0]);
     }
     else if (ins.addr_mode == &AM_ZEROPAGE_Y) {
-        printf(" $%.2x,Y", ins.args[0]);
+        fprintf(fp, " $%.2x,Y\t", ins.args[0]);
     }
     else if (ins.addr_mode == &AM_ABSOLUTE) {
-        printf(" $%.2x%.2x", ins.args[1], ins.args[0]);
+        fprintf(fp, " $%.2x%.2x\t", ins.args[1], ins.args[0]);
     }
     else if (ins.addr_mode == &AM_ABSOLUTE_X) {
-        printf(" $%.2x%.2x,X", ins.args[1], ins.args[0]);
+        fprintf(fp, " $%.2x%.2x,X\t", ins.args[1], ins.args[0]);
     }
     else if (ins.addr_mode == &AM_ABSOLUTE_Y) {
-        printf(" $%.2x%.2x,Y", ins.args[1], ins.args[0]);
+        fprintf(fp, " $%.2x%.2x,Y\t", ins.args[1], ins.args[0]);
     }
     else if (ins.addr_mode == &AM_INDIRECT) {
-        printf(" ($%.2x%.2x)", ins.args[1], ins.args[0]);
+        fprintf(fp, " ($%.2x%.2x)\t", ins.args[1], ins.args[0]);
     }
     else if (ins.addr_mode == &AM_INDIRECT_X) {
-        printf(" ($%.2x,X)", ins.args[0]);
+        fprintf(fp, " ($%.2x,X)\t", ins.args[0]);
     }
     else if (ins.addr_mode == &AM_INDIRECT_Y) {
-        printf(" ($%.2x),Y", ins.args[0]);
+        fprintf(fp, " ($%.2x),Y\t", ins.args[0]);
     }
-    printf("\n");
+    else {
+        fprintf(fp, "\t\t\t");
+    }
 }
 
 bool strprefix(const char *str, const char *pre) {

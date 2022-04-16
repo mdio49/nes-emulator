@@ -355,7 +355,7 @@ void test_instructions(tframe_t *frame) {
     assert(frame->ac = 0x80);
     assert(frame->sr.carry == 0);
     assert(frame->sr.neg == 1);
-    assert(frame->sr.vflow == 0);
+    assert(frame->sr.vflow == 1);
     assert(frame->sr.zero == 0);
 
     frame->ac = 0xFF;
@@ -389,6 +389,17 @@ void test_instructions(tframe_t *frame) {
     assert(frame->sr.carry == 1);
     assert(frame->sr.neg == 1);
     assert(frame->sr.vflow == 0);
+    assert(frame->sr.zero == 0);
+
+    frame->ac = 0x80;
+    frame->sr.carry = 0;
+    value = 0xFF;
+
+    exec_ins(&INS_ADC, frame, as, 0, &value);
+    assert(frame->ac == 0x7F);
+    assert(frame->sr.carry == 1);
+    assert(frame->sr.neg == 0);
+    assert(frame->sr.vflow == 1);
     assert(frame->sr.zero == 0);
 
     // Binary coded decimal.
@@ -573,7 +584,7 @@ void test_instructions(tframe_t *frame) {
     assert(frame->ac == 0x7F);
     assert(frame->sr.carry == 1);
     assert(frame->sr.neg == 0);
-    assert(frame->sr.vflow == 0);
+    assert(frame->sr.vflow == 1);
     assert(frame->sr.zero == 0);
 
     frame->ac = 0x85;
@@ -596,6 +607,17 @@ void test_instructions(tframe_t *frame) {
     assert(frame->sr.carry == 0);
     assert(frame->sr.neg == 0);
     assert(frame->sr.vflow == 0);
+    assert(frame->sr.zero == 0);
+
+    frame->ac = 0x7F;
+    frame->sr.carry = 1;
+    value = 0xFF;
+
+    exec_ins(&INS_SBC, frame, as, 0, &value);
+    assert(frame->ac == 0x80);
+    assert(frame->sr.carry == 0);
+    assert(frame->sr.neg == 1);
+    assert(frame->sr.vflow == 1);
     assert(frame->sr.zero == 0);
 
     // Binary coded decimal.
@@ -944,10 +966,10 @@ void test_instructions(tframe_t *frame) {
     /**
      * Test interrupts.
      */
-
-    frame->sr.brk = 0;
+    
+    uint8_t old_sp = frame->sp;
     exec_ins(&INS_BRK, frame, as, 0, NULL);
-    assert(frame->sr.brk == 1);
+    assert(frame->sp == old_sp - 3);
 
     /**
      * Test no-op.

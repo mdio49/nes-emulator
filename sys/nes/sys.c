@@ -26,7 +26,10 @@ void sys_poweron(void) {
         as_add_segment(cpu->as, i + 2, 1, &ppu->status.value);
         as_add_segment(cpu->as, i + 3, 5, &ppu->oam_addr);
     }
-    as_add_segment(cpu->as, 0x4000, 0x0020, cpu->apu_io_reg);
+    as_add_segment(cpu->as, 0x4000, 0x0016, cpu->apu_io_reg1);
+    as_add_segment(cpu->as, JOYPAD1, 0x0001, &cpu->joypad1);
+    as_add_segment(cpu->as, JOYPAD2, 0x0001, &cpu->joypad2);
+    as_add_segment(cpu->as, 0x4018, 0x0008, cpu->apu_io_reg2);
     as_set_update_rule(cpu->as, cpu_update_rule);
 }
 
@@ -53,7 +56,12 @@ void sys_insert(prog_t *prog) {
     as_add_segment(cpu->as, 0x4020, 0x1FE0, mapper_regs);
     as_add_segment(cpu->as, 0x6000, 0x2000, prg_ram);
     as_add_segment(cpu->as, 0x8000, 0x4000, (uint8_t*)prog->prg_rom);
-    as_add_segment(cpu->as, 0xC000, 0x4000, (uint8_t*)prog->prg_rom + 0x4000);
+    if (prog->header.prg_rom_size > 1) {
+        as_add_segment(cpu->as, 0xC000, 0x4000, (uint8_t*)prog->prg_rom + 0x4000);
+    }
+    else {
+        as_add_segment(cpu->as, 0xC000, 0x4000, (uint8_t*)prog->prg_rom);
+    }
 
     // Setup PPU address space.
     as_add_segment(ppu->as, 0x0000, 0x2000, (uint8_t*)prog->chr_rom);
@@ -82,11 +90,12 @@ void sys_insert(prog_t *prog) {
 
     // Palette memory.
     for (int i = 0; i < 8; i++) {
-        addr_t offset = 0x3F00 + (i * 0x0020);
+        addr_t offset = 0x3F00 + (i * N_PALETTES * 4);
         as_add_segment(ppu->as, offset, 1, &ppu->bkg_color);
         for (int j = 0; j < N_PALETTES; j++) {
-            as_add_segment(ppu->as, offset + 1 + j * 4, 3, (uint8_t*)&ppu->palettes[j]);
-            as_add_segment(ppu->as, offset + (j + 1) * 4, 1, &ppu->bkg_color);
+            addr_t start = offset + j * 4 + 1;
+            as_add_segment(ppu->as, start, 3, &ppu->palette[j * 3]);
+            as_add_segment(ppu->as, start + 3, 1, &ppu->bkg_color);
         }
     }
 }
@@ -123,6 +132,22 @@ void sys_run(handlers_t *handlers) {
             if (ppu->controller.nmi) {
                 cpu_nmi(cpu);
             }
+        }
+
+        // Check for input.
+        if (cpu->jp_strobe) {
+            cpu->joypad1_t = handlers->poll_input();
+            cpu->joypad2_t = 0; // TODO
+            cpu->joypad1 = (cpu->joypad1_t & 0x01) > 0;
+            cpu->joypad2 = (cpu->joypad2_t & 0x01) > 0;
+        }
+        else if (cpu->joypad1_t > 0) {
+            cpu->joypad1 = cpu->joypad1_t;
+            cpu->joypad2 = cpu->joypad2_t;
+            cpu->joypad1_t = 0;
+            cpu->joypad2_t = 0;
+
+            //printf("%d\n", cpu->joypad1);
         }
 
         // Spin while an interrupt is taking place.
@@ -166,6 +191,11 @@ static void cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t value, 
             if (write) {
                 ppu->ppudata_flags.write = 1;
                 //printf("w: $%.4x - %.2x\n", vaddr, value);
+            }
+            break;
+        case JOYPAD1:
+            if (write) {
+                cpu->jp_strobe = (value & 0x01) > 0;
             }
             break;
     }

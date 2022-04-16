@@ -37,29 +37,6 @@ static void transfer(tframe_t *frame, uint8_t *dest, uint8_t value) {
     update_sign_flags(frame, value);
 }
 
-static void push(tframe_t *frame, const addrspace_t *as, uint8_t value) {
-    as_write(as, STACK_START + frame->sp, value);
-    frame->sp--;
-}
-
-static uint8_t pull(tframe_t *frame, const addrspace_t *as) {
-    frame->sp++;
-    uint8_t value = as_read(as, STACK_START + frame->sp);
-    update_sign_flags(frame, value);
-    return value;
-}
-
-static void push_word(tframe_t *frame, const addrspace_t *as, uint16_t value) {
-    push(frame, as, value >> 8);       // high
-    push(frame, as, value & 0x00FF);   // low
-}
-
-static uint16_t pull_word(tframe_t *frame, const addrspace_t *as) {
-    uint8_t low = pull(frame, as);
-    uint8_t high = pull(frame, as);
-    return bytes_to_word(low, high);
-}
-
 /**
  * Transfer instructions.
  */
@@ -144,6 +121,7 @@ static void php_apply(tframe_t *frame, const addrspace_t *as, mem_loc_t loc) {
 
 static void pla_apply(tframe_t *frame, const addrspace_t *as, mem_loc_t loc) {
     frame->ac = pull(frame, as);
+    update_sign_flags(frame, frame->ac);
 }
 
 static void plp_apply(tframe_t *frame, const addrspace_t *as, mem_loc_t loc) {
@@ -206,21 +184,28 @@ static uint8_t to_bcd(uint8_t value) {
     return ((value / 10) << 4) + (value % 10);
 }
 
+static uint8_t add(tframe_t *frame, uint8_t arg) {
+    uint16_t result = frame->ac + arg + frame->sr.carry;
+    frame->sr.carry = (result > 255);
+    frame->sr.vflow = ((frame->ac ^ arg) & 0x80) == 0 && ((frame->ac ^ result) & 0x80) != 0;
+    return result;
+}
+
 static void adc_apply(tframe_t *frame, const addrspace_t *as, mem_loc_t loc) {
     uint8_t value = load(as, loc);
-    uint8_t carry = frame->sr.carry;
     if (frame->sr.dec == 0) {
         // Standard binary arithmetic.
-        frame->sr.carry = ((int16_t)frame->ac + value + carry > 255);
-        frame->ac = frame->ac + value + carry;
+        frame->ac = add(frame, value);
     }
     else {
         // Binary coded decimal.
+        uint8_t carry = frame->sr.carry;
         uint8_t a = from_bcd(frame->ac);
         uint8_t m = from_bcd(value);
         int16_t result = a + m + carry;
 
         frame->sr.carry = result >= 100;
+        frame->sr.vflow = 0; // undefined behaviour
         frame->ac = to_bcd(result % 100);
     }
     
@@ -229,19 +214,19 @@ static void adc_apply(tframe_t *frame, const addrspace_t *as, mem_loc_t loc) {
 
 static void sbc_apply(tframe_t *frame, const addrspace_t *as, mem_loc_t loc) {
     uint8_t value = load(as, loc);
-    uint8_t carry = frame->sr.carry ^ 0x01;
     if (frame->sr.dec == 0) {
         // Standard binary arithmetic.
-        frame->sr.carry = ((int16_t)frame->ac - value - carry >= 0);
-        frame->ac = frame->ac - value - carry;
+        frame->ac = add(frame, ~value);
     }
     else {
         // Binary coded decimal.
+        uint8_t carry = frame->sr.carry ^ 0x01;
         uint8_t a = from_bcd(frame->ac);
         uint8_t m = from_bcd(value);
         int16_t result = a - m - carry;
 
         frame->sr.carry = result >= 0;
+        frame->sr.vflow = 0; // undefined behaviour
         frame->ac = to_bcd((100 + (result % 100)) % 100);
     }
 
@@ -469,9 +454,11 @@ const instruction_t INS_RTS = { "RTS", rts_apply, true };
 
 static void brk_apply(tframe_t *frame, const addrspace_t *as, mem_loc_t loc) {
     // Push PC and status register.
-    frame->sr.brk = 1;
     push_word(frame, as, frame->pc + 2);
-    push(frame, as, frame->sr.bits);
+    push(frame, as, frame->sr.bits | SR_BREAK);
+
+    // Disable interrupts.
+    frame->sr.irq = 1;
 
     // Jump to interrupt handler.
     uint8_t low = as_read(as, IRQ_VECTOR);
@@ -480,7 +467,9 @@ static void brk_apply(tframe_t *frame, const addrspace_t *as, mem_loc_t loc) {
 }
 
 static void rti_apply(tframe_t *frame, const addrspace_t *as, mem_loc_t loc) {
-    frame->sr.bits = pull(frame, as);
+    uint8_t bits = pull(frame, as);
+    uint8_t mask = SR_BREAK | SR_IGNORED;
+    frame->sr.bits = (bits & ~mask) | (frame->sr.bits & mask);
     frame->pc = pull_word(frame, as);
 }
 

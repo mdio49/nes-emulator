@@ -19,6 +19,9 @@
 #define SR_OVERFLOW     0x40
 #define SR_NEGATIVE     0x80
 
+#define JOYPAD1         0x4016
+#define JOYPAD2         0x4017
+
 #define NMI_VECTOR      0xFFFA
 #define RES_VECTOR      0xFFFC
 #define IRQ_VECTOR      0xFFFE
@@ -62,7 +65,17 @@ typedef struct cpu {
     uint8_t         *wmem;      // The CPU's working memory.
     uint8_t         *stack;     // A pointer to the bottom of the stack (increment by stack pointer register to get current value in stack).
 
-    uint8_t         apu_io_reg[32];     // APU and I/O registers (stored here until implemented).
+    uint8_t         apu_io_reg1[22];    // APU and I/O registers (stored here until implemented).
+    uint8_t         joypad1;            // Joypad 1
+    uint8_t         joypad2;            // Joypad 2
+    uint8_t         apu_io_reg2[8];
+
+    uint8_t         joypad1_t;          // Joypad 1 state while probing.
+    uint8_t         joypad2_t;          // Joypad 2 state while probing.
+
+    unsigned        jp_strobe   : 1;    // Controller shift register strobe (0: low; 1: high).
+    unsigned                    : 7;
+
 
 } cpu_t;
 
@@ -156,6 +169,7 @@ typedef struct operation {
 
     const addrmode_t        *addr_mode;         // The address mode to use.
     const instruction_t     *instruction;       // The instruction to execute.
+    uint8_t                 opc;                // The opcode (i.e. value at program counter).
     uint8_t                 args[2];            // The arguments of the instruction (may be up to 2).
 
 } operation_t;
@@ -237,5 +251,12 @@ operation_t cpu_decode(const cpu_t *cpu, const uint8_t opc);
  * @param op The instruction to execute.
  */
 void cpu_execute(cpu_t *cpu, operation_t op);
+
+/* stack instructions */
+
+void push(tframe_t *frame, const addrspace_t *as, uint8_t value);
+uint8_t pull(tframe_t *frame, const addrspace_t *as);
+void push_word(tframe_t *frame, const addrspace_t *as, uint16_t value);
+uint16_t pull_word(tframe_t *frame, const addrspace_t *as);
 
 #endif

@@ -138,17 +138,11 @@ void sys_run(handlers_t *handlers) {
         if (cpu->jp_strobe) {
             cpu->joypad1_t = handlers->poll_input();
             cpu->joypad2_t = 0; // TODO
-            cpu->joypad1 = (cpu->joypad1_t & 0x01) > 0;
-            cpu->joypad2 = (cpu->joypad2_t & 0x01) > 0;
         }
-        else if (cpu->joypad1_t > 0) {
-            cpu->joypad1 = cpu->joypad1_t;
-            cpu->joypad2 = cpu->joypad2_t;
-            cpu->joypad1_t = 0;
-            cpu->joypad2_t = 0;
 
-            //printf("%d\n", cpu->joypad1);
-        }
+        // Store the state of next key to be checked in the joypad I/O registers.
+        cpu->joypad1 = cpu->joypad1_t & 0x01;
+        cpu->joypad2 = cpu->joypad2_t & 0x01;
 
         // Spin while an interrupt is taking place.
         while (handlers->interrupted);
@@ -196,6 +190,14 @@ static void cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t value, 
         case JOYPAD1:
             if (write) {
                 cpu->jp_strobe = (value & 0x01) > 0;
+            }
+            else if (read) {
+                cpu->joypad1_t = 0x80 | (cpu->joypad1_t >> 1);
+            }
+            break;
+        case JOYPAD2:
+            if (read) {
+                cpu->joypad2_t = 0x80 | (cpu->joypad2_t >> 1);
             }
             break;
     }

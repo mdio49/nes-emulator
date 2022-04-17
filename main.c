@@ -226,11 +226,12 @@ void run_hex(int argc, char *bytes[]) {
     }
 
     // Execute program.
+    uint8_t opc = 0x01;
     addr_t prev_pc = 0;
     cpu->frame.pc = start;
-    while (cpu->frame.sr.brk == 0) {
+    while (opc != 0x00) {
         prev_pc = cpu->frame.pc;
-        uint8_t opc = cpu_fetch(cpu);
+        opc = cpu_fetch(cpu);
         operation_t ins = cpu_decode(cpu, opc);
         printf("$%.4x: ", cpu->frame.pc);
         print_ins(stdout, ins);

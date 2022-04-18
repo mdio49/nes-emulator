@@ -182,7 +182,7 @@ void ppu_render(ppu_t *ppu, int cycles) {
                     index >>= 4;
                 index &= 0x03;
 
-                uint8_t col_index = val > 0 ? ppu->palette[index * 3 + val - 1] : ppu->bkg_color;
+                uint8_t col_index = val > 0 ? ppu->bkg_palette[index * 3 + val - 1] : ppu->bkg_color;
                 color_t col = color_resolve(col_index);
                 put_pixel(ppu, x, y, col);
 

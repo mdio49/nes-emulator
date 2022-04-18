@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 static void cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t value, uint8_t mode);
+static void ppu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t value, uint8_t mode);
 
 cpu_t *cpu = NULL;
 ppu_t *ppu = NULL;
@@ -90,14 +91,17 @@ void sys_insert(prog_t *prog) {
 
     // Palette memory.
     for (int i = 0; i < 8; i++) {
-        addr_t offset = 0x3F00 + (i * N_PALETTES * 4);
+        addr_t offset = 0x3F00 + (i * 0x20);
         as_add_segment(ppu->as, offset, 1, &ppu->bkg_color);
-        for (int j = 0; j < N_PALETTES; j++) {
-            addr_t start = offset + j * 4 + 1;
-            as_add_segment(ppu->as, start, 3, &ppu->palette[j * 3]);
-            as_add_segment(ppu->as, start + 3, 1, &ppu->bkg_color);
+        as_add_segment(ppu->as, offset + 1, 15, ppu->bkg_palette);
+        for (int j = 0; j < 4; j++) {
+            addr_t start = offset + 0x10 + (j << 2);
+            as_add_segment(ppu->as, start, 1, j > 0 ? &ppu->bkg_palette[j * 4 - 1] : &ppu->bkg_color);
+            as_add_segment(ppu->as, start + 1, 3, &ppu->spr_palette[j * 3]);
         }
     }
+
+    as_set_update_rule(ppu->as, ppu_update_rule);
 }
 
 void sys_run(handlers_t *handlers) {
@@ -201,4 +205,8 @@ static void cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t value, 
             }
             break;
     }
+}
+
+static void ppu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t value, uint8_t mode) {
+    
 }

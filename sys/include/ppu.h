@@ -97,8 +97,9 @@ typedef struct ppu {
     addrspace_t     *as;            // The PPU's address space.
     uint8_t         *vram;          // 2KB of memory.
 
-    uint8_t         bkg_color;                  // The universal background color.
-    uint8_t         palette[N_PALETTES * 3];    // Palette memory.
+    uint8_t         bkg_color;          // The universal background color.
+    uint8_t         bkg_palette[15];    // Palette memory.
+    uint8_t         spr_palette[12];    // Palette memory.
 
     /* memory mapped registers (stored contiguously) */
     

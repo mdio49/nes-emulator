@@ -96,6 +96,11 @@ typedef struct mem_loc {
      */
     uint8_t     *ptr;
 
+    /**
+     * @brief A value indicating whether the page boundary was crossed in order to obtain this virtual address.
+     */
+    bool        page_boundary_crossed;
+
 } mem_loc_t;
 
 /**
@@ -129,9 +134,11 @@ typedef struct instruction {
      * 
      * @param frame The CPU's registers.
      * @param as The CPU's address space.
+     * @param am The addressing mode used by the instruction.
      * @param loc The memory location that the instruction's argument refers to.
+     * @return The number of cycles taken to execute the instruction.
      */
-    void (*apply)(tframe_t *frame, const addrspace_t *as, mem_loc_t loc);
+    int (*apply)(tframe_t *frame, const addrspace_t *as, const addrmode_t *am, mem_loc_t loc);
 
     /**
      * @brief Indicates whether the instruction is a jump instruction, in which case the program counter shouldn't increment after executing.
@@ -249,8 +256,9 @@ operation_t cpu_decode(const cpu_t *cpu, const uint8_t opc);
  * 
  * @param cpu The CPU's state.
  * @param op The instruction to execute.
+ * @param cycles The number of cycles taken to execute the instruction.
  */
-void cpu_execute(cpu_t *cpu, operation_t op);
+int cpu_execute(cpu_t *cpu, operation_t op);
 
 /* stack instructions */
 

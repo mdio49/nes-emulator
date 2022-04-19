@@ -24,7 +24,7 @@ int main() {
 
 void exec_ins(const instruction_t *ins, tframe_t *frame, const addrspace_t *as, addr_t addr, uint8_t *value) {
     mem_loc_t loc = { addr, value };
-    ins->apply(frame, as, loc);
+    ins->apply(frame, as, NULL, loc);
 }
 
 void test_virtual_memory() {

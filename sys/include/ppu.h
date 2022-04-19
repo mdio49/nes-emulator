@@ -6,7 +6,6 @@
 #include <time.h>
 #include <vm.h>
 
-#define N_PALETTES  8
 #define VRAM_SIZE   0x0800
 
 #define PPU_CTRL    0x2000
@@ -30,13 +29,6 @@
 #define OUT_B       0x02
 
 #define TIME_STEP   1.0 / 30.0
-
-typedef struct palette {
-
-    uint8_t     cols[3];
-    uint8_t     bkg;
-
-} palette_t;
 
 typedef struct {
     unsigned    read    : 1;
@@ -98,8 +90,8 @@ typedef struct ppu {
     uint8_t         *vram;          // 2KB of memory.
 
     uint8_t         bkg_color;          // The universal background color.
-    uint8_t         bkg_palette[15];    // Palette memory.
-    uint8_t         spr_palette[12];    // Palette memory.
+    uint8_t         bkg_palette[15];    // Background palette memory.
+    uint8_t         spr_palette[12];    // Sprite palette memory.
 
     /* memory mapped registers (stored contiguously) */
     

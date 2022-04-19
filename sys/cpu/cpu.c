@@ -114,7 +114,7 @@ operation_t cpu_decode(const cpu_t *cpu, const uint8_t opc) {
     return result;
 }
 
-void cpu_execute(cpu_t *cpu, operation_t op) {
+int cpu_execute(cpu_t *cpu, operation_t op) {
     // If the instruction hasn't been implemented, then print an error and terminate.
     if (op.instruction->apply == NULL) {
         printf("Instruction %s not implemented. Program terminated.\n", op.instruction->name);
@@ -125,10 +125,12 @@ void cpu_execute(cpu_t *cpu, operation_t op) {
     const mem_loc_t loc = op.addr_mode->resolve(&cpu->frame, cpu->as, op.args);
 
     // Execute the instruction.
-    op.instruction->apply(&cpu->frame, cpu->as, loc);
+    int cycles = op.instruction->apply(&cpu->frame, cpu->as, op.addr_mode, loc);
 
     // Advance the program counter (unless the instruction is a jump instruction).
     if (!op.instruction->jump) {
         cpu->frame.pc += op.addr_mode->argc + 1;
     }
+
+    return cycles;
 }

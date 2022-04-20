@@ -73,7 +73,7 @@ void cpu_destroy(cpu_t *cpu) {
 void cpu_reset(cpu_t *cpu) {
     uint8_t low = as_read(cpu->as, RES_VECTOR);
     uint8_t high = as_read(cpu->as, RES_VECTOR + 1);
-    cpu->frame.pc = 0xC000; //bytes_to_word(low, high);
+    cpu->frame.pc = bytes_to_word(low, high);
 }
 
 void cpu_nmi(cpu_t *cpu) {

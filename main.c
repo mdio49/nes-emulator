@@ -51,7 +51,8 @@ SDL_Texture *screen = NULL;
 
 history_t history[HIST_LEN] = { 0 };
 handlers_t handlers = {
-    .interrupted = false
+    .interrupted = false,
+    .cpu_cycle_counter = 0
 };
 
 int status = 0x00;
@@ -270,6 +271,7 @@ void before_execute(operation_t ins) {
         print_ins(log_fp, ins);
         fprintf(log_fp, "\t|\t");
         print_state(log_fp, cpu);
+        fprintf(log_fp, "\t|\t CPU: %ld", handlers.cpu_cycle_counter);
         fprintf(log_fp, "\n");
     }
 }
@@ -407,6 +409,7 @@ void print_state(FILE *fp, cpu_t *cpu) {
     fprintf(fp, cpu->frame.sr.irq ? "i" : "-");
     fprintf(fp, cpu->frame.sr.zero ? "z" : "-");
     fprintf(fp, cpu->frame.sr.carry ? "c" : "-");
+    fprintf(fp, " ($%.2x)", cpu->frame.sr.bits);
 }
 
 void print_ins(FILE *fp, operation_t ins) {

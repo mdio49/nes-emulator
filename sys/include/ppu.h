@@ -169,6 +169,7 @@ typedef struct ppu {
     /* temporary until interrupts are done correctly */
 
     addr_t  vram_write_addr;
+    uint8_t draw_x, draw_y;     // Current screen position of render.
 
 } ppu_t;
 

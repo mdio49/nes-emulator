@@ -235,44 +235,14 @@ static uint8_t add(tframe_t *frame, uint8_t arg) {
 
 static int adc_apply(tframe_t *frame, const addrspace_t *as, const addrmode_t *am, mem_loc_t loc) {
     uint8_t value = load(as, loc);
-    if (frame->sr.dec == 0) {
-        // Standard binary arithmetic.
-        frame->ac = add(frame, value);
-    }
-    else {
-        // Binary coded decimal.
-        uint8_t carry = frame->sr.carry;
-        uint8_t a = from_bcd(frame->ac);
-        uint8_t m = from_bcd(value);
-        int16_t result = a + m + carry;
-
-        frame->sr.carry = result >= 100;
-        frame->sr.vflow = 0; // undefined behaviour
-        frame->ac = to_bcd(result % 100);
-    }
-    
+    frame->ac = add(frame, value);
     update_sign_flags(frame, frame->ac);
     return def_cycles(am, loc);
 }
 
 static int sbc_apply(tframe_t *frame, const addrspace_t *as, const addrmode_t *am, mem_loc_t loc) {
     uint8_t value = load(as, loc);
-    if (frame->sr.dec == 0) {
-        // Standard binary arithmetic.
-        frame->ac = add(frame, ~value);
-    }
-    else {
-        // Binary coded decimal.
-        uint8_t carry = frame->sr.carry ^ 0x01;
-        uint8_t a = from_bcd(frame->ac);
-        uint8_t m = from_bcd(value);
-        int16_t result = a - m - carry;
-
-        frame->sr.carry = result >= 0;
-        frame->sr.vflow = 0; // undefined behaviour
-        frame->ac = to_bcd((100 + (result % 100)) % 100);
-    }
-
+    frame->ac = add(frame, ~value);
     update_sign_flags(frame, frame->ac);
     return def_cycles(am, loc);
 }

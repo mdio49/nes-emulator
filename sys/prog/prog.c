@@ -67,6 +67,7 @@ static void load_ines(prog_t *prog, const char *src) {
         fp += chr_rom_bytes;
     }
     else {
+        // Use CHR-RAM instead.
         prog->chr_rom = NULL;
     }
 

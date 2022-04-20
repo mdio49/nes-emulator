@@ -11,6 +11,7 @@ prog_t *curprog = NULL;
 
 static uint8_t mapper_regs[0x1FE0];
 static uint8_t prg_ram[0x2000];
+static uint8_t chr_ram[0x2000];
 
 void sys_poweron(void) {
     // Create CPU and PPU.
@@ -65,7 +66,12 @@ void sys_insert(prog_t *prog) {
     }
 
     // Setup PPU address space.
-    as_add_segment(ppu->as, 0x0000, 0x2000, (uint8_t*)prog->chr_rom);
+    if (prog->chr_rom != NULL) {
+        as_add_segment(ppu->as, 0x0000, 0x2000, (uint8_t*)prog->chr_rom);
+    }
+    else {
+        as_add_segment(ppu->as, 0x0000, 0x2000, chr_ram);
+    }
     as_add_segment(ppu->as, 0x2000, 0x0400, ppu->vram);
     as_add_segment(ppu->as, 0x3000, 0x0400, ppu->vram);
     if (prog->header.mirroring == 1) {
@@ -110,6 +116,7 @@ void sys_run(handlers_t *handlers) {
 
     // Run the program.
     handlers->running = true;
+    handlers->cpu_cycle_counter += 7;
     while (handlers->running) {
         // Fetch and decode the next instruction.
         uint8_t opc = cpu_fetch(cpu);
@@ -121,15 +128,18 @@ void sys_run(handlers_t *handlers) {
         }
 
         // Execute the instruction.
-        cpu_execute(cpu, ins);
+        int cycles = cpu_execute(cpu, ins);
         
         // Handle any events that occur after the instruction is executed.
         if (handlers->after_execute != NULL) {
             handlers->after_execute(ins);
         }
 
+        // Increment the cycle counter.
+        handlers->cpu_cycle_counter += cycles;
+
         // Cycle the PPU.
-        ppu_render(ppu, 1);
+        ppu_render(ppu, cycles * 3);
         if (ppu->flush_flag) {
             ppu->flush_flag = false;
             handlers->update_screen(ppu->out);
@@ -205,8 +215,12 @@ static void cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t value, 
             }
             break;
     }
+
+    //printf("cpu %c: $%.4x - %.2x\n", read ? 'r' : 'w', vaddr, value);
 }
 
 static void ppu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t value, uint8_t mode) {
-    
+    //bool read = mode & AS_READ;
+    //bool write = mode & AS_WRITE;
+    //printf("ppu %c: $%.4x - %.2x\n", read ? 'r' : 'w', vaddr, value);
 }

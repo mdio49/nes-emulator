@@ -162,9 +162,9 @@ void ppu_render(ppu_t *ppu, int cycles) {
             pt = fetch_tile(ppu, nt);
             pt.fine_x = ppu->x;
             pt.fine_y = ppu->v.fine_y;
-            fetch_tile_planes(ppu, pt, &p1, &p2);
             addr_t attr_addr = get_at_addr(nt);
             attr = as_read(ppu->as, attr_addr);
+            fetch_tile_planes(ppu, pt, &p1, &p2);
 
             // Move across the scanline.
             for (int x = 0; x < SCREEN_WIDTH; x++) {
@@ -205,9 +205,9 @@ void ppu_render(ppu_t *ppu, int cycles) {
                     pt = fetch_tile(ppu, nt);
                     pt.fine_x = ppu->x;
                     pt.fine_y = ppu->v.fine_y;
-                    fetch_tile_planes(ppu, pt, &p1, &p2);
                     addr_t attr_addr = get_at_addr(nt);
                     attr = as_read(ppu->as, attr_addr);
+                    fetch_tile_planes(ppu, pt, &p1, &p2);
                 }
             }
 

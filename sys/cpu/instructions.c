@@ -178,7 +178,8 @@ const instruction_t INS_PLP = { "PLP", plp_apply, false };
 static int dec_apply(tframe_t *frame, const addrspace_t *as, const addrmode_t *am, mem_loc_t loc) {
     uint8_t value = load(as, loc);
     update_sign_flags(frame, store(as, loc, --value));
-    return def_cycles(am, loc);
+    loc.page_boundary_crossed = true;
+    return def_cycles(am, loc) + 2;
 }
 
 static int dex_apply(tframe_t *frame, const addrspace_t *as, const addrmode_t *am, mem_loc_t loc) {
@@ -194,7 +195,8 @@ static int dey_apply(tframe_t *frame, const addrspace_t *as, const addrmode_t *a
 static int inc_apply(tframe_t *frame, const addrspace_t *as, const addrmode_t *am, mem_loc_t loc) {
     uint8_t value = load(as, loc);
     update_sign_flags(frame, store(as, loc, ++value));
-    return def_cycles(am, loc);
+    loc.page_boundary_crossed = true;
+    return def_cycles(am, loc) + 2;
 }
 
 static int inx_apply(tframe_t *frame, const addrspace_t *as, const addrmode_t *am, mem_loc_t loc) {
@@ -217,14 +219,6 @@ const instruction_t INS_INY = { "INY", iny_apply, false };
 /**
  * Arithmetic operators.
  */
-
-static uint8_t from_bcd(uint8_t bin) {
-    return (bin >> 4) * 10 + (bin & 0x0F);
-}
-
-static uint8_t to_bcd(uint8_t value) {
-    return ((value / 10) << 4) + (value % 10);
-}
 
 static uint8_t add(tframe_t *frame, uint8_t arg) {
     uint16_t result = frame->ac + arg + frame->sr.carry;
@@ -411,7 +405,7 @@ static int branch(tframe_t *frame, addr_t target, bool condition) {
     int cycles = 2;
     if (condition) {
         cycles++; // Add 1 cycle if branch occurs.
-        if ((frame->pc & ~PAGE_MASK) != (target & ~PAGE_MASK))
+        if (((frame->pc + 2) & ~PAGE_MASK) != ((target + 2) & ~PAGE_MASK))
             cycles++; // Add 1 cycle if branch occurs on different page.
         frame->pc = target;
     }
@@ -572,7 +566,7 @@ static int isc_apply(tframe_t *frame, const addrspace_t *as, const addrmode_t *a
     inc_apply(frame, as, am, loc);
     sbc_apply(frame, as, am, loc);
     loc.page_boundary_crossed = true;
-    return am == &AM_INDIRECT_Y ? 4 : def_cycles(am, loc) + 2;
+    return def_cycles(am, loc) + 2;
 }
 
 static int las_apply(tframe_t *frame, const addrspace_t *as, const addrmode_t *am, mem_loc_t loc) {

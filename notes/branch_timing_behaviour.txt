@@ -1,0 +1,5 @@
+1106: CFFE  F0 05     BEQ $D005                       A:5A X:81 Y:69 P:27 SP:FB PPU: 22,313 CYC:2605
+1107: D005  A9 AA     LDA #$AA                        A:5A X:81 Y:69 P:27 SP:FB PPU: 22,322 CYC:2608	(+3) (*)
+...
+7955: F2FC  F0 02     BEQ $F300                       A:52 X:02 Y:E9 P:67 SP:FB PPU:205, 19 CYC:23308
+7956: F300  C8        INY                             A:52 X:02 Y:E9 P:67 SP:FB PPU:205, 31 CYC:23312	(+4) (**)

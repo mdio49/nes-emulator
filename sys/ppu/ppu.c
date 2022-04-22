@@ -21,7 +21,7 @@ static inline addr_t get_nt_addr(nt_entry_t entry) {
  * @return The resultant address.
  */
 static inline addr_t get_pt_addr(pt_entry_t entry) {
-    return (entry.table << 9) | (entry.tile_y << 8) | (entry.tile_x << 4) | (entry.plane << 3) | entry.fine_y;
+    return (entry.table << 12) | (entry.tile_y << 8) | (entry.tile_x << 4) | (entry.plane << 3) | entry.fine_y;
 }
 
 /**
@@ -59,6 +59,7 @@ static void fetch_tile_into_sr(ppu_t *ppu) {
     
     // Fetch NT byte.
     pt_entry_t pt = fetch_tile(ppu, nt);
+    pt.table = ppu->controller.bpt_addr;
     pt.fine_x = ppu->x;
     pt.fine_y = ppu->v.fine_y;
 

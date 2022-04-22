@@ -71,8 +71,8 @@ void cpu_destroy(cpu_t *cpu) {
 }
 
 void cpu_reset(cpu_t *cpu) {
-    uint8_t low = as_read(cpu->as, RES_VECTOR);
-    uint8_t high = as_read(cpu->as, RES_VECTOR + 1);
+    const uint8_t low = as_read(cpu->as, RES_VECTOR);
+    const uint8_t high = as_read(cpu->as, RES_VECTOR + 1);
     cpu->frame.pc = bytes_to_word(low, high);
 }
 
@@ -82,9 +82,11 @@ void cpu_nmi(cpu_t *cpu) {
     push(&cpu->frame, cpu->as, cpu->frame.sr.bits);
     
     // Jump to interrupt handler.
-    uint8_t low = as_read(cpu->as, NMI_VECTOR);
-    uint8_t high = as_read(cpu->as, NMI_VECTOR + 1);
+    const uint8_t low = as_read(cpu->as, NMI_VECTOR);
+    const uint8_t high = as_read(cpu->as, NMI_VECTOR + 1);
     cpu->frame.pc = bytes_to_word(low, high);
+
+    //printf("NMI detected.\n");
 }
 
 uint8_t cpu_fetch(const cpu_t *cpu) {

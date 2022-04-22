@@ -149,17 +149,17 @@ uint8_t as_read(const addrspace_t *as, addr_t vaddr) {
     //printf("R %p: $%.4x\n", as, vaddr);
     uint8_t value = *as_resolve(as, vaddr);
     if (as->update_rule != NULL) {
-        as->update_rule(as, vaddr, value, AS_READ);
+        value = as->update_rule(as, vaddr, value, AS_READ);
     }
     return value;
 }
 
 void as_write(const addrspace_t *as, addr_t vaddr, uint8_t value) {
     //printf("W: %p $%.4x\n", as, vaddr);
-    *as_resolve(as, vaddr) = value;
     if (as->update_rule != NULL) {
-        as->update_rule(as, vaddr, value, AS_WRITE);
+        value = as->update_rule(as, vaddr, value, AS_WRITE);
     }
+    *as_resolve(as, vaddr) = value;
 }
 
 uint8_t *as_traverse(const addrspace_t *as, addr_t start, size_t nbytes) {

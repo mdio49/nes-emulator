@@ -28,6 +28,9 @@
 #define OUT_G       0x01
 #define OUT_B       0x02
 
+#define SCANLINE_END    340
+#define N_SCANLINES     260
+
 #define TIME_STEP   1.0 / 30.0
 
 typedef struct {
@@ -150,6 +153,8 @@ typedef struct ppu {
     // PPUDATA
     uint8_t     ppu_data;
 
+    /* io flags */
+
     io_flags_t  ppucontrol_flags;
     io_flags_t  ppustatus_flags;
     io_flags_t  oamaddr_flags;
@@ -158,18 +163,20 @@ typedef struct ppu {
     io_flags_t  ppuaddr_flags;
     io_flags_t  ppudata_flags;
 
-    char out[SCREEN_WIDTH * SCREEN_HEIGHT * 3];
+    int16_t     draw_x, draw_y;                     // Current screen position of render.
+    char out[SCREEN_WIDTH * SCREEN_HEIGHT * 3];     // Pixel output (3 bytes per pixel; RGB order).
+
+    unsigned    nmi_occured : 1;                    // A flag that is true if an NMI should occur on the next CPU instruction fetch.
+    unsigned                : 8;
 
     /* temporary until cycling is done correctly */
 
-    clock_t last_time;
-    double  frame_counter;
-    bool    flush_flag;
+    clock_t     last_time;
+    double      frame_counter;
 
     /* temporary until interrupts are done correctly */
 
-    addr_t  vram_write_addr;
-    uint8_t draw_x, draw_y;     // Current screen position of render.
+    addr_t      vram_write_addr;
 
 } ppu_t;
 

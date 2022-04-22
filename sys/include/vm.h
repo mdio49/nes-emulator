@@ -22,10 +22,11 @@ typedef struct addrspace addrspace_t;
  * 
  * @param as The address space that was updated.
  * @param vaddr The virtual address that was updated.
- * @param value The value at the address after the update.
+ * @param value The value at the address before the update.
  * @param mode Whether the update was a read or a write.
+ * @return The value that gets read, or the value to write to the virtual address.
  */
-typedef void (*update_rule_t)(const addrspace_t *as, addr_t vaddr, uint8_t value, uint8_t mode);
+typedef uint8_t (*update_rule_t)(const addrspace_t *as, addr_t vaddr, uint8_t value, uint8_t mode);
 
 /**
  * @brief Creates an empty address space.

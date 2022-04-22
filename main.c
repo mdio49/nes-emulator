@@ -271,8 +271,7 @@ void before_execute(operation_t ins) {
         print_ins(log_fp, ins);
         fprintf(log_fp, "\t|\t");
         print_state(log_fp, cpu);
-        fprintf(log_fp, "\t|\t CPU: %ld", handlers.cpu_cycle_counter);
-        fprintf(log_fp, "\n");
+        fprintf(log_fp, "\t|\tPPU: %3d, %3d CPU: %ld\n", ppu->draw_x, ppu->draw_y, handlers.cpu_cycle_counter);
     }
 }
 

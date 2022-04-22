@@ -4,6 +4,9 @@
 #include <stdlib.h>
 #include <time.h>
 
+static inline void cycle_render(ppu_t *ppu, int cycles);
+static inline void simple_render(ppu_t *ppu);
+
 /**
  * @brief Gets the address of the corresponding nametable entry.
  * 
@@ -49,6 +52,29 @@ static inline void fetch_tile_planes(ppu_t *ppu, pt_entry_t pt, uint8_t *p1, uin
     *p2 = as_read(ppu->as, pt_addr + 0x08);
 }
 
+static void fetch_tile_into_sr(ppu_t *ppu) {
+    const nt_entry_t nt = {
+        .cell_x = ppu->v.coarse_x,
+        .cell_y = ppu->v.coarse_y,
+        .nt_x = ppu->v.nt_x,
+        .nt_y = ppu->v.nt_y
+    };
+    
+    // Fetch NT byte.
+    pt_entry_t pt = fetch_tile(ppu, nt);
+    pt.fine_x = ppu->x;
+    pt.fine_y = ppu->v.fine_y;
+
+    // Fetch AT byte.
+    addr_t attr_addr = get_at_addr(nt);
+    ppu->sr8[0] = as_read(ppu->as, attr_addr);
+
+    // Fetch low and high BG tile byte.
+    uint8_t p1, p2;
+    fetch_tile_planes(ppu, pt, &p1, &p2);
+    ppu->sr16[0] = p1 | (p2 << 8);
+}
+
 static inline void put_pixel(ppu_t *ppu, int screen_x, int screen_y, color_t color) {
     int index = (screen_x + screen_y * SCREEN_WIDTH) * 3;
     ppu->out[index + OUT_R] = color.red;
@@ -60,9 +86,12 @@ ppu_t *ppu_create(void) {
     ppu_t *ppu = malloc(sizeof(struct ppu));
     ppu->vram = malloc(sizeof(uint8_t) * VRAM_SIZE);
     ppu->as = as_create();
-    ppu->flush_flag = false;
     ppu->last_time = clock();
     ppu->bkg_color = 0x0F;
+
+    ppu->draw_x = 0;
+    ppu->draw_y = 0;
+
     return ppu;
 }
 
@@ -83,6 +112,7 @@ void ppu_render(ppu_t *ppu, int cycles) {
     // PPUSTATUS
     if (ppu->ppustatus_flags.read) {
         ppu->status.vblank = 0;
+        ppu->nmi_occured = false;
         ppu->ppustatus_flags.read = 0;
         ppu->w = 0;
     }
@@ -138,6 +168,128 @@ void ppu_render(ppu_t *ppu, int cycles) {
         ppu->ppudata_flags.read = 0;
     }
 
+    // Rendering.
+    //printf("PPU: %d, %d\n", ppu->draw_x, ppu->draw_y);
+    cycle_render(ppu, cycles);
+}
+
+static inline void cycle_render(ppu_t *ppu, int cycles) {
+    while (cycles > 0) {
+        if (ppu->draw_y == -1) {
+            // Pre-render scanline.
+            if (ppu->draw_x == 1) {
+                ppu->status.vblank = 0;
+                ppu->status.overflow = 0;
+                ppu->status.hit = 0;
+                ppu->nmi_occured = 0;
+            }
+            else if (ppu->draw_x >= 280 && ppu->draw_x <= 304) {
+                // Reset y.
+                ppu->v.coarse_y = ppu->t.coarse_y;
+                ppu->v.fine_y = ppu->t.fine_y;
+                ppu->v.nt_y = ppu->t.nt_y;
+            }
+            else if (ppu->draw_x == 340) {
+                fetch_tile_into_sr(ppu);
+            }
+        }
+        else if (ppu->draw_y == 240) {
+            // Post-render scanline.
+        }
+        else if (ppu->draw_y == 241) {
+            // Vblank.
+            if (ppu->draw_x == 1) {
+                ppu->status.vblank = 1;
+                ppu->nmi_occured = true;
+            }
+        }
+        else if (ppu->draw_y < 240) {
+            // Normal rendering.
+            if (ppu->draw_x == 0) {
+                // Idle
+            }
+            else if (ppu->draw_x <= 256) {
+                // Determine the value of the bit at this pixel of the tile.
+                uint8_t mask = 0x80 >> ppu->x;
+                uint8_t b0 = ((ppu->sr16[0] & 0xFF) & mask) > 0;
+                uint8_t b1 = ((ppu->sr16[0] >> 8) & mask) > 0;
+                uint8_t val = (b1 << 1) | b0;
+
+                // Output the pixel.
+                uint8_t index = ppu->sr8[0];
+                if ((ppu->v.coarse_x & 0x02) > 0)
+                    index >>= 2;
+                if ((ppu->v.coarse_y & 0x02) > 0)
+                    index >>= 4;
+                index &= 0x03;
+
+                uint8_t col_index = val > 0 ? ppu->bkg_palette[index * 3 + val - 1] : ppu->bkg_color;
+                color_t col = color_resolve(col_index);
+                put_pixel(ppu, ppu->draw_x - 1, ppu->draw_y, col);
+
+                // Increment x.
+                if (ppu->x < 7) {
+                    ppu->x++;
+                }
+                else {
+                    ppu->x = 0;
+                    if (ppu->v.coarse_x < 31) {
+                        ppu->v.coarse_x++;
+                    }
+                    else {
+                        ppu->v.coarse_x = 0;
+                        ppu->v.nt_x = !ppu->v.nt_x;
+                    }
+
+                    // Fetch the next tile.
+                    fetch_tile_into_sr(ppu);
+                }
+
+                if (ppu->draw_x == 256) {
+                    // Increment y.
+                    if (ppu->v.fine_y < 7) {
+                        ppu->v.fine_y++;
+                    }
+                    else {
+                        ppu->v.fine_y = 0;
+                        if (ppu->v.coarse_y == 29) {
+                            ppu->v.coarse_y = 0;
+                            ppu->v.nt_y = !ppu->v.nt_y;
+                        }
+                        else if (ppu->v.coarse_y == 31) {
+                            ppu->v.coarse_y = 0;
+                        }
+                        else {
+                            ppu->v.coarse_y++;
+                        }
+                    }
+                }
+            }
+            else if (ppu->draw_x == 257) {
+                // Reset x.
+                ppu->v.coarse_x = ppu->t.coarse_x;
+                ppu->v.nt_x = ppu->t.nt_x;
+            }
+            else if (ppu->draw_x == 340) {
+                fetch_tile_into_sr(ppu);
+            }
+        }
+
+        // Increment scanline pointer.
+        ppu->draw_x++;
+        if (ppu->draw_x == 341) {
+            ppu->draw_x = 0;
+            ppu->draw_y++;
+        }
+        if (ppu->draw_y == 261) {
+            ppu->draw_y = -1;
+        }
+
+        cycles--;
+    }
+}
+
+static inline void simple_render(ppu_t *ppu) {
     clock_t t = clock();
     double dt = (double)(t - ppu->last_time) / CLOCKS_PER_SEC;
     ppu->frame_counter += dt;
@@ -145,9 +297,9 @@ void ppu_render(ppu_t *ppu, int cycles) {
     if (ppu->frame_counter >= TIME_STEP) {
         ppu->status.vblank = 1;
         ppu->frame_counter -= TIME_STEP;
-        ppu->flush_flag = true;
+        ppu->nmi_occured = true;
 
-        uint8_t p1, p2, attr;
+        uint8_t p1, p2;
         nt_entry_t nt;
         pt_entry_t pt;
         
@@ -163,7 +315,7 @@ void ppu_render(ppu_t *ppu, int cycles) {
             pt.fine_x = ppu->x;
             pt.fine_y = ppu->v.fine_y;
             addr_t attr_addr = get_at_addr(nt);
-            attr = as_read(ppu->as, attr_addr);
+            ppu->sr8[0] = as_read(ppu->as, attr_addr);
             fetch_tile_planes(ppu, pt, &p1, &p2);
 
             // Move across the scanline.
@@ -174,8 +326,8 @@ void ppu_render(ppu_t *ppu, int cycles) {
                 uint8_t b1 = (p2 & mask) > 0;
                 uint8_t val = (b1 << 1) | b0;
 
-                // Output the pixel (black or white for now).
-                uint8_t index = attr;
+                // Output the pixel.
+                uint8_t index = ppu->sr8[0];
                 if ((ppu->v.coarse_x & 0x02) > 0)
                     index >>= 2;
                 if ((ppu->v.coarse_y & 0x02) > 0)
@@ -206,7 +358,7 @@ void ppu_render(ppu_t *ppu, int cycles) {
                     pt.fine_x = ppu->x;
                     pt.fine_y = ppu->v.fine_y;
                     addr_t attr_addr = get_at_addr(nt);
-                    attr = as_read(ppu->as, attr_addr);
+                    ppu->sr8[0] = as_read(ppu->as, attr_addr);
                     fetch_tile_planes(ppu, pt, &p1, &p2);
                 }
             }

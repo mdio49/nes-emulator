@@ -2,8 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-static void cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t value, uint8_t mode);
-static void ppu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t value, uint8_t mode);
+static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t value, uint8_t mode);
+static uint8_t ppu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t value, uint8_t mode);
 
 cpu_t *cpu = NULL;
 ppu_t *ppu = NULL;
@@ -114,9 +114,12 @@ void sys_run(handlers_t *handlers) {
     // Reset the system (so the program counter is set correctly).
     sys_reset();
 
+    // Simulate 7 power-on cycles (TODO: figure out what this actually is).
+    //handlers->cpu_cycle_counter += 7;
+    //ppu_render(ppu, 21);
+
     // Run the program.
     handlers->running = true;
-    handlers->cpu_cycle_counter += 7;
     while (handlers->running) {
         // Fetch and decode the next instruction.
         uint8_t opc = cpu_fetch(cpu);
@@ -140,8 +143,8 @@ void sys_run(handlers_t *handlers) {
 
         // Cycle the PPU.
         ppu_render(ppu, cycles * 3);
-        if (ppu->flush_flag) {
-            ppu->flush_flag = false;
+        if (ppu->nmi_occured) {
+            ppu->nmi_occured = false;
             handlers->update_screen(ppu->out);
             if (ppu->controller.nmi) {
                 cpu_nmi(cpu);
@@ -163,64 +166,75 @@ void sys_run(handlers_t *handlers) {
     }
 }
 
-static void cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t value, uint8_t mode) {
+static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t value, uint8_t mode) {
     bool read = mode & AS_READ;
     bool write = mode & AS_WRITE;
-    switch (vaddr) {
-        case PPU_CTRL:
-            if (write) {
-                ppu->ppustatus_flags.write = 1;
-            }
-            break;
-        case PPU_STATUS:
-            if (read) {
-                ppu->ppustatus_flags.read = 1;
-                if (ppu->status.value == 128) {
-                    //printf("r: $%.4x - %d - %d\n", vaddr, value, ppu->status.value);
+    if ((vaddr & 0xC000) == 0 && (vaddr & 0x2000) > 0) {
+        // PPU memory-mapped registers.
+        switch (vaddr & 0x2007) {
+            case PPU_CTRL:
+                if (write) {
+                    ppu->ppustatus_flags.write = 1;
                 }
-            }
-            break;
-        case PPU_SCROLL:
-            if (write) {
-                ppu->ppuscroll_flags.write = 1;
-            }
-            break;
-        case PPU_ADDR:
-            if (write) {
-                ppu->ppuaddr_flags.write = 1;
-                //printf("w: $%.4x - %.2x\n", vaddr, value);
-            }
-            break;
-        case PPU_DATA:
-            if (read) {
-                ppu->ppudata_flags.read = 1;
-                //printf("r: $%.4x - %.2x\n", vaddr, value);
-            }
-            if (write) {
-                ppu->ppudata_flags.write = 1;
-                //printf("w: $%.4x - %.2x\n", vaddr, value);
-            }
-            break;
-        case JOYPAD1:
-            if (write) {
-                cpu->jp_strobe = (value & 0x01) > 0;
-            }
-            else if (read) {
-                cpu->joypad1_t = 0x80 | (cpu->joypad1_t >> 1);
-            }
-            break;
-        case JOYPAD2:
-            if (read) {
-                cpu->joypad2_t = 0x80 | (cpu->joypad2_t >> 1);
-            }
-            break;
+                break;
+            case PPU_STATUS:
+                if (read) {
+                    ppu->ppustatus_flags.read = 1;
+                }
+                if (write) {
+                    // Writing to PPUSTATUS shouldn't affect VBL flag.
+                    value = (ppu->status.value & 0x80) | (value & ~0x80);
+                }
+                break;
+            case PPU_SCROLL:
+                if (write) {
+                    ppu->ppuscroll_flags.write = 1;
+                }
+                break;
+            case PPU_ADDR:
+                if (write) {
+                    ppu->ppuaddr_flags.write = 1;
+                    //printf("w: $%.4x - %.2x\n", vaddr, value);
+                }
+                break;
+            case PPU_DATA:
+                if (read) {
+                    ppu->ppudata_flags.read = 1;
+                    //printf("r: $%.4x - %.2x\n", vaddr, value);
+                }
+                if (write) {
+                    ppu->ppudata_flags.write = 1;
+                    //printf("w: $%.4x - %.2x\n", vaddr, value);
+                }
+                break;
+        }
+        //printf("cpu %c: $%.4x - %.2x\n", read ? 'r' : 'w', vaddr, value);
+    }
+    else {
+        switch (vaddr) {
+            case JOYPAD1:
+                if (write) {
+                    cpu->jp_strobe = (value & 0x01) > 0;
+                }
+                else if (read) {
+                    cpu->joypad1_t = 0x80 | (cpu->joypad1_t >> 1);
+                }
+                break;
+            case JOYPAD2:
+                if (read) {
+                    cpu->joypad2_t = 0x80 | (cpu->joypad2_t >> 1);
+                }
+                break;
+        }
     }
 
     //printf("cpu %c: $%.4x - %.2x\n", read ? 'r' : 'w', vaddr, value);
+    return value;
 }
 
-static void ppu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t value, uint8_t mode) {
+static uint8_t ppu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t value, uint8_t mode) {
     //bool read = mode & AS_READ;
     //bool write = mode & AS_WRITE;
     //printf("ppu %c: $%.4x - %.2x\n", read ? 'r' : 'w', vaddr, value);
+    return value;
 }

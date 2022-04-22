@@ -4,9 +4,6 @@
 #include <stdlib.h>
 #include <time.h>
 
-static inline void cycle_render(ppu_t *ppu, int cycles);
-static inline void simple_render(ppu_t *ppu);
-
 /**
  * @brief Gets the address of the corresponding nametable entry.
  * 
@@ -112,7 +109,7 @@ void ppu_render(ppu_t *ppu, int cycles) {
     // PPUSTATUS
     if (ppu->ppustatus_flags.read) {
         ppu->status.vblank = 0;
-        ppu->nmi_occured = false;
+        ppu->nmi_occurred = false;
         ppu->ppustatus_flags.read = 0;
         ppu->w = 0;
     }
@@ -170,10 +167,6 @@ void ppu_render(ppu_t *ppu, int cycles) {
 
     // Rendering.
     //printf("PPU: %d, %d\n", ppu->draw_x, ppu->draw_y);
-    cycle_render(ppu, cycles);
-}
-
-static inline void cycle_render(ppu_t *ppu, int cycles) {
     while (cycles > 0) {
         if (ppu->draw_y == -1) {
             // Pre-render scanline.
@@ -181,7 +174,7 @@ static inline void cycle_render(ppu_t *ppu, int cycles) {
                 ppu->status.vblank = 0;
                 ppu->status.overflow = 0;
                 ppu->status.hit = 0;
-                ppu->nmi_occured = 0;
+                ppu->nmi_occurred = false;
             }
             else if (ppu->draw_x >= 280 && ppu->draw_x <= 304) {
                 // Reset y.
@@ -200,7 +193,7 @@ static inline void cycle_render(ppu_t *ppu, int cycles) {
             // Vblank.
             if (ppu->draw_x == 1) {
                 ppu->status.vblank = 1;
-                ppu->nmi_occured = true;
+                ppu->nmi_occurred = true;
             }
         }
         else if (ppu->draw_y < 240) {
@@ -286,109 +279,5 @@ static inline void cycle_render(ppu_t *ppu, int cycles) {
         }
 
         cycles--;
-    }
-}
-
-static inline void simple_render(ppu_t *ppu) {
-    clock_t t = clock();
-    double dt = (double)(t - ppu->last_time) / CLOCKS_PER_SEC;
-    ppu->frame_counter += dt;
-    ppu->last_time = t;
-    if (ppu->frame_counter >= TIME_STEP) {
-        ppu->status.vblank = 1;
-        ppu->frame_counter -= TIME_STEP;
-        ppu->nmi_occured = true;
-
-        uint8_t p1, p2;
-        nt_entry_t nt;
-        pt_entry_t pt;
-        
-        // For each scanline.
-        for (int y = 0; y < SCREEN_HEIGHT; y++) {
-            nt.cell_x = ppu->v.coarse_x;
-            nt.cell_y = ppu->v.coarse_y;
-
-            nt.nt_x = ppu->v.nt_x;
-            nt.nt_y = ppu->v.nt_y;
-
-            pt = fetch_tile(ppu, nt);
-            pt.fine_x = ppu->x;
-            pt.fine_y = ppu->v.fine_y;
-            addr_t attr_addr = get_at_addr(nt);
-            ppu->sr8[0] = as_read(ppu->as, attr_addr);
-            fetch_tile_planes(ppu, pt, &p1, &p2);
-
-            // Move across the scanline.
-            for (int x = 0; x < SCREEN_WIDTH; x++) {
-                // Determine the value of the bit at this pixel of the tile.
-                uint8_t mask = 0x80 >> ppu->x;
-                uint8_t b0 = (p1 & mask) > 0;
-                uint8_t b1 = (p2 & mask) > 0;
-                uint8_t val = (b1 << 1) | b0;
-
-                // Output the pixel.
-                uint8_t index = ppu->sr8[0];
-                if ((ppu->v.coarse_x & 0x02) > 0)
-                    index >>= 2;
-                if ((ppu->v.coarse_y & 0x02) > 0)
-                    index >>= 4;
-                index &= 0x03;
-
-                uint8_t col_index = val > 0 ? ppu->bkg_palette[index * 3 + val - 1] : ppu->bkg_color;
-                color_t col = color_resolve(col_index);
-                put_pixel(ppu, x, y, col);
-
-                // Increment x.
-                if (ppu->x < 7) {
-                    ppu->x++;
-                }
-                else {
-                    ppu->x = 0;
-                    if (ppu->v.coarse_x < 31) {
-                        ppu->v.coarse_x++;
-                    }
-                    else {
-                        ppu->v.coarse_x = 0;
-                        ppu->v.nt_x = !ppu->v.nt_x;
-                    }
-
-                    // Fetch the next tile.
-                    nt.cell_x = ppu->v.coarse_x;
-                    pt = fetch_tile(ppu, nt);
-                    pt.fine_x = ppu->x;
-                    pt.fine_y = ppu->v.fine_y;
-                    addr_t attr_addr = get_at_addr(nt);
-                    ppu->sr8[0] = as_read(ppu->as, attr_addr);
-                    fetch_tile_planes(ppu, pt, &p1, &p2);
-                }
-            }
-
-            // Reset x.
-            ppu->v.coarse_x = ppu->t.coarse_x;
-            ppu->v.nt_x = ppu->t.nt_x;
-
-            // Increment y.
-            if (ppu->v.fine_y < 7) {
-                ppu->v.fine_y++;
-            }
-            else {
-                ppu->v.fine_y = 0;
-                if (ppu->v.coarse_y == 29) {
-                    ppu->v.coarse_y = 0;
-                    ppu->v.nt_y = !ppu->v.nt_y;
-                }
-                else if (ppu->v.coarse_y == 31) {
-                    ppu->v.coarse_y = 0;
-                }
-                else {
-                    ppu->v.coarse_y++;
-                }
-            }
-        }
-
-        // Reset y.
-        ppu->v.coarse_y = ppu->t.coarse_y;
-        ppu->v.fine_y = ppu->t.fine_y;
-        ppu->v.nt_y = ppu->t.nt_y;
     }
 }

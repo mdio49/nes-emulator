@@ -143,8 +143,8 @@ void sys_run(handlers_t *handlers) {
 
         // Cycle the PPU.
         ppu_render(ppu, cycles * 3);
-        if (ppu->nmi_occured) {
-            ppu->nmi_occured = false;
+        if (ppu->nmi_occurred) {
+            ppu->nmi_occurred = false;
             handlers->update_screen(ppu->out);
             if (ppu->controller.nmi) {
                 cpu_nmi(cpu);

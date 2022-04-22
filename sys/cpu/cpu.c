@@ -78,7 +78,7 @@ void cpu_reset(cpu_t *cpu) {
 
 void cpu_nmi(cpu_t *cpu) {
     // Push PC and status register.
-    push_word(&cpu->frame, cpu->as, cpu->frame.pc + 2);
+    push_word(&cpu->frame, cpu->as, cpu->frame.pc);
     push(&cpu->frame, cpu->as, cpu->frame.sr.bits);
     
     // Jump to interrupt handler.

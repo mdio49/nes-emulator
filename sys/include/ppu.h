@@ -166,8 +166,9 @@ typedef struct ppu {
     int16_t     draw_x, draw_y;                     // Current screen position of render.
     char out[SCREEN_WIDTH * SCREEN_HEIGHT * 3];     // Pixel output (3 bytes per pixel; RGB order).
 
-    unsigned    nmi_occured : 1;                    // A flag that is true if an NMI should occur on the next CPU instruction fetch.
-    unsigned                : 8;
+    unsigned    nmi_occurred    : 1;                // A flag that is true if an NMI should occur on the next CPU instruction fetch.
+    unsigned    vbl_occurred    : 1;                // A flag that is true if a vblank just occured and the screen should be redrawn.
+    unsigned                    : 6;
 
     /* temporary until cycling is done correctly */
 

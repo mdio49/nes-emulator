@@ -399,7 +399,7 @@ void print_hist(history_t *hist, int nhist) {
 }
 
 void print_state(FILE *fp, cpu_t *cpu) {
-    fprintf(fp, "pc: $%.4x, a: $%.2x. x: $%.2x, y: $%.2x, sp: $%.2x, sr: ", cpu->frame.pc, cpu->frame.ac, cpu->frame.x, cpu->frame.y, cpu->frame.sp);
+    fprintf(fp, "pc: $%.4x, a: $%.2x, x: $%.2x, y: $%.2x, sp: $%.2x, sr: ", cpu->frame.pc, cpu->frame.ac, cpu->frame.x, cpu->frame.y, cpu->frame.sp);
     fprintf(fp, cpu->frame.sr.neg ? "n" : "-");
     fprintf(fp, cpu->frame.sr.vflow ? "v" : "-");
     fprintf(fp, cpu->frame.sr.ign ? "-" : "-");

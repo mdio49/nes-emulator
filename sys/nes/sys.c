@@ -28,7 +28,9 @@ void sys_poweron(void) {
         as_add_segment(cpu->as, i + 2, 1, &ppu->status.value);
         as_add_segment(cpu->as, i + 3, 5, &ppu->oam_addr);
     }
-    as_add_segment(cpu->as, 0x4000, 0x0016, cpu->apu_io_reg1);
+    as_add_segment(cpu->as, 0x4000, 0x0014, cpu->apu_io_reg1);
+    as_add_segment(cpu->as, OAM_DMA, 0x0001, &cpu->oam_dma);
+    as_add_segment(cpu->as, OAM_DMA + 1, 0x001, &cpu->temp);
     as_add_segment(cpu->as, JOYPAD1, 0x0001, &cpu->joypad1);
     as_add_segment(cpu->as, JOYPAD2, 0x0001, &cpu->joypad2);
     as_add_segment(cpu->as, 0x4018, 0x0008, cpu->apu_io_reg2);
@@ -121,25 +123,36 @@ void sys_run(handlers_t *handlers) {
     // Run the program.
     handlers->running = true;
     while (handlers->running) {
-        // Fetch and decode the next instruction.
-        uint8_t opc = cpu_fetch(cpu);
-        operation_t ins = cpu_decode(cpu, opc);
-
-        // Handle any events that occur before the instruction is executed.
-        if (handlers->before_execute != NULL) {
-            handlers->before_execute(ins);
+        int cycles;
+        if (cpu->oam_upload) {
+            const addr_t offset = cpu->oam_dma << 8;
+            for (int i = 0; i < 0xFF; i++) {
+                ppu->oam[(ppu->oam_addr + i) & 0xFF] = as_read(cpu->as, offset + i);
+            }
+            cycles = 513 + (cpu->cycles % 2); // Add 1 cycle on odd CPU cycle.
+            cpu->oam_upload = false;
         }
+        else {
+            // Fetch and decode the next instruction.
+            uint8_t opc = cpu_fetch(cpu);
+            operation_t ins = cpu_decode(cpu, opc);
 
-        // Execute the instruction.
-        int cycles = cpu_execute(cpu, ins);
-        
-        // Handle any events that occur after the instruction is executed.
-        if (handlers->after_execute != NULL) {
-            handlers->after_execute(ins);
+            // Handle any events that occur before the instruction is executed.
+            if (handlers->before_execute != NULL) {
+                handlers->before_execute(ins);
+            }
+
+            // Execute the instruction.
+            cycles = cpu_execute(cpu, ins);
+            
+            // Handle any events that occur after the instruction is executed.
+            if (handlers->after_execute != NULL) {
+                handlers->after_execute(ins);
+            }
         }
 
         // Increment the cycle counter.
-        handlers->cpu_cycle_counter += cycles;
+        cpu->cycles += cycles;
 
         // Cycle the PPU.
         ppu_render(ppu, cycles * 3);
@@ -191,6 +204,14 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
                     ppu->ppuscroll_flags.write = 1;
                 }
                 break;
+            case OAM_DATA:
+                if (read) {
+                    ppu->oamdata_flags.read = 1;
+                }
+                if (write) {
+                    ppu->oamdata_flags.write = 1;
+                }
+                break;
             case PPU_ADDR:
                 if (write) {
                     ppu->ppuaddr_flags.write = 1;
@@ -212,6 +233,9 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
     }
     else {
         switch (vaddr) {
+            case OAM_DMA:
+                cpu->oam_upload = true;
+                break;
             case JOYPAD1:
                 if (write) {
                     cpu->jp_strobe = (value & 0x01) > 0;

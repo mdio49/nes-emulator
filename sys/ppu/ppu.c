@@ -2,7 +2,7 @@
 #include <ppu.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
+#include <string.h>
 
 /**
  * @brief Gets the address of the corresponding nametable entry.
@@ -49,7 +49,7 @@ static inline void fetch_tile_planes(ppu_t *ppu, pt_entry_t pt, uint8_t *p1, uin
     *p2 = as_read(ppu->as, pt_addr + 0x08);
 }
 
-static void fetch_tile_into_sr(ppu_t *ppu) {
+static inline void fetch_tile_into_sr(ppu_t *ppu) {
     const nt_entry_t nt = {
         .cell_x = ppu->v.coarse_x,
         .cell_y = ppu->v.coarse_y,
@@ -80,11 +80,14 @@ static inline void put_pixel(ppu_t *ppu, int screen_x, int screen_y, color_t col
     ppu->out[index + OUT_B] = color.blue;
 }
 
+static inline bool sprite_in_range(ppu_t *ppu, uint8_t sprite_y) {
+    return sprite_y >= ppu->draw_y && sprite_y < ppu->draw_y + 8 + ppu->controller.spr_size * 8;
+}
+
 ppu_t *ppu_create(void) {
     ppu_t *ppu = malloc(sizeof(struct ppu));
     ppu->vram = malloc(sizeof(uint8_t) * VRAM_SIZE);
     ppu->as = as_create();
-    ppu->last_time = clock();
     ppu->bkg_color = 0x0F;
 
     ppu->draw_x = 0;
@@ -131,6 +134,16 @@ void ppu_render(ppu_t *ppu, int cycles) {
         ppu->w= !ppu->w;
     }
 
+    // OAMDATA
+    if (ppu->oamdata_flags.write) {
+        ppu->oam[ppu->oam_addr] = ppu->oam_data;
+        ppu->oam_addr++;
+        ppu->oamdata_flags.write = 0;
+    }
+    if (ppu->oamdata_flags.read) {
+        ppu->oamdata_flags.read = 0;
+    }
+
     // PPUADDR
     if (ppu->ppuaddr_flags.write) {
         if (ppu->w) {
@@ -169,6 +182,7 @@ void ppu_render(ppu_t *ppu, int cycles) {
     // Rendering.
     //printf("PPU: %d, %d\n", ppu->draw_x, ppu->draw_y);
     while (cycles > 0) {
+        // Render background.
         if (ppu->draw_y == -1) {
             // Pre-render scanline.
             if (ppu->draw_x == 1) {
@@ -186,6 +200,8 @@ void ppu_render(ppu_t *ppu, int cycles) {
             else if (ppu->draw_x == 340) {
                 fetch_tile_into_sr(ppu);
             }
+
+            
         }
         else if (ppu->draw_y == 240) {
             // Post-render scanline.
@@ -266,6 +282,87 @@ void ppu_render(ppu_t *ppu, int cycles) {
             }
             else if (ppu->draw_x == 340) {
                 fetch_tile_into_sr(ppu);
+            }
+
+            // Reset OAMADDR.
+            if (ppu->draw_x >= 257 && ppu->draw_x <= 320) {
+                ppu->oam_addr = 0;
+            }
+        }
+
+        // Render sprites.
+        if (ppu->draw_y == 0) {
+            if (ppu->draw_x >= 257 && ppu->draw_x <= 320) {
+                // Reset OAMADDR.
+                ppu->oam_addr = 0;
+            }
+        }
+        if (ppu->draw_y < 240) {
+            if (ppu->draw_x == 0) {
+                // Idle (reset iterators).
+                ppu->n = 0;
+                ppu->m = 0;
+                ppu->oam2_ptr = 0;
+            }
+            else if (ppu->draw_x <= 64) {
+                // Secondary OAM clear.
+                ppu->oam2[((ppu->draw_x - 1) >> 1) & 0x1F] = 0xFF;
+            }
+            else if (ppu->draw_x <= 256) {
+                if (ppu->draw_x % 2 == 1) {
+                    // Read OAM data on odd cycles into a buffer.
+                    uint8_t oam_index = (4 * ppu->n + ppu->m + ppu->oam_addr) & 0xFF;
+                    ppu->oam_buffer = ppu->oam[oam_index];
+                }
+                else if (ppu->oam2_ptr % 4 != 0) {
+                    // Copy remaining sprite data into secondary OAM.
+                    if (ppu->oam2_ptr < sizeof(ppu->oam2)) {
+                        ppu->oam2[ppu->oam2_ptr] = ppu->oam_buffer;
+                    }
+                    ppu->oam2_ptr++;
+                    if (ppu->m == 3) {
+                        ppu->n++;
+                    }
+                    ppu->m++;
+                }
+                else if (ppu->n >= N_SPRITES) {
+                    // All 64 sprites have already been evaluated.
+                    if (ppu->oam2_ptr < sizeof(ppu->oam2)) {
+                        ppu->oam2[ppu->oam2_ptr] = ppu->oam_buffer;
+                    }
+                    ppu->n++;
+                }
+                else if (ppu->oam2_ptr >= sizeof(ppu->oam2)) {
+                    // Sprite overflow.
+                    if (sprite_in_range(ppu, ppu->oam_buffer)) {
+                        ppu->status.overflow = true;
+                        ppu->oam2_ptr++;
+                        ppu->m++;
+                    }
+                    else {
+                        ppu->n++;
+                        ppu->m++; // Sprite overflow bug.
+                    }
+                }
+                else {
+                    // Fetch next sprite and check if y-coordinate is within range.
+                    ppu->oam2[ppu->oam2_ptr] = ppu->oam_buffer;
+                    if (sprite_in_range(ppu, ppu->oam_buffer)) {
+                        ppu->oam2_ptr++;
+                        ppu->m++;
+                    }
+                    else {
+                        ppu->n++;
+                    }
+                }
+            }
+            else if (ppu->draw_x <= 320) {
+
+                // Reset OAMADDR.
+                ppu->oam_addr = 0;
+            }
+            else {
+
             }
         }
 

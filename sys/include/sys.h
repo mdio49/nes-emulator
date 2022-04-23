@@ -17,8 +17,6 @@ typedef struct handlers {
     void        (*update_screen)(const char *data);
     uint8_t     (*poll_input)(void);
 
-    long        cpu_cycle_counter;
-
 } handlers_t;
 
 /**

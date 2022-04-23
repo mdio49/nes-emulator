@@ -19,6 +19,7 @@
 #define SR_OVERFLOW     0x40
 #define SR_NEGATIVE     0x80
 
+#define OAM_DMA         0x4014
 #define JOYPAD1         0x4016
 #define JOYPAD2         0x4017
 
@@ -65,7 +66,9 @@ typedef struct cpu {
     uint8_t         *wmem;      // The CPU's working memory.
     uint8_t         *stack;     // A pointer to the bottom of the stack (increment by stack pointer register to get current value in stack).
 
-    uint8_t         apu_io_reg1[22];    // APU and I/O registers (stored here until implemented).
+    uint8_t         apu_io_reg1[20];    // APU and I/O registers (stored here until implemented).
+    uint8_t         oam_dma;            // OAM direct memory access.
+    uint8_t         temp;
     uint8_t         joypad1;            // Joypad 1
     uint8_t         joypad2;            // Joypad 2
     uint8_t         apu_io_reg2[8];
@@ -74,8 +77,10 @@ typedef struct cpu {
     uint8_t         joypad2_t;          // Joypad 2 state while probing.
 
     unsigned        jp_strobe   : 1;    // Controller shift register strobe (0: low; 1: high).
-    unsigned                    : 7;
+    unsigned        oam_upload  : 1;    // Whether the CPU is suspended due to OAM DMA.
+    unsigned                    : 6;
 
+    uint64_t        cycles;             // CPU cycle counter (set to 0 on reset).
 
 } cpu_t;
 

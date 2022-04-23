@@ -16,13 +16,14 @@
 #define PPU_SCROLL  0x2005
 #define PPU_ADDR    0x2006
 #define PPU_DATA    0x2007
-#define OAM_DMA     0x4014
 
 #define SCREEN_WIDTH    256
 #define SCREEN_HEIGHT   240
 
 #define NT_ROWS     30
 #define NT_COLS     32
+
+#define N_SPRITES   64
 
 #define OUT_R       0x00
 #define OUT_G       0x01
@@ -78,23 +79,37 @@ typedef struct vram_reg {
  * @brief A PPU struct that contains all data needed to emulate the PPU.
  */
 typedef struct ppu {
-    
-    vram_reg_t      v;              // Current VRAM address.
-    vram_reg_t      t;              // Temporary VRAM address.
 
-    uint8_t         x : 3;          // Fine X scroll.
-    uint8_t         w : 1;          // First or second write toggle bit.
+    /* main registers/memory */
+    
+    vram_reg_t      v;                  // Current VRAM address.
+    vram_reg_t      t;                  // Temporary VRAM address.
+
+    uint8_t         x : 3;              // Fine X scroll.
+    uint8_t         w : 1;              // First or second write toggle bit.
     unsigned          : 4;
     
-    uint16_t        sr16[2];        // 16-bit shift registers.
-    uint8_t         sr8[2];         // 8-bit shift registers.
+    uint16_t        sr16[2];            // 16-bit shift registers.
+    uint8_t         sr8[2];             // 8-bit shift registers.
 
-    addrspace_t     *as;            // The PPU's address space.
-    uint8_t         *vram;          // 2KB of memory.
+    addrspace_t     *as;                // The PPU's address space.
+    uint8_t         *vram;              // 2KB of memory.
 
     uint8_t         bkg_color;          // The universal background color.
     uint8_t         bkg_palette[15];    // Background palette memory.
     uint8_t         spr_palette[12];    // Sprite palette memory.
+
+    uint8_t         oam[256];           // Object attribute memory.
+    uint8_t         oam2[32];           // Secondary OAM.
+
+    /* variables used during sprite evaluation */
+
+    unsigned        n : 8;              // n-iterator for sprite evaluation.
+    unsigned        m : 2;              // m-iterator for sprite evaluation.
+    unsigned          : 6;
+
+    uint8_t         oam2_ptr;           // Pointer to secondary OAM memory during sprite evaluation.
+    uint8_t         oam_buffer;         // OAM read buffer during sprite evaluation.
 
     /* memory mapped registers (stored contiguously) */
     
@@ -163,17 +178,14 @@ typedef struct ppu {
     io_flags_t  ppuaddr_flags;
     io_flags_t  ppudata_flags;
 
+    /* variables used for background rendering */
+
     int16_t     draw_x, draw_y;                     // Current screen position of render.
     char out[SCREEN_WIDTH * SCREEN_HEIGHT * 3];     // Pixel output (3 bytes per pixel; RGB order).
 
     unsigned    nmi_occurred    : 1;                // A flag that is true if an NMI should occur on the next CPU instruction fetch.
     unsigned    vbl_occurred    : 1;                // A flag that is true if a vblank just occured and the screen should be redrawn.
     unsigned                    : 6;
-
-    /* temporary until cycling is done correctly */
-
-    clock_t     last_time;
-    double      frame_counter;
 
     /* temporary until interrupts are done correctly */
 

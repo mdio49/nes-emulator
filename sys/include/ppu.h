@@ -75,6 +75,16 @@ typedef struct vram_reg {
     unsigned                : 1;
 } vram_reg_t;
 
+typedef struct spr_attr {
+
+    unsigned    palette     : 2;    // Palette number (4 to 7).
+    unsigned                : 3;
+    unsigned    priority    : 1;    // Priority (0: in front of background; 1: behind background).
+    unsigned    flip_h      : 1;    // Flip sprite horizontally.
+    unsigned    flip_v      : 1;    // Flip sprite vertically.
+
+} spr_attr_t;
+
 /**
  * @brief A PPU struct that contains all data needed to emulate the PPU.
  */
@@ -101,6 +111,12 @@ typedef struct ppu {
 
     uint8_t         oam[256];           // Object attribute memory.
     uint8_t         oam2[32];           // Secondary OAM.
+
+    /* oam shift registers */
+
+    uint8_t         oam_p[8][2];        // Sprite tile planes.
+    uint8_t         oam_x[8];           // Sprite x position.
+    spr_attr_t      oam_attr[8];        // Sprite attribute memory.
 
     /* variables used during sprite evaluation */
 

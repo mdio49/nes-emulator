@@ -1,4 +1,5 @@
 #include <addrmodes.h>
+#include <color.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -301,7 +302,6 @@ void after_execute(operation_t ins) {
             status = new_status;
         }
     }
-    
 }
 
 void update_screen(const char *data) {
@@ -325,6 +325,50 @@ void update_screen(const char *data) {
     SDL_RenderClear(mainRenderer);
 
     // Update and copy the texture to the surface.
+    /*uint8_t p1, p2;
+    spr_attr_t oam_attr;
+    char pixels[3 * SCREEN_WIDTH * SCREEN_HEIGHT] = { 0 };
+    for (int i = 0; i < 64; i++) {
+        uint8_t tile = ppu->oam[4 * i + 1];
+        
+        // Fetch attribute data.
+        uint8_t attr = ppu->oam[4 * i + 2];
+        oam_attr.palette = attr & 0x02;
+        oam_attr.priority = (attr >> 5) & 0x01;
+        oam_attr.flip_h = (attr >> 6) & 0x01;
+        oam_attr.flip_v = (attr >> 7) & 0x01;
+
+        for (int y = 0; y < 8; y++) {
+            // Get pattern table address.
+            addr_t pt_addr;
+            if (ppu->controller.spr_size) {
+                pt_addr = ((tile & 0x01) << 12) | ((tile & ~0x01) << 4) | ((y & 0x08) << 1) | (y & 0x07); // 8x16 sprite mode.
+            }
+            else {
+                pt_addr = (ppu->controller.spt_addr << 12) | (tile << 4) | (y & 0x07); // 8x8 sprite mode.
+            }
+
+            int x = 0;
+            p1 = as_read(ppu->as, pt_addr);
+            p2 = as_read(ppu->as, pt_addr + 0x08);
+            for (uint8_t mask = 0x80; mask > 0; mask >>= 1, x++) {
+                uint8_t val = (p1 & mask) | ((p2 & mask) << 1);
+                if (val == 0)
+                    continue;
+
+                uint8_t col_index = ppu->spr_palette[oam_attr.palette * 3 + val - 1];
+                color_t col = color_resolve(col_index);
+
+                uint8_t screen_x = x + (i % 8) * 8;
+                uint8_t screen_y = y + ((i >> 3) << 3);
+
+                pixels[(screen_y * SCREEN_WIDTH + screen_x) * 3 + OUT_R] = col.red;
+                pixels[(screen_y * SCREEN_WIDTH + screen_x) * 3 + OUT_G] = col.green;
+                pixels[(screen_y * SCREEN_WIDTH + screen_x) * 3 + OUT_B] = col.blue;
+            }
+        }
+    }*/
+
     SDL_Rect rect = { 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT };
     SDL_UpdateTexture(screen, NULL, data, 3 * SCREEN_WIDTH);
     SDL_RenderCopy(mainRenderer, screen, NULL, &rect);

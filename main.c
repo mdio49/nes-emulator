@@ -322,6 +322,9 @@ void update_screen(const char *data) {
                 if (e.key.keysym.scancode == SDL_SCANCODE_ESCAPE) {
                     exit(0);
                 }
+                if (e.key.keysym.scancode == SDL_SCANCODE_R) {
+                    sys_reset();
+                } 
                 break;
         }
     }

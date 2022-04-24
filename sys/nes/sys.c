@@ -187,7 +187,7 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
         switch (vaddr & 0x2007) {
             case PPU_CTRL:
                 if (write) {
-                    ppu->ppustatus_flags.write = 1;
+                    ppu->ppucontrol_flags.write = 1;
                 }
                 break;
             case PPU_STATUS:

@@ -191,6 +191,7 @@ void ppu_render(ppu_t *ppu, int cycles) {
     while (cycles > 0) {
         // Render background.
         if (ppu->draw_y == -1) {
+            //printf("%d %d\n", ppu->t.coarse_y, ppu->t.nt_y);
             // Pre-render scanline.
             if (ppu->draw_x == 1) {
                 ppu->status.vblank = 0;

@@ -32,8 +32,6 @@
 #define SCANLINE_END    340
 #define N_SCANLINES     260
 
-#define TIME_STEP   1.0 / 30.0
-
 typedef struct {
     unsigned    read    : 1;
     unsigned    write   : 1;

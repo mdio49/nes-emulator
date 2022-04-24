@@ -15,7 +15,8 @@ typedef struct handlers {
     void        (*after_execute)(operation_t ins);
     
     void        (*update_screen)(const char *data);
-    uint8_t     (*poll_input)(void);
+    uint8_t     (*poll_input_p1)(void);
+    uint8_t     (*poll_input_p2)(void);
 
 } handlers_t;
 

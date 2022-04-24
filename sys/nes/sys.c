@@ -126,7 +126,7 @@ void sys_run(handlers_t *handlers) {
         int cycles;
         if (cpu->oam_upload) {
             const addr_t offset = cpu->oam_dma << 8;
-            for (int i = 0; i < 0xFF; i++) {
+            for (int i = 0; i < 256; i++) {
                 ppu->oam[(ppu->oam_addr + i) & 0xFF] = as_read(cpu->as, offset + i);
             }
             cycles = 513 + (cpu->cycles % 2); // Add 1 cycle on odd CPU cycle.
@@ -166,8 +166,8 @@ void sys_run(handlers_t *handlers) {
 
         // Check for input.
         if (cpu->jp_strobe) {
-            cpu->joypad1_t = handlers->poll_input();
-            cpu->joypad2_t = 0; // TODO
+            cpu->joypad1_t = handlers->poll_input_p1();
+            cpu->joypad2_t = handlers->poll_input_p2();
         }
 
         // Store the state of next key to be checked in the joypad I/O registers.

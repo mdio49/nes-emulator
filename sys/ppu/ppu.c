@@ -88,7 +88,7 @@ static inline void put_pixel(ppu_t *ppu, int screen_x, int screen_y, color_t col
 }
 
 static inline bool sprite_in_range(ppu_t *ppu, uint8_t sprite_y) {
-    return sprite_y >= ppu->draw_y && sprite_y < ppu->draw_y + (ppu->controller.spr_size ? 16 : 8);
+    return ppu->draw_y >= sprite_y && ppu->draw_y < sprite_y + (ppu->controller.spr_size ? 16 : 8);
 }
 
 ppu_t *ppu_create(void) {
@@ -171,7 +171,7 @@ void ppu_render(ppu_t *ppu, int cycles) {
             ppu->vram_write_addr = (ppu->vram_write_addr & 0x00FF) | (ppu->ppu_addr << 8);
         }
         ppu->ppuaddr_flags.write = 0;
-        ppu->w= !ppu->w;
+        ppu->w = !ppu->w;
     }
 
     // PPUDATA
@@ -224,8 +224,11 @@ void ppu_render(ppu_t *ppu, int cycles) {
                 // Idle
             }
             else if (ppu->draw_x <= 256) {
+                // Get the x-coordinate of the pixel on the screen.
+                const uint8_t screen_x = ppu->draw_x - 1;
+
                 // Determine the value of the bit at this pixel of the tile.
-                uint8_t bkg = get_tile_value(ppu->sr16[0] & 0xFF,ppu->sr16[0] >> 8, ppu->x);
+                uint8_t bkg = get_tile_value(ppu->sr16[0] & 0xFF, ppu->sr16[0] >> 8, ppu->x);
                 
                 // Determine the color of the pixel.
                 uint8_t index = ppu->sr8[0];
@@ -233,32 +236,38 @@ void ppu_render(ppu_t *ppu, int cycles) {
                     index >>= 2;
                 if ((ppu->v.coarse_y & 0x02) > 0)
                     index >>= 4;
-                index &= 0x03;
-
-                uint8_t col_index = bkg > 0 ? ppu->bkg_palette[index * 4 + bkg - 1] : ppu->bkg_color;
+                uint8_t col_index = bkg > 0 ? ppu->bkg_palette[(index & 0x03) * 4 + bkg - 1] : ppu->bkg_color;
 
                 // Get active sprites.
                 for (int i = 0; i < 8; i++) {
                     if (ppu->oam_x[i] == 0xFF)
                         continue;
-                    if (ppu->oam_x[i] > ppu->draw_x - 1)
+                    if (ppu->oam_x[i] > screen_x)
                         continue;
-                    if (ppu->draw_x - 1 >= ppu->oam_x[i] + 8)
+                    if (screen_x > ppu->oam_x[i] + 8)
                         continue;
                     
-                    uint8_t spr = get_tile_value(ppu->oam_p[i][0], ppu->oam_p[i][1], ppu->draw_x - ppu->oam_x[i]);
+                    // Get fine-x and flip horizontally if necessary.
+                    uint8_t fine_x = screen_x - ppu->oam_x[i];
+                    if (ppu->oam_attr[i].flip_h) {
+                        fine_x = 7 - fine_x;
+                    }
+
+                    // Get value of sprite at current pixel and decide whether it should override the background.
+                    uint8_t spr = get_tile_value(ppu->oam_p[i][0], ppu->oam_p[i][1], fine_x);
                     if (spr == 0)
                         continue;
                     if (bkg > 0 && ppu->oam_attr[i].priority)
                         continue;
                     
+                    // Update the color and break as any subsequent sprites would be displayed behind this sprite.
                     col_index = ppu->spr_palette[ppu->oam_attr[i].palette * 3 + spr - 1];
                     break;
                 }
 
                 // Output the pixel.
                 color_t col = color_resolve(col_index);
-                put_pixel(ppu, ppu->draw_x - 1, ppu->draw_y, col);
+                put_pixel(ppu, screen_x, ppu->draw_y, col);
 
                 // Increment x.
                 if (ppu->x < 7) {
@@ -390,6 +399,18 @@ void ppu_render(ppu_t *ppu, int cycles) {
                     uint8_t fine_y = ppu->draw_y - sprite_y;
                     uint8_t tile = ppu->oam2[4 * i + 1];
 
+                    // Fetch attribute data.
+                    uint8_t attr = ppu->oam2[4 * i + 2];
+                    ppu->oam_attr[i].palette = attr & 0x03;
+                    ppu->oam_attr[i].priority = (attr >> 5) & 0x01;
+                    ppu->oam_attr[i].flip_h = (attr >> 6) & 0x01;
+                    ppu->oam_attr[i].flip_v = (attr >> 7) & 0x01;
+
+                    // Flip vertically if necessary.
+                    if (ppu->oam_attr[i].flip_v) {
+                        fine_y = (ppu->controller.spr_size ? 15 : 7) - fine_y;
+                    }
+
                     // Get pattern table address.
                     addr_t pt_addr;
                     if (ppu->controller.spr_size) {
@@ -402,13 +423,6 @@ void ppu_render(ppu_t *ppu, int cycles) {
                     // Fetch tile planes.
                     ppu->oam_p[i][0] = as_read(ppu->as, pt_addr);
                     ppu->oam_p[i][1] = as_read(ppu->as, pt_addr + 0x08);
-
-                    // Fetch attribute data.
-                    uint8_t attr = ppu->oam2[4 * i + 2];
-                    ppu->oam_attr[i].palette = attr & 0x02;
-                    ppu->oam_attr[i].priority = (attr >> 5) & 0x01;
-                    ppu->oam_attr[i].flip_h = (attr >> 6) & 0x01;
-                    ppu->oam_attr[i].flip_v = (attr >> 7) & 0x01;
 
                     // Fetch x-position.
                     ppu->oam_x[i] = ppu->oam2[4 * i + 3];

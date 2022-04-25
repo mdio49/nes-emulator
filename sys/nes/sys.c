@@ -5,6 +5,7 @@
 static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t value, uint8_t mode);
 static uint8_t ppu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t value, uint8_t mode);
 
+apu_t *apu = NULL;
 cpu_t *cpu = NULL;
 ppu_t *ppu = NULL;
 prog_t *curprog = NULL;
@@ -15,6 +16,7 @@ static uint8_t chr_ram[0x2000];
 
 void sys_poweron(void) {
     // Create CPU and PPU.
+    apu = apu_create();
     cpu = cpu_create();
     ppu = ppu_create();
 
@@ -28,16 +30,51 @@ void sys_poweron(void) {
         as_add_segment(cpu->as, i + 2, 1, &ppu->status.value);
         as_add_segment(cpu->as, i + 3, 5, &ppu->oam_addr);
     }
-    as_add_segment(cpu->as, 0x4000, 0x0014, cpu->apu_io_reg1);
-    as_add_segment(cpu->as, OAM_DMA, 0x0001, &cpu->oam_dma);
-    as_add_segment(cpu->as, OAM_DMA + 1, 0x001, &cpu->temp);
-    as_add_segment(cpu->as, JOYPAD1, 0x0001, &cpu->joypad1);
-    as_add_segment(cpu->as, JOYPAD2, 0x0001, &cpu->joypad2);
-    as_add_segment(cpu->as, 0x4018, 0x0008, cpu->apu_io_reg2);
+
+    // APU registers.
+    as_add_segment(cpu->as, APU_PULSE1 + 0, 1, &apu->pulse1.reg0);
+    as_add_segment(cpu->as, APU_PULSE1 + 1, 1, &apu->pulse1.reg1);
+    as_add_segment(cpu->as, APU_PULSE1 + 2, 1, &apu->pulse1.reg2);
+    as_add_segment(cpu->as, APU_PULSE1 + 3, 1, &apu->pulse1.reg3);
+
+    as_add_segment(cpu->as, APU_PULSE2 + 0, 1, &apu->pulse2.reg0);
+    as_add_segment(cpu->as, APU_PULSE2 + 1, 1, &apu->pulse2.reg1);
+    as_add_segment(cpu->as, APU_PULSE2 + 2, 1, &apu->pulse2.reg2);
+    as_add_segment(cpu->as, APU_PULSE2 + 3, 1, &apu->pulse2.reg3);
+
+    as_add_segment(cpu->as, APU_TRIANGLE + 0, 1, &apu->triangle.reg0);
+    as_add_segment(cpu->as, APU_TRIANGLE + 1, 1, &apu->triangle.reg1);
+    as_add_segment(cpu->as, APU_TRIANGLE + 2, 1, &apu->triangle.reg2);
+    as_add_segment(cpu->as, APU_TRIANGLE + 3, 1, &apu->triangle.reg3);
+
+    as_add_segment(cpu->as, APU_NOISE + 0, 1, &apu->noise.reg0);
+    as_add_segment(cpu->as, APU_NOISE + 1, 1, &apu->noise.reg1);
+    as_add_segment(cpu->as, APU_NOISE + 2, 1, &apu->noise.reg2);
+    as_add_segment(cpu->as, APU_NOISE + 3, 1, &apu->noise.reg3);
+
+    as_add_segment(cpu->as, APU_DMC + 0, 1, &apu->dmc.reg0);
+    as_add_segment(cpu->as, APU_DMC + 1, 1, &apu->dmc.reg1);
+    as_add_segment(cpu->as, APU_DMC + 2, 1, &apu->dmc.reg2);
+    as_add_segment(cpu->as, APU_DMC + 3, 1, &apu->dmc.reg3);
+
+    // OAM DMA.
+    as_add_segment(cpu->as, OAM_DMA, 1, &cpu->oam_dma);
+
+    // APU status.
+    as_add_segment(cpu->as, APU_STATUS, 1, &apu->status.value);
+
+    // Joypad registers.
+    as_add_segment(cpu->as, JOYPAD1, 1, &cpu->joypad1);
+    as_add_segment(cpu->as, JOYPAD2, 1, &cpu->joypad2);
+
+    // Memory not normally used.
+    as_add_segment(cpu->as, TEST_MODE, sizeof(cpu->test_mode), cpu->test_mode);
+
     as_set_update_rule(cpu->as, cpu_update_rule);
 }
 
 void sys_poweroff(void) {
+    apu_destroy(apu);
     cpu_destroy(cpu);
     ppu_destroy(ppu);
     curprog = NULL;
@@ -230,6 +267,100 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
                 break;
         }
         //printf("cpu %c: $%.4x - %.2x\n", read ? 'r' : 'w', vaddr, value);
+    }
+    else if (vaddr >= APU_PULSE1 && vaddr <= APU_DMC + 0x03) {
+        // APU memory-mapped registers (excluding status).
+        pulse_t pulse;
+        triangle_t triangle;
+        noise_t noise;
+        dmc_t dmc;
+        
+        if (read) {
+            // Ensure that the correct value is put into the register after evaluating bitmasks.
+            switch (vaddr) {
+                case APU_PULSE1:
+                case APU_PULSE2:
+                    pulse.vol = value & 0x0F;
+                    pulse.cons = (value >> 4) & 0x01;
+                    pulse.loop = (value >> 5) & 0x01;
+                    pulse.duty = (value >> 6) & 0x03;
+                    value = pulse.reg0;
+                    break;
+                case APU_PULSE1 + 0x01:
+                case APU_PULSE2 + 0x01:
+                    pulse.sweep.shift = value & 0x07;
+                    pulse.sweep.negate = (value >> 3) & 0x01;
+                    pulse.sweep.period = (value >> 4) & 0x07;
+                    pulse.sweep.enabled = (value >> 7) & 0x01;
+                    value = pulse.reg1;
+                    break;
+                case APU_PULSE1 + 0x03:
+                case APU_PULSE2 + 0x03:
+                    pulse.timer_high = value & 0x07;
+                    pulse.len_counter_load = value >> 3;
+                    value = pulse.reg3;
+                    break;
+                case APU_TRIANGLE:
+                    triangle.lin_counter_load = value & 0x7F;
+                    triangle.lin_counter_ctrl = value >> 7;
+                    value = triangle.reg0;
+                    break;
+                case APU_TRIANGLE + 0x03:
+                    triangle.timer_high = value & 0x07;
+                    triangle.len_counter_load = value >> 3;
+                    value = triangle.reg3;
+                    break;
+                case APU_NOISE:
+                    noise.vol = value & 0x0F;
+                    noise.cons = (value >> 4) & 0x01;
+                    noise.len_counter_halt = (value >> 5) & 0x01;
+                    value = noise.reg0;
+                    break;
+                case APU_NOISE + 0x02:
+                    noise.period = value & 0x0F;
+                    noise.loop = value >> 7;
+                    value = noise.reg2;
+                    break;
+                case APU_NOISE + 0x03:
+                    noise.len_counter_load = value >> 3;
+                    value = noise.reg3;
+                    break;
+                case APU_DMC:
+                    dmc.freq = value & 0x0F;
+                    dmc.loop = (value >> 6) & 0x01;
+                    dmc.loop = (value >> 7) & 0x01;
+                    value = dmc.reg0;
+                    break;
+                case APU_DMC + 0x01:
+                    dmc.load = value & 0x7F;
+                    value = dmc.reg1;
+                    break;
+            }
+        }
+        else {
+            // APU registers are not meant to be read from, so just return a value of 0.
+            value = 0x00;
+        }
+    }
+    else if (vaddr == APU_STATUS) {
+        union apu_status status;
+        if (write) {
+            status.p1 = value & 0x01;
+            status.p2 = (value >> 1) & 0x01;
+            status.tri = (value >> 2) & 0x01;
+            status.noise = (value >> 3) & 0x01;
+            status.dmc = (value >> 4) & 0x01;
+
+            // Writing doesn't change these flags.
+            status.f_irq = apu->status.f_irq;
+            status.d_irq = apu->status.d_irq;
+
+            value = status.value;
+        }
+        else if (read) {
+            status.value = value;
+            value = (status.d_irq << 7) | (status.f_irq << 6) | (status.dmc << 4) | (status.noise << 3) | (status.tri << 2) | (status.p2 << 1) | status.p1;
+        }
     }
     else {
         switch (vaddr) {

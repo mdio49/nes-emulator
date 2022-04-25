@@ -22,6 +22,7 @@
 #define OAM_DMA         0x4014
 #define JOYPAD1         0x4016
 #define JOYPAD2         0x4017
+#define TEST_MODE       0x4018
 
 #define NMI_VECTOR      0xFFFA
 #define RES_VECTOR      0xFFFC
@@ -61,20 +62,19 @@ typedef struct tframe {
  */
 typedef struct cpu {
 
-    tframe_t        frame;      // The CPU's registers.
-    addrspace_t     *as;        // The CPU's address space.
-    uint8_t         *wmem;      // The CPU's working memory.
-    uint8_t         *stack;     // A pointer to the bottom of the stack (increment by stack pointer register to get current value in stack).
+    tframe_t        frame;              // The CPU's registers.
+    addrspace_t     *as;                // The CPU's address space.
+    uint8_t         *wmem;              // The CPU's working memory.
 
-    uint8_t         apu_io_reg1[20];    // APU and I/O registers (stored here until implemented).
     uint8_t         oam_dma;            // OAM direct memory access.
-    uint8_t         temp;
+
     uint8_t         joypad1;            // Joypad 1
     uint8_t         joypad2;            // Joypad 2
-    uint8_t         apu_io_reg2[8];
 
     uint8_t         joypad1_t;          // Joypad 1 state while probing.
     uint8_t         joypad2_t;          // Joypad 2 state while probing.
+
+    uint8_t         test_mode[8];       // Memory used for APU and I/O functionality that is normally disabled (not used by emulator).
 
     unsigned        jp_strobe   : 1;    // Controller shift register strobe (0: low; 1: high).
     unsigned        oam_upload  : 1;    // Whether the CPU is suspended due to OAM DMA.

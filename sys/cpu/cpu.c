@@ -44,7 +44,6 @@ cpu_t *cpu_create(void) {
 
     // Setup stack.
     cpu->frame.sp = 0xFD;
-    cpu->stack = cpu->wmem + STACK_START;
 
     // Create address space.
     cpu->as = as_create();

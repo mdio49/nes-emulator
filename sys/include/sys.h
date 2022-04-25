@@ -1,6 +1,7 @@
 #ifndef SYS_H
 #define SYS_H
 
+#include <apu.h>
 #include <cpu.h>
 #include <ppu.h>
 #include <prog.h>
@@ -52,6 +53,7 @@ void sys_reset(void);
  */
 void sys_run(handlers_t *handlers);
 
+extern apu_t   *apu;        // The APU.
 extern cpu_t   *cpu;        // The CPU.
 extern ppu_t   *ppu;        // The PPU.
 extern prog_t  *curprog;    // The cartridge inserted into the system.

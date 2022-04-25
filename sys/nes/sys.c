@@ -32,15 +32,15 @@ void sys_poweron(void) {
     }
 
     // APU registers.
-    as_add_segment(cpu->as, APU_PULSE1 + 0, 1, &apu->pulse1.reg0);
-    as_add_segment(cpu->as, APU_PULSE1 + 1, 1, &apu->pulse1.reg1);
-    as_add_segment(cpu->as, APU_PULSE1 + 2, 1, &apu->pulse1.reg2);
-    as_add_segment(cpu->as, APU_PULSE1 + 3, 1, &apu->pulse1.reg3);
+    as_add_segment(cpu->as, APU_PULSE1 + 0, 1, &apu->pulse[0].reg0);
+    as_add_segment(cpu->as, APU_PULSE1 + 1, 1, &apu->pulse[0].reg1);
+    as_add_segment(cpu->as, APU_PULSE1 + 2, 1, &apu->pulse[0].reg2);
+    as_add_segment(cpu->as, APU_PULSE1 + 3, 1, &apu->pulse[0].reg3);
 
-    as_add_segment(cpu->as, APU_PULSE2 + 0, 1, &apu->pulse2.reg0);
-    as_add_segment(cpu->as, APU_PULSE2 + 1, 1, &apu->pulse2.reg1);
-    as_add_segment(cpu->as, APU_PULSE2 + 2, 1, &apu->pulse2.reg2);
-    as_add_segment(cpu->as, APU_PULSE2 + 3, 1, &apu->pulse2.reg3);
+    as_add_segment(cpu->as, APU_PULSE2 + 0, 1, &apu->pulse[1].reg0);
+    as_add_segment(cpu->as, APU_PULSE2 + 1, 1, &apu->pulse[1].reg1);
+    as_add_segment(cpu->as, APU_PULSE2 + 2, 1, &apu->pulse[1].reg2);
+    as_add_segment(cpu->as, APU_PULSE2 + 3, 1, &apu->pulse[1].reg3);
 
     as_add_segment(cpu->as, APU_TRIANGLE + 0, 1, &apu->triangle.reg0);
     as_add_segment(cpu->as, APU_TRIANGLE + 1, 1, &apu->triangle.reg1);
@@ -275,7 +275,7 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
         noise_t noise;
         dmc_t dmc;
         
-        if (read) {
+        if (write) {
             // Ensure that the correct value is put into the register after evaluating bitmasks.
             switch (vaddr) {
                 case APU_PULSE1:
@@ -297,7 +297,7 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
                 case APU_PULSE1 + 0x03:
                 case APU_PULSE2 + 0x03:
                     pulse.timer_high = value & 0x07;
-                    pulse.len_counter_load = value >> 3;
+                    pulse.len_counter = value >> 3;
                     value = pulse.reg3;
                     break;
                 case APU_TRIANGLE:
@@ -307,7 +307,7 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
                     break;
                 case APU_TRIANGLE + 0x03:
                     triangle.timer_high = value & 0x07;
-                    triangle.len_counter_load = value >> 3;
+                    triangle.len_counter = value >> 3;
                     value = triangle.reg3;
                     break;
                 case APU_NOISE:
@@ -322,7 +322,7 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
                     value = noise.reg2;
                     break;
                 case APU_NOISE + 0x03:
-                    noise.len_counter_load = value >> 3;
+                    noise.len_counter = value >> 3;
                     value = noise.reg3;
                     break;
                 case APU_DMC:

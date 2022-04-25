@@ -35,6 +35,8 @@ void before_execute(operation_t ins);
 void after_execute(operation_t ins);
 
 void update_screen(const char *data);
+void audio_callback(void *udata, uint8_t *stream, int len);
+
 uint8_t poll_input_p1(void);
 uint8_t poll_input_p2(void);
 
@@ -52,6 +54,7 @@ SDL_Window *mainWindow = NULL;
 SDL_Surface *mainSurface = NULL;
 SDL_Renderer *mainRenderer = NULL;
 SDL_Texture *screen = NULL;
+SDL_AudioSpec audio;
 
 history_t history[HIST_LEN] = { 0 };
 handlers_t handlers = {
@@ -139,6 +142,22 @@ bool init(void) {
 
     // Create a texture for the screen.
     screen = SDL_CreateTexture(mainRenderer, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_TARGET, SCREEN_WIDTH, SCREEN_HEIGHT);
+
+
+    /* Set the audio format */
+    audio.freq = 22050;
+    audio.format = AUDIO_S16;
+    audio.channels = 2;    /* 1 = mono, 2 = stereo */
+    audio.samples = 1024;  /* Good low-latency value for callback */
+    audio.callback = audio_callback;
+    audio.userdata = NULL;
+
+    if (SDL_OpenAudio(&audio, NULL) != 0) {
+        printf("Couldn't open audio: %s\n", SDL_GetError());
+        return false;
+    }
+
+    SDL_PauseAudio(0);
 
     return true;
 }
@@ -349,6 +368,53 @@ void update_screen(const char *data) {
         delta += ticks - last_update;
         last_update = ticks;
     }*/
+
+    // NOTE: Sound test
+    /*const int SamplesPerSecond = 48000;
+    const int ToneHz = 512;
+    const int16_t ToneVolume = 3000;
+    uint32_t RunningSampleIndex = 0;
+    const int SquareWavePeriod = SamplesPerSecond / ToneHz;
+    const int HalfSquareWavePeriod = SquareWavePeriod / 2;
+    const int BytesPerSample = sizeof(int16_t) * 2;
+
+    int BytesToWrite = 800 * BytesPerSample;
+    uint8_t *SoundBuffer = malloc(BytesToWrite);
+    int16_t *SampleOut = (int16_t*)SoundBuffer;
+    int SampleCount = BytesToWrite / BytesPerSample;
+
+    for(int SampleIndex = 0; SampleIndex < SampleCount; ++SampleIndex) {
+        int16_t SampleValue = ((RunningSampleIndex++ / HalfSquareWavePeriod) % 2) ? ToneVolume : -ToneVolume;
+        *SampleOut++ = SampleValue;
+        *SampleOut++ = SampleValue;
+    }
+
+    SDL_QueueAudio(1, SoundBuffer, BytesToWrite);
+    free(SoundBuffer);*/
+}
+
+void audio_callback(void *udata, uint8_t *stream, int len) {
+    // NOTE: Sound test
+    /*const int SamplesPerSecond = audio.freq;
+    const int ToneHz = (apu->pulse1.timer_high << 8) | apu->pulse1.timer_low;
+    printf("%d\n", ToneHz);
+    if (ToneHz >= 8) {
+        const int16_t ToneVolume = 3000;
+        uint32_t RunningSampleIndex = 0;
+        const int SquareWavePeriod = SamplesPerSecond / ToneHz;
+        const int HalfSquareWavePeriod = SquareWavePeriod / 2;
+
+        int16_t *SampleOut = (int16_t*)stream;
+        for(int SampleIndex = 0; SampleIndex < len / 2; ++SampleIndex) {
+            int16_t SampleValue = ((RunningSampleIndex++ / HalfSquareWavePeriod) % 2) ? ToneVolume : -ToneVolume;
+            *SampleOut++ = SampleValue;
+            *SampleOut++ = SampleValue;
+        }
+    }
+    else {
+        memset(stream, 0, len);
+    }*/
+    memset(stream, 0, len);
 }
 
 uint8_t poll_input_p1(void) {

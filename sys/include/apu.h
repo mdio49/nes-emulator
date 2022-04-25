@@ -2,6 +2,7 @@
 #define APU_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #define APU_PULSE1      0x4000
 #define APU_PULSE2      0x4004
@@ -25,7 +26,7 @@ typedef struct pulse {
         uint8_t reg0;
     };
     union {
-        struct sweep_unit {
+        struct {
             unsigned    shift   : 4;
             unsigned    negate  : 1;
             unsigned    period  : 3;
@@ -39,8 +40,8 @@ typedef struct pulse {
     };
     union {
         struct {
-            unsigned    timer_high          : 3;
-            unsigned    len_counter_load    : 5;
+            unsigned    timer_high  : 3;
+            unsigned    len_counter : 5;
         };
         uint8_t reg3;
     };
@@ -64,8 +65,8 @@ typedef struct triangle {
     };
     union {
         struct {
-            unsigned    timer_high          : 3;
-            unsigned    len_counter_load    : 5;
+            unsigned    timer_high  : 3;
+            unsigned    len_counter : 5;
         };
         uint8_t reg3;
     };
@@ -95,8 +96,8 @@ typedef struct noise {
     };
     union {
         struct {
-            unsigned                        : 3;
-            unsigned    len_counter_load    : 5;
+            unsigned                : 3;
+            unsigned    len_counter : 5;
         };
         uint8_t reg3;
     };
@@ -132,13 +133,28 @@ typedef struct dmc {
     };
 } dmc_t;
 
+typedef struct envelope {
+
+    bool        start_flag;
+    uint8_t     decay_level;
+    uint8_t     divider;
+
+} envelope_t;
+
+typedef struct sweep_unit {
+
+    uint8_t     divider;
+    bool        reload_flag;
+
+} sweep_unit_t;
+
 /**
  * @brief A struct that contains data for an APU.
  */
 typedef struct apu {
-
-    pulse_t     pulse1;     // Pulse channel 1.
-    pulse_t     pulse2;     // Pulse channel 2.
+    
+    /* APU channels */
+    pulse_t     pulse[2];   // Pulse channels.
     triangle_t  triangle;   // Triangle channel.
     noise_t     noise;      // Noise channel.
     dmc_t       dmc;        // DMC channel.
@@ -158,6 +174,15 @@ typedef struct apu {
         uint8_t value;
     } status;
 
+    envelope_t      envelopes[3];       // Envelopes (pulse1, pulse2 and noise respectively).
+    sweep_unit_t    sweep_units[2];     // Sweep units (one for each pulse channel).
+
+    unsigned        qframe      : 2;    // A 4-state flag used to determine the quarter that the current quarter-cycle is in.
+    unsigned        sequencer   : 3;    // The current step of the sequencer.
+    unsigned                    : 3;
+
+    uint16_t        seq_timers[3];      // Sequencer timers (one for each pulse channel and one for triangle channel).
+
 } apu_t;
 
 /**
@@ -173,5 +198,13 @@ apu_t *apu_create(void);
  * @param apu The APU to destroy.
  */
 void apu_destroy(apu_t *apu);
+
+/**
+ * @brief Updates the given APU by a specified number of frames.
+ * 
+ * @param apu The APU to update.
+ * @param qcycles The number of quarter-cycles to update by (4 quarter-cycles = 1 frame = 2 CPU cycles).
+ */
+void apu_update(apu_t *apu, int qcycles);
 
 #endif

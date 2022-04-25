@@ -263,6 +263,7 @@ void ppu_render(ppu_t *ppu, int cycles) {
                     
                     // Update the color and break as any subsequent sprites would be displayed behind this sprite.
                     col_index = ppu->spr_palette[ppu->oam_attr[i].palette * 3 + spr - 1];
+                    //ppu->status.hit = 1;
                     break;
                 }
 

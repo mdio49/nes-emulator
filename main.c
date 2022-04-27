@@ -68,6 +68,7 @@ bool test = false;
 FILE *log_fp = NULL;
 
 uint64_t last_update = 0;
+uint32_t mixer_ptr = 0;
 
 int main(int argc, char *argv[]) {
     // Setup signal handlers.
@@ -143,10 +144,9 @@ bool init(void) {
     // Create a texture for the screen.
     screen = SDL_CreateTexture(mainRenderer, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_TARGET, SCREEN_WIDTH, SCREEN_HEIGHT);
 
-
     /* Set the audio format */
-    audio.freq = 22050;
-    audio.format = AUDIO_S16;
+    audio.freq = 262144;
+    audio.format = AUDIO_F32;
     audio.channels = 2;    /* 1 = mono, 2 = stereo */
     audio.samples = 1024;  /* Good low-latency value for callback */
     audio.callback = audio_callback;
@@ -394,27 +394,30 @@ void update_screen(const char *data) {
 }
 
 void audio_callback(void *udata, uint8_t *stream, int len) {
-    // NOTE: Sound test
-    /*const int SamplesPerSecond = audio.freq;
-    const int ToneHz = (apu->pulse1.timer_high << 8) | apu->pulse1.timer_low;
-    printf("%d\n", ToneHz);
-    if (ToneHz >= 8) {
-        const int16_t ToneVolume = 3000;
-        uint32_t RunningSampleIndex = 0;
-        const int SquareWavePeriod = SamplesPerSecond / ToneHz;
-        const int HalfSquareWavePeriod = SquareWavePeriod / 2;
+    //printf("-- %d -> %d\n", mixer_ptr, apu->mixer_ptr);
+    for (int i = 0; i < len / 4; i++) {
+        if (mixer_ptr == apu->mixer_ptr) {
+            stream[i] = 0x00;
+        }
+        else {
+            //printf("%d %f\n", mixer_ptr, apu->mixer_out[mixer_ptr]);
+            ((float*)stream)[i] = apu->mixer_out[mixer_ptr];
+            mixer_ptr = (mixer_ptr + 1) % MIXER_BUFFER;
+        }
+    }
 
-        int16_t *SampleOut = (int16_t*)stream;
-        for(int SampleIndex = 0; SampleIndex < len / 2; ++SampleIndex) {
-            int16_t SampleValue = ((RunningSampleIndex++ / HalfSquareWavePeriod) % 2) ? ToneVolume : -ToneVolume;
-            *SampleOut++ = SampleValue;
-            *SampleOut++ = SampleValue;
+    // Sound test
+    /*const int SquareWavePeriod = (apu->pulse[0].timer_high << 8) | apu->pulse[0].timer_low;
+    if (SquareWavePeriod >= 8) {
+        const int QuarterSquareWavePeriod = SquareWavePeriod / 4;
+        for(int i = 0; i < len / 4; ++i) {
+            ((float*)stream)[i] = ((i / QuarterSquareWavePeriod) % 2) ? 0.1f : -0.1f;
         }
     }
     else {
         memset(stream, 0, len);
     }*/
-    memset(stream, 0, len);
+    //memset(stream, 0, len);
 }
 
 uint8_t poll_input_p1(void) {

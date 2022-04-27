@@ -89,6 +89,26 @@ void cpu_nmi(cpu_t *cpu) {
     //printf("NMI detected.\n");
 }
 
+void cpu_irq(cpu_t *cpu) {
+    // Ignore if interrupt flag is set.
+    if (cpu->frame.sr.irq)
+        return;
+    
+    // Push PC and status register.
+    push_word(&cpu->frame, cpu->as, cpu->frame.pc);
+    push(&cpu->frame, cpu->as, cpu->frame.sr.bits);
+
+    // Disable further interrupts.
+    cpu->frame.sr.irq = 1;
+    
+    // Jump to interrupt handler.
+    const uint8_t low = as_read(cpu->as, IRQ_VECTOR);
+    const uint8_t high = as_read(cpu->as, IRQ_VECTOR + 1);
+    cpu->frame.pc = bytes_to_word(low, high);
+
+    printf("IRQ detected.\n");
+}
+
 uint8_t cpu_fetch(const cpu_t *cpu) {
     return as_read(cpu->as, cpu->frame.pc);
 }

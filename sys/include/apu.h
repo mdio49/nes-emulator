@@ -12,10 +12,30 @@
 #define APU_STATUS      0x4015
 #define APU_FRAME       0x4017
 
+#define QUARTER_FRAME   3728
+
+#define MIXER_BUFFER    65536
+
+typedef struct envelope {
+
+    bool        start_flag;
+    unsigned    decay_level : 4;
+    unsigned    divider     : 4;
+
+} envelope_t;
+
+typedef struct sweep_unit {
+
+    uint8_t     divider;        // The divider.
+    bool        reload_flag;    // The reload flag.
+
+} sweep_unit_t;
+
 /**
  * @brief A struct that contains data for a pulse channel.
  */
 typedef struct pulse {
+    /* registers */
     union {
         struct {
             unsigned    vol     : 4;    // Volume/envelope.
@@ -40,11 +60,25 @@ typedef struct pulse {
     };
     union {
         struct {
-            unsigned    timer_high  : 3;
-            unsigned    len_counter : 5;
+            unsigned    timer_high          : 3;
+            unsigned    len_counter_load    : 5;
         };
         uint8_t reg3;
     };
+
+    /* units */
+    
+    envelope_t      envelope;   // Envelope unit.
+    sweep_unit_t    sweep_u;    // Sweep unit.
+
+    /* other variables */
+
+    uint8_t         len_counter;
+    unsigned        sequencer           : 3;    // The sequencer.
+    unsigned        timer               : 11;   // The sequencer's timer/divider.
+    unsigned        len_counter_reload  : 1;    // Set if the length counter should be reloaded.
+    unsigned                            : 1;
+    
 } pulse_t;
 
 /**
@@ -133,21 +167,6 @@ typedef struct dmc {
     };
 } dmc_t;
 
-typedef struct envelope {
-
-    bool        start_flag;
-    uint8_t     decay_level;
-    uint8_t     divider;
-
-} envelope_t;
-
-typedef struct sweep_unit {
-
-    uint8_t     divider;
-    bool        reload_flag;
-
-} sweep_unit_t;
-
 /**
  * @brief A struct that contains data for an APU.
  */
@@ -174,14 +193,16 @@ typedef struct apu {
         uint8_t value;
     } status;
 
-    envelope_t      envelopes[3];       // Envelopes (pulse1, pulse2 and noise respectively).
-    sweep_unit_t    sweep_units[2];     // Sweep units (one for each pulse channel).
+    /* other variables */
+    uint16_t        frame_counter;          // The frame counter.
+    unsigned        step            : 3;    // The current sequencer step.
+    unsigned        cyc_carry       : 1;    // Set if the last update had one half-cycle left over.
+    unsigned        irq_occurred    : 1;    // Set if an IRQ has already occurred for the current frame.
+    unsigned        irq_flag        : 1;    // Set if an IRQ should occur.
+    unsigned                        : 2;
 
-    unsigned        qframe      : 2;    // A 4-state flag used to determine the quarter that the current quarter-cycle is in.
-    unsigned        sequencer   : 3;    // The current step of the sequencer.
-    unsigned                    : 3;
-
-    uint16_t        seq_timers[3];      // Sequencer timers (one for each pulse channel and one for triangle channel).
+    float           mixer_out[MIXER_BUFFER];
+    uint32_t        mixer_ptr;
 
 } apu_t;
 
@@ -203,8 +224,8 @@ void apu_destroy(apu_t *apu);
  * @brief Updates the given APU by a specified number of frames.
  * 
  * @param apu The APU to update.
- * @param qcycles The number of quarter-cycles to update by (4 quarter-cycles = 1 frame = 2 CPU cycles).
+ * @param hcycles The number of half-cycles that have passed (2 CPU cycles = 1 APU cycle).
  */
-void apu_update(apu_t *apu, int qcycles);
+void apu_update(apu_t *apu, int hcycles);
 
 #endif

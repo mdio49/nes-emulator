@@ -186,9 +186,21 @@ void sys_run(handlers_t *handlers) {
             if (handlers->after_execute != NULL) {
                 handlers->after_execute(ins);
             }
+        }        
+
+        // Cycle the APU.
+        apu_update(apu, cycles * 2);
+
+        // Check for IRQ.
+        if (apu->irq_flag) {
+            apu->irq_flag = false;
+            cpu_irq(cpu);
+
+            // Add 7 cycles for the IRQ to occur.
+            cycles += 7;
         }
 
-        // Increment the cycle counter.
+        // Increment the CPU's cycle counter.
         cpu->cycles += cycles;
 
         // Cycle the PPU.
@@ -276,6 +288,27 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
         dmc_t dmc;
         
         if (write) {
+            // Set start flag of envelopes and reload flag of sweep units, and reset sequencers (if necessary).
+            switch (vaddr) {
+                case APU_PULSE1 + 0x01:
+                    apu->pulse[0].sweep_u.reload_flag = true;
+                    break;
+                case APU_PULSE1 + 0x03:
+                    apu->pulse[0].envelope.start_flag = true;
+                    apu->pulse[0].sequencer = 0;
+                    break;
+                case APU_PULSE2 + 0x01:
+                    apu->pulse[1].sweep_u.reload_flag = true;
+                    break;
+                case APU_PULSE2 + 0x03:
+                    apu->pulse[1].envelope.start_flag = true;
+                    apu->pulse[1].sequencer = 0;
+                    break;
+                case APU_TRIANGLE + 0x03:
+                    // TODO
+                    break;
+            }
+
             // Ensure that the correct value is put into the register after evaluating bitmasks.
             switch (vaddr) {
                 case APU_PULSE1:
@@ -297,7 +330,7 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
                 case APU_PULSE1 + 0x03:
                 case APU_PULSE2 + 0x03:
                     pulse.timer_high = value & 0x07;
-                    pulse.len_counter = value >> 3;
+                    pulse.len_counter_load = value >> 3;
                     value = pulse.reg3;
                     break;
                 case APU_TRIANGLE:
@@ -351,9 +384,15 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
             status.noise = (value >> 3) & 0x01;
             status.dmc = (value >> 4) & 0x01;
 
-            // Writing doesn't change these flags.
+            // Writing doesn't change frame interrupt flag.
             status.f_irq = apu->status.f_irq;
-            status.d_irq = apu->status.d_irq;
+
+            // Writing clears DMC interrupt flag.
+            status.d_irq = 0;
+
+            // Reset timers.
+            apu->frame_counter = 0;
+            apu->step = 0;
 
             value = status.value;
         }

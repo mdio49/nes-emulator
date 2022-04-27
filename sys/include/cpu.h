@@ -240,6 +240,13 @@ void cpu_reset(cpu_t *cpu);
 void cpu_nmi(cpu_t *cpu);
 
 /**
+ * @brief Invokes an interrupt request on the CPU. Fails if the interrupt disable flag is set.
+ * 
+ * @param cpu The CPU to interrupt.
+ */
+void cpu_irq(cpu_t *cpu);
+
+/**
  * @brief Fetches the next instruction from memory without advancing the program counter.
  * 
  * @param cpu The CPU's state.

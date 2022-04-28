@@ -16,6 +16,8 @@ typedef struct handlers {
     void        (*after_execute)(operation_t ins);
     
     void        (*update_screen)(const char *data);
+    void        (*flush_apu)(const float *data, int len);
+    
     uint8_t     (*poll_input_p1)(void);
     uint8_t     (*poll_input_p2)(void);
 

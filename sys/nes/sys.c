@@ -197,7 +197,7 @@ void sys_run(handlers_t *handlers) {
             cpu_irq(cpu);
 
             // Add 7 cycles for the IRQ to occur.
-            cycles += 7;
+            //cycles += 7;
         }
 
         // Increment the CPU's cycle counter.

@@ -342,8 +342,7 @@ void test_instructions(tframe_t *frame) {
      */
 
     // ADC
-
-    // Standard arithmetic.
+    
     frame->sr.dec = 0;
 
     frame->ac = 0x01;
@@ -423,134 +422,8 @@ void test_instructions(tframe_t *frame) {
     assert(frame->sr.vflow == 1);
     assert(frame->sr.zero == 0);
 
-    // Binary coded decimal.
-    frame->sr.dec = 1;
-
-    frame->ac = 0x01;
-    frame->sr.carry = 0;
-    value = 0x02;
-
-    exec_ins(&INS_ADC, frame, as, 0, &value);
-    assert(frame->ac == 0x03);
-    assert(frame->sr.carry == 0);
-    assert(frame->sr.neg == 0);
-    assert(frame->sr.vflow == 0);
-    assert(frame->sr.zero == 0);
-
-    frame->ac = 0x01;
-    frame->sr.carry = 1;
-    value = 0x02;
-
-    exec_ins(&INS_ADC, frame, as, 0, &value);
-    assert(frame->ac == 0x04);
-    assert(frame->sr.carry == 0);
-    assert(frame->sr.neg == 0);
-    assert(frame->sr.vflow == 0);
-    assert(frame->sr.zero == 0);
-
-    frame->ac = 0x18;
-    frame->sr.carry = 0;
-    value = 0x06;
-
-    exec_ins(&INS_ADC, frame, as, 0, &value);
-    assert(frame->ac == 0x24);
-    assert(frame->sr.carry == 0);
-    assert(frame->sr.neg == 0);
-    assert(frame->sr.vflow == 0);
-    assert(frame->sr.zero == 0);
-
-    frame->ac = 0x79;
-    frame->sr.carry = 0;
-    value = 0x01;
-
-    exec_ins(&INS_ADC, frame, as, 0, &value);
-    assert(frame->ac = 0x80);
-    assert(frame->sr.carry == 0);
-    assert(frame->sr.neg == 1);
-    assert(frame->sr.vflow == 0);
-    assert(frame->sr.zero == 0);
-
-    frame->ac = 0x99;
-    frame->sr.carry = 0;
-    value = 0x01;
-
-    exec_ins(&INS_ADC, frame, as, 0, &value);
-    assert(frame->ac == 0x00);
-    assert(frame->sr.carry == 1);
-    assert(frame->sr.neg == 0);
-    assert(frame->sr.vflow == 0);
-    assert(frame->sr.zero == 1);
-
-    frame->ac = 0x99;
-    frame->sr.carry = 0;
-    value = 0x02;
-
-    exec_ins(&INS_ADC, frame, as, 0, &value);
-    assert(frame->ac == 0x01);
-    assert(frame->sr.carry == 1);
-    assert(frame->sr.neg == 0);
-    assert(frame->sr.vflow == 0);
-    assert(frame->sr.zero == 0);
-
-    frame->ac = 0x99;
-    frame->sr.carry = 1;
-    value = 0x99;
-
-    exec_ins(&INS_ADC, frame, as, 0, &value);
-    assert(frame->ac == 0x99);
-    assert(frame->sr.carry == 1);
-    assert(frame->sr.neg == 1);
-    assert(frame->sr.vflow == 0);
-    assert(frame->sr.zero == 0);
-
-    // BCD overflow cases.
-    frame->ac = 0x0A;               // 10
-    frame->sr.carry = 0;
-    value = 0x00;                   // +0
-
-    exec_ins(&INS_ADC, frame, as, 0, &value);
-    assert(frame->ac == 0x10);      // 10
-    assert(frame->sr.carry == 0);
-    assert(frame->sr.neg == 0);
-    assert(frame->sr.vflow == 0);
-    assert(frame->sr.zero == 0);
-
-    frame->ac = 0xA0;               // 100
-    frame->sr.carry = 0;
-    value = 0x00;                   // + 0
-
-    exec_ins(&INS_ADC, frame, as, 0, &value);
-    assert(frame->ac == 0x00);      // 100
-    assert(frame->sr.carry == 1);
-    assert(frame->sr.neg == 0);
-    assert(frame->sr.vflow == 0);
-    assert(frame->sr.zero == 1);
-
-    frame->ac = 0xFF;               // 165
-    frame->sr.carry = 0;
-    value = 0x00;                   // + 0
-
-    exec_ins(&INS_ADC, frame, as, 0, &value);
-    assert(frame->ac == 0x65);      // 165
-    assert(frame->sr.carry == 1);
-    assert(frame->sr.neg == 0);
-    assert(frame->sr.vflow == 0);
-    assert(frame->sr.zero == 0);
-    
-    frame->ac = 0xFF;               // 165
-    frame->sr.carry = 0;
-    value = 0x34;                   // +34
-
-    exec_ins(&INS_ADC, frame, as, 0, &value);
-    assert(frame->ac == 0x99);      // 199
-    assert(frame->sr.carry == 1);
-    assert(frame->sr.neg == 1);
-    assert(frame->sr.vflow == 0);
-    assert(frame->sr.zero == 0);
-
     // SBC
 
-    // Standard arithmetic.
     frame->sr.dec = 0;
 
     frame->ac = 0x08;
@@ -639,86 +512,6 @@ void test_instructions(tframe_t *frame) {
     assert(frame->sr.carry == 0);
     assert(frame->sr.neg == 1);
     assert(frame->sr.vflow == 1);
-    assert(frame->sr.zero == 0);
-
-    // Binary coded decimal.
-    frame->sr.dec = 1;
-
-    frame->ac = 0x08;
-    frame->sr.carry = 1;
-    value = 0x02;
-
-    exec_ins(&INS_SBC, frame, as, 0, &value);
-    assert(frame->ac == 0x06);
-    assert(frame->sr.carry == 1);
-    assert(frame->sr.neg == 0);
-    assert(frame->sr.vflow == 0);
-    assert(frame->sr.zero == 0);
-
-    frame->ac = 0x08;
-    frame->sr.carry = 1;
-    value = 0x08;
-
-    exec_ins(&INS_SBC, frame, as, 0, &value);
-    assert(frame->ac == 0x00);
-    assert(frame->sr.carry == 1);
-    assert(frame->sr.neg == 0);
-    assert(frame->sr.vflow == 0);
-    assert(frame->sr.zero == 1);
-
-    frame->ac = 0x08;
-    frame->sr.carry = 1;
-    value = 0x09;
-
-    exec_ins(&INS_SBC, frame, as, 0, &value);
-    assert(frame->ac == 0x99);
-    assert(frame->sr.carry == 0);
-    assert(frame->sr.neg == 1);
-    assert(frame->sr.vflow == 0);
-    assert(frame->sr.zero == 0);
-
-    frame->ac = 0x08;
-    frame->sr.carry = 0;
-    value = 0x02;
-
-    exec_ins(&INS_SBC, frame, as, 0, &value);
-    assert(frame->ac == 0x05);
-    assert(frame->sr.carry == 1);
-    assert(frame->sr.neg == 0);
-    assert(frame->sr.vflow == 0);
-    assert(frame->sr.zero == 0);
-
-    frame->ac = 0x81;
-    frame->sr.carry = 1;
-    value = 0x02;
-
-    exec_ins(&INS_SBC, frame, as, 0, &value);
-    assert(frame->ac == 0x79);
-    assert(frame->sr.carry == 1);
-    assert(frame->sr.neg == 0);
-    assert(frame->sr.vflow == 0);
-    assert(frame->sr.zero == 0);
-
-    frame->ac = 0x85;
-    frame->sr.carry = 1;
-    value = 0x02;
-
-    exec_ins(&INS_SBC, frame, as, 0, &value);
-    assert(frame->ac == 0x83);
-    assert(frame->sr.carry == 1);
-    assert(frame->sr.neg == 1);
-    assert(frame->sr.vflow == 0);
-    assert(frame->sr.zero == 0);
-
-    frame->ac = 0x00;
-    frame->sr.carry = 1;
-    value = 0x99;
-
-    exec_ins(&INS_SBC, frame, as, 0, &value);
-    assert(frame->ac == 0x01);
-    assert(frame->sr.carry == 0);
-    assert(frame->sr.neg == 0);
-    assert(frame->sr.vflow == 0);
     assert(frame->sr.zero == 0);
 
     /**

@@ -3,7 +3,7 @@ CC = gcc
 TARGET = emu
 
 # Paths.
-INC_PATHS = sys/include SDL2/include
+INC_PATHS = emu/include SDL2/include sys/include
 LIB_PATHS = SDL2/lib
 SRC_PATH = .
 
@@ -26,11 +26,11 @@ main: main.o
 test: test.o
 	$(CC) $(CFLAGS) $(OBJECTS) test.o -o $(TARGET)_test 
 
-test.o: test.c cpu.o
-	$(CC) $(CFLAGS) -c test.c
+test.o: emu/test/*.c cpu.o
+	$(CC) $(CFLAGS) -c emu/test/*.c
 
-main.o: main.c sys.o
-	$(CC) $(CFLAGS) -c main.c
+main.o: emu/src/*.c sys.o
+	$(CC) $(CFLAGS) -c emu/src/*.c
 
 sys.o: apu.o cpu.o ppu.o prog.o
 	$(CC) $(CFLAGS) -c sys/nes/*.c

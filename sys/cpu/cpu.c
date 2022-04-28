@@ -106,7 +106,7 @@ void cpu_irq(cpu_t *cpu) {
     const uint8_t high = as_read(cpu->as, IRQ_VECTOR + 1);
     cpu->frame.pc = bytes_to_word(low, high);
 
-    printf("IRQ detected.\n");
+    //printf("IRQ detected.\n");
 }
 
 uint8_t cpu_fetch(const cpu_t *cpu) {

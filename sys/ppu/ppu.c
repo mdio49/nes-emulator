@@ -229,7 +229,7 @@ void ppu_render(ppu_t *ppu, int cycles) {
                 const uint8_t screen_x = ppu->draw_x - 1;
 
                 // Determine the value of the bit at this pixel of the tile.
-                uint8_t bkg = get_tile_value(ppu->sr16[0] & 0xFF, ppu->sr16[0] >> 8, ppu->x);
+                uint8_t bkg = ppu->mask.background ? get_tile_value(ppu->sr16[0] & 0xFF, ppu->sr16[0] >> 8, ppu->x) : 0;
                 
                 // Determine the color of the pixel.
                 uint8_t index = ppu->sr8[0];
@@ -239,32 +239,41 @@ void ppu_render(ppu_t *ppu, int cycles) {
                     index >>= 4;
                 uint8_t col_index = bkg > 0 ? ppu->bkg_palette[(index & 0x03) * 4 + bkg - 1] : ppu->bkg_color;
 
-                // Get active sprites.
-                for (int i = 0; i < 8; i++) {
-                    if (ppu->oam_x[i] == 0xFF)
-                        continue;
-                    if (ppu->oam_x[i] > screen_x)
-                        continue;
-                    if (screen_x > ppu->oam_x[i] + 8)
-                        continue;
-                    
-                    // Get fine-x and flip horizontally if necessary.
-                    uint8_t fine_x = screen_x - ppu->oam_x[i];
-                    if (ppu->oam_attr[i].flip_h) {
-                        fine_x = 7 - fine_x;
-                    }
+                // Check if the pixel should be overriden with one from a sprite.
+                if (ppu->mask.sprites) {
+                    // Get active sprites.
+                    for (int i = 0; i < 8; i++) {
+                        if (ppu->oam_x[i] == 0xFF)
+                            continue;
+                        if (ppu->oam_x[i] > screen_x)
+                            continue;
+                        if (screen_x > ppu->oam_x[i] + 8)
+                            continue;
+                        
+                        // Get fine-x and flip horizontally if necessary.
+                        uint8_t fine_x = screen_x - ppu->oam_x[i];
+                        if (ppu->oam_attr[i].flip_h) {
+                            fine_x = 7 - fine_x;
+                        }
 
-                    // Get value of sprite at current pixel and decide whether it should override the background.
-                    uint8_t spr = get_tile_value(ppu->oam_p[i][0], ppu->oam_p[i][1], fine_x);
-                    if (spr == 0)
-                        continue;
-                    if (bkg > 0 && ppu->oam_attr[i].priority)
-                        continue;
-                    
-                    // Update the color and break as any subsequent sprites would be displayed behind this sprite.
-                    col_index = ppu->spr_palette[ppu->oam_attr[i].palette * 3 + spr - 1];
-                    //ppu->status.hit = 1;
-                    break;
+                        // Get value of sprite at current pixel and decide whether it should override the background.
+                        uint8_t spr = get_tile_value(ppu->oam_p[i][0], ppu->oam_p[i][1], fine_x);
+                        if (spr == 0)
+                            continue;
+                        
+                        // Check if the sprite 0 hit flag should be updated.
+                        if (bkg > 0 && i == 0 && ppu->s0) {
+                            ppu->status.hit = 1;
+                        }
+
+                        // Decide whether it should override the background.
+                        if (bkg > 0 && ppu->oam_attr[i].priority)
+                            continue;
+                        
+                        // Update the color and break as any subsequent sprites would be displayed behind this sprite.
+                        col_index = ppu->spr_palette[ppu->oam_attr[i].palette * 3 + spr - 1];
+                        break;
+                    }
                 }
 
                 // Output the pixel.
@@ -336,6 +345,7 @@ void ppu_render(ppu_t *ppu, int cycles) {
                 // Idle (reset iterators).
                 ppu->n = 0;
                 ppu->m = 0;
+                ppu->s0 = false;
                 ppu->oam2_ptr = 0;
             }
             else if (ppu->draw_x <= 64) {
@@ -382,6 +392,9 @@ void ppu_render(ppu_t *ppu, int cycles) {
                     // Fetch next sprite and check if y-coordinate is within range.
                     ppu->oam2[ppu->oam2_ptr] = ppu->oam_buffer;
                     if (sprite_in_range(ppu, ppu->oam_buffer)) {
+                        if (ppu->n == 0) {
+                            ppu->s0 = true;
+                        }
                         ppu->oam2_ptr++;
                         ppu->m++;
                     }

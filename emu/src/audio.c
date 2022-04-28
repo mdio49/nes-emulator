@@ -7,7 +7,7 @@ static uint32_t mixer_ptr = 0;
 
 bool init_audio(void) {
     /* Set the audio format */
-    audio.freq = 262144;
+    audio.freq = 262144; //44100;
     audio.format = AUDIO_F32;
     audio.channels = 2;    /* 1 = mono, 2 = stereo */
     audio.samples = 1024;  /* Good low-latency value for callback */
@@ -29,6 +29,11 @@ bool init_audio(void) {
 
 static void audio_callback(void *udata, uint8_t *stream, int len) {
     //printf("-- %d -> %d\n", mixer_ptr, apu->mixer_ptr);
+    /*const int nsamples = len / 4;
+    for (int i = 0; i < nsamples; i++) {
+        ((float*)stream)[i] = apu->mixer_out[(apu->mixer_ptr * i) / nsamples];
+    }
+    apu->mixer_ptr = 0;*/
     for (int i = 0; i < len / 4; i++) {
         if (mixer_ptr == apu->mixer_ptr) {
             stream[i] = 0x00;

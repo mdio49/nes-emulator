@@ -118,9 +118,10 @@ typedef struct ppu {
 
     /* variables used during sprite evaluation */
 
-    unsigned        n : 8;              // n-iterator for sprite evaluation.
-    unsigned        m : 2;              // m-iterator for sprite evaluation.
-    unsigned          : 6;
+    unsigned        n   : 8;            // n-iterator for sprite evaluation.
+    unsigned        m   : 2;            // m-iterator for sprite evaluation.
+    unsigned        s0  : 1;            // Set if sprite 0 is included in the current scanline.
+    unsigned            : 5;
 
     uint8_t         oam2_ptr;           // Pointer to secondary OAM memory during sprite evaluation.
     uint8_t         oam_buffer;         // OAM read buffer during sprite evaluation.

@@ -91,6 +91,33 @@ static inline bool sprite_in_range(ppu_t *ppu, uint8_t sprite_y) {
     return ppu->draw_y >= sprite_y && ppu->draw_y < sprite_y + (ppu->controller.spr_size ? 16 : 8);
 }
 
+static inline void inc_vram_addr(ppu_t *ppu, vram_reg_t *addr) {
+    if (!ppu->controller.vram_inc) {
+        addr->coarse_x++;
+    }
+    if (ppu->controller.vram_inc || addr->coarse_x == 0) {
+        addr->coarse_y++;
+        if (addr->coarse_y == 0) {
+            addr->nt_x++;
+            if (addr->nt_x == 0) {
+                addr->nt_y++;
+                if (addr->nt_y == 0) {
+                    addr->fine_y++;
+                    if (addr->fine_y == 0) {
+                        if (!ppu->controller.vram_inc) {
+                            addr->coarse_x = 0;
+                        }
+                        addr->coarse_y = 0;
+                        addr->nt_x = 0;
+                        addr->nt_y = 0;
+                        addr->fine_y = 0;
+                    }
+                }
+            }
+        }
+    }
+}
+
 ppu_t *ppu_create(void) {
     ppu_t *ppu = malloc(sizeof(struct ppu));
     ppu->vram = malloc(sizeof(uint8_t) * VRAM_SIZE);
@@ -157,16 +184,16 @@ void ppu_render(ppu_t *ppu, int cycles) {
             // second write
             //ppu->t.coarse_x = ppu->ppu_addr & 0x1F;
             //ppu->t.coarse_y = (ppu->t.coarse_y & ~0x07) | (ppu->ppu_addr >> 5);
-            ppu->v = ppu->t;
+            //ppu->v = ppu->t;
 
             ppu->vram_write_addr = (ppu->vram_write_addr & 0xFF00) | ppu->ppu_addr;
         }
         else {
             // first write
-            //ppu->v.coarse_y = (ppu->v.coarse_y & 0x07) | ((ppu->ppu_addr & 0x03) << 3);
-            //ppu->v.nt_x = (ppu->ppu_addr >> 2) & 0x01;
-            //ppu->v.nt_y = (ppu->ppu_addr >> 3) & 0x01;
-            //ppu->v.fine_y = (ppu->ppu_addr >> 4) & 0x03;
+            //ppu->t.coarse_y = (ppu->t.coarse_y & 0x07) | ((ppu->ppu_addr & 0x03) << 3);
+            //ppu->t.nt_x = (ppu->ppu_addr >> 2) & 0x01;
+            //ppu->t.nt_y = (ppu->ppu_addr >> 3) & 0x01;
+            //ppu->t.fine_y = (ppu->ppu_addr >> 4) & 0x03;
 
             ppu->vram_write_addr = (ppu->vram_write_addr & 0x00FF) | (ppu->ppu_addr << 8);
         }
@@ -175,14 +202,17 @@ void ppu_render(ppu_t *ppu, int cycles) {
     }
 
     // PPUDATA
-    if (ppu->ppudata_flags.write) {
-        as_write(ppu->as, ppu->vram_write_addr, ppu->ppu_data);
+    if (ppu->ppudata_flags.write || ppu->ppudata_flags.read) {
+        addr_t addr = ppu->vram_write_addr; //(ppu->t.fine_y << 12) | (ppu->t.nt_y << 11) | (ppu->t.nt_x << 10) | (ppu->t.coarse_y << 5) | ppu->t.coarse_x;
+        if (ppu->ppudata_flags.write) {
+            as_write(ppu->as, addr, ppu->ppu_data);
+        }
+        if (ppu->ppudata_flags.read) {
+            ppu->ppu_data = as_read(ppu->as, addr);
+        }
+        //inc_vram_addr(ppu, &ppu->t);
         ppu->vram_write_addr += ppu->controller.vram_inc ? 32 : 1;
         ppu->ppudata_flags.write = 0;
-    }
-    if (ppu->ppudata_flags.read) {
-        ppu->ppu_data = as_read(ppu->as, ppu->vram_write_addr);
-        ppu->vram_write_addr += ppu->controller.vram_inc ? 32 : 1;
         ppu->ppudata_flags.read = 0;
     }
 
@@ -229,7 +259,16 @@ void ppu_render(ppu_t *ppu, int cycles) {
                 const uint8_t screen_x = ppu->draw_x - 1;
 
                 // Determine the value of the bit at this pixel of the tile.
-                uint8_t bkg = ppu->mask.background ? get_tile_value(ppu->sr16[0] & 0xFF, ppu->sr16[0] >> 8, ppu->x) : 0;
+                uint8_t bkg;
+                if (!ppu->mask.background) {
+                    bkg = 0;
+                }
+                else if (ppu->draw_x <= 8 && !ppu->mask.bkg_left) {
+                    bkg = 0;
+                }
+                else {
+                    bkg = get_tile_value(ppu->sr16[0] & 0xFF, ppu->sr16[0] >> 8, ppu->x);
+                }
                 
                 // Determine the color of the pixel.
                 uint8_t index = ppu->sr8[0];
@@ -249,6 +288,10 @@ void ppu_render(ppu_t *ppu, int cycles) {
                             continue;
                         if (screen_x > ppu->oam_x[i] + 8)
                             continue;
+                        if (ppu->draw_x <= 8 && !ppu->mask.spr_left)
+                            continue;
+                        if (ppu->draw_x == 256)
+                            continue;
                         
                         // Get fine-x and flip horizontally if necessary.
                         uint8_t fine_x = screen_x - ppu->oam_x[i];
@@ -262,7 +305,7 @@ void ppu_render(ppu_t *ppu, int cycles) {
                             continue;
                         
                         // Check if the sprite 0 hit flag should be updated.
-                        if (bkg > 0 && i == 0 && ppu->s0) {
+                        if (i == 0 && bkg > 0 && ppu->szc) {
                             ppu->status.hit = 1;
                         }
 
@@ -345,7 +388,7 @@ void ppu_render(ppu_t *ppu, int cycles) {
                 // Idle (reset iterators).
                 ppu->n = 0;
                 ppu->m = 0;
-                ppu->s0 = false;
+                ppu->szn = false;
                 ppu->oam2_ptr = 0;
             }
             else if (ppu->draw_x <= 64) {
@@ -379,7 +422,9 @@ void ppu_render(ppu_t *ppu, int cycles) {
                 else if (ppu->oam2_ptr >= sizeof(ppu->oam2)) {
                     // Sprite overflow.
                     if (sprite_in_range(ppu, ppu->oam_buffer)) {
-                        ppu->status.overflow = true;
+                        if (ppu->mask.background || ppu->mask.sprites) {
+                            ppu->status.overflow = true; // Shouldn't be set if all rendering is off.
+                        }
                         ppu->oam2_ptr++;
                         ppu->m++;
                     }
@@ -393,7 +438,7 @@ void ppu_render(ppu_t *ppu, int cycles) {
                     ppu->oam2[ppu->oam2_ptr] = ppu->oam_buffer;
                     if (sprite_in_range(ppu, ppu->oam_buffer)) {
                         if (ppu->n == 0) {
-                            ppu->s0 = true;
+                            ppu->szn = true;
                         }
                         ppu->oam2_ptr++;
                         ppu->m++;
@@ -442,6 +487,9 @@ void ppu_render(ppu_t *ppu, int cycles) {
                     // Fetch x-position.
                     ppu->oam_x[i] = ppu->oam2[4 * i + 3];
                 }
+
+                // Check if sprite 0 is included at indices 0-3 of the secondary OAM.
+                ppu->szc = ppu->szn;
             }
         }
 

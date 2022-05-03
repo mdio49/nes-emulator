@@ -14,6 +14,7 @@ int status = 0x00;
 int msg_ptr = 0x6004;
 
 bool test = false;
+bool no_audio = false;
 FILE *log_fp = NULL;
 
 int main(int argc, char *argv[]) {
@@ -42,17 +43,20 @@ int main(int argc, char *argv[]) {
         else if (strcmp(arg, "-nogui") == 0) {
             nogui = true;
         }
+        else if (strcmp(arg, "-m") == 0) {
+            no_audio = true;
+        }
         else if (!strprefix(arg, "-") && path == NULL) {
             path = arg;
         }
         else {
-            printf("Usage: %s [<path|-x hex...>] [-t] [-nogui]\n", argv[0]);
+            printf("Usage: %s [<path|-x hex...>] [-l] [-m] [-nogui] [-t]\n", argv[0]);
             return EXIT_FAILURE;
         }
     }
     
     if (path == NULL) {
-        printf("Usage: %s [<path|-x hex...>] [-t] [-nogui]\n", argv[0]);
+        printf("Usage: %s [<path|-x hex...>] [-l] [-m] [-nogui] [-t]\n", argv[0]);
         return EXIT_FAILURE;
     }
 
@@ -79,7 +83,7 @@ bool init(void) {
 	}
 
     // Initialize subsystems.
-    if (!init_audio()) {
+    if (!no_audio && !init_audio()) {
         return false;
     }
     if (!init_display()) {
@@ -224,7 +228,7 @@ void before_execute(operation_t ins) {
         print_ins(log_fp, ins);
         fprintf(log_fp, "\t|\t");
         print_state(log_fp, cpu);
-        fprintf(log_fp, "\t|\tPPU: %3d, %3d CPU: %I64d\n", ppu->draw_x, ppu->draw_y, cpu->cycles);
+        fprintf(log_fp, "\t|\tPPU: %3d, %3d CPU: %lld\n", ppu->draw_x, ppu->draw_y, cpu->cycles);
     }
 }
 

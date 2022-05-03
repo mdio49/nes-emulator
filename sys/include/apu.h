@@ -193,13 +193,25 @@ typedef struct apu {
         uint8_t value;
     } status;
 
+    // Frame counter.
+    union apu_frame {
+        struct {
+            unsigned    mode    : 1;    // Mode.
+            unsigned    irq     : 1;    // Interrupt inhibit flag.
+            unsigned            : 6;
+        };
+        uint8_t value;
+    } frame;
+
     /* other variables */
-    uint16_t        frame_counter;          // The frame counter.
+    int16_t         frame_counter;          // The frame counter.
+    uint8_t         frame_reset;            // Number of CPU cycles to reset timer.
+
     unsigned        step            : 3;    // The current sequencer step.
     unsigned        cyc_carry       : 1;    // Set if the last update had one half-cycle left over.
     unsigned        irq_occurred    : 1;    // Set if an IRQ has already occurred for the current frame.
     unsigned        irq_flag        : 1;    // Set if an IRQ should occur.
-    unsigned                        : 2;
+    unsigned                        : 2;    
 
     float           mixer_out[MIXER_BUFFER];
     uint32_t        mixer_ptr;

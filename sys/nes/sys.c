@@ -378,11 +378,12 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
     else if (vaddr == APU_STATUS) {
         union apu_status status;
         if (write) {
-            status.p1 = value & 0x01;
-            status.p2 = (value >> 1) & 0x01;
-            status.tri = (value >> 2) & 0x01;
-            status.noise = (value >> 3) & 0x01;
-            status.dmc = (value >> 4) & 0x01;
+            // Set the channel status flags.
+            status.p1 = (value & 0x01) > 0;
+            status.p2 = (value & 0x02) > 0;
+            status.tri = (value & 0x04) > 0;
+            status.noise = (value & 0x08) > 0;
+            status.dmc = (value & 0x10) > 0;
 
             // Writing doesn't change frame interrupt flag.
             status.f_irq = apu->status.f_irq;
@@ -397,7 +398,18 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
             value = status.value;
         }
         else if (read) {
-            status.value = value;
+            // Set the channel status flags if its respective length counter is greater than 0.
+            status.p1 = apu->pulse[0].len_counter > 0;
+            status.p2 = apu->pulse[1].len_counter > 0;
+            status.tri = apu->triangle.len_counter > 0;
+            status.noise = apu->noise.len_counter > 0;
+            status.dmc = 0; // TODO
+
+            // Set the interrupt flags.
+            status.f_irq = apu->status.f_irq;
+            status.d_irq = apu->status.d_irq;
+
+            // Return the correct value.
             value = (status.d_irq << 7) | (status.f_irq << 6) | (status.dmc << 4) | (status.noise << 3) | (status.tri << 2) | (status.p2 << 1) | status.p1;
         }
     }
@@ -415,7 +427,14 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
                 }
                 break;
             case JOYPAD2:
-                if (read) {
+                if (write) {
+                    // This is the APU frame counter.
+                    apu->frame.mode = (value & 0x80) > 0;
+                    apu->frame.irq = (value & 0x40) > 0;
+                    apu->frame_reset = 3 + apu->cyc_carry;
+                }
+                else if (read) {
+                    // This is the input from Joypad 2.
                     cpu->joypad2_t = 0x80 | (cpu->joypad2_t >> 1);
                 }
                 break;

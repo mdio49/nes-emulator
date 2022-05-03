@@ -290,8 +290,6 @@ void ppu_render(ppu_t *ppu, int cycles) {
                             continue;
                         if (ppu->draw_x <= 8 && !ppu->mask.spr_left)
                             continue;
-                        if (ppu->draw_x == 256)
-                            continue;
                         
                         // Get fine-x and flip horizontally if necessary.
                         uint8_t fine_x = screen_x - ppu->oam_x[i];
@@ -305,7 +303,7 @@ void ppu_render(ppu_t *ppu, int cycles) {
                             continue;
                         
                         // Check if the sprite 0 hit flag should be updated.
-                        if (i == 0 && bkg > 0 && ppu->szc) {
+                        if (i == 0 && bkg > 0 && ppu->szc && ppu->draw_x != 256) {
                             ppu->status.hit = 1;
                         }
 

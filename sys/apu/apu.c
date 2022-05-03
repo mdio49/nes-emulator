@@ -58,14 +58,32 @@ void apu_update(apu_t *apu, int hcycles) {
     }
     else if (apu->pulse[0].len_counter_load > 0) {
         apu->pulse[0].len_counter = LENGTH_TABLE[apu->pulse[0].len_counter_load];
-        apu->pulse[0].len_counter_load = 0;
     }
     if (!apu->status.p2) {
         apu->pulse[1].len_counter = 0;
     }
     else if (apu->pulse[1].len_counter_load > 0) {
         apu->pulse[1].len_counter = LENGTH_TABLE[apu->pulse[1].len_counter_load];
-        apu->pulse[1].len_counter_load = 0;
+    }
+    apu->pulse[0].len_counter_load = 0;
+    apu->pulse[1].len_counter_load = 0;
+
+    // Check if the frame counter should be reset.
+    if (apu->frame_reset > 0) {
+        if (hcycles >= apu->frame_reset) {
+            if (apu->frame.mode == 1) {
+                // Clock the half-frame and quarter-frame events if the mode is set to 5-step sequence.
+                apu->frame_counter = 2 * QUARTER_FRAME + 1;
+                apu->step = 4;
+            }
+            else {
+                apu->frame_counter = 0;
+            }
+            apu->frame_reset = 0;
+        }
+        else {
+            apu->frame_reset -= hcycles;
+        }
     }
 
     // Update pulse channel sweep units.
@@ -86,11 +104,15 @@ void apu_update(apu_t *apu, int hcycles) {
     
     // Handle sequencer events.
     apu->frame_counter += hcycles;
-    if (apu->step == 3 && !apu->irq_occurred && apu->frame_counter >= 2 * QUARTER_FRAME) {
+    if (apu->step == 3 && !apu->irq_occurred && apu->frame_counter >= 2 * QUARTER_FRAME && !apu->frame.irq && !apu->status.f_irq && apu->frame.mode == 0) {
+        apu->status.f_irq = 1;
         apu->irq_flag = true;
         apu->irq_occurred = true;
     }
     if (apu->frame_counter >= 2 * QUARTER_FRAME + 1) {
+        // Check if the current step is a half-frame.
+        bool half_frame = apu->step == 1 || (apu->frame.mode == 0 && apu->step == 3) || (apu->frame.mode == 1 && apu->step == 4);
+
         // Update pulse channels.
         for (int i = 0; i < 2; i++) {
             pulse_t *pulse = &apu->pulse[i];
@@ -99,7 +121,7 @@ void apu_update(apu_t *apu, int hcycles) {
             envelope_clock(&pulse->envelope, pulse->vol, apu->pulse->duty);
 
             // Clock every half-frame.
-            if (apu->step == 2 || apu->step == 4) {
+            if (half_frame) {
                 // Adjust the period of the pulse if applicable if the sweep unit is not currently silencing the channel.
                 if (!sweep_mute[i] && pulse->sweep_u.divider == 0 && pulse->sweep.enabled && pulse->sweep.shift != 0) {
                     pulse->timer_high = (target[i] & 0x300) >> 8;
@@ -123,9 +145,12 @@ void apu_update(apu_t *apu, int hcycles) {
         }
 
         apu->frame_counter -= 2 * QUARTER_FRAME;
-        if (apu->step == 3) {
+        if ((apu->frame.mode == 0 && apu->step == 3) || (apu->frame.mode == 1 && apu->step == 4)) {
             apu->irq_occurred = false;
             apu->step = 0;
+
+            // Realign frame counter for next frame.
+            apu->frame_counter -= 2;
         }
         else {
             apu->step++;
@@ -185,9 +210,7 @@ void apu_update(apu_t *apu, int hcycles) {
         hcycles -= 2;
     }
 
-    if (hcycles == 1) {
-        apu->cyc_carry = 1;
-    }
+    apu->cyc_carry = (hcycles == 1);
 }
 
 static inline void envelope_clock(envelope_t *env, uint8_t vol, uint8_t loop) {

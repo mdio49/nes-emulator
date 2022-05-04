@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <sys.h>
 
 /**
  * @brief Clocks an envelope.
@@ -58,6 +59,10 @@ static const uint16_t NOISE_PERIODS[16] = {
 apu_t *apu_create(void) {
     apu_t *apu = malloc(sizeof(struct apu));
     
+    // Initialize frame counter.
+    apu->frame_counter = 0;
+    apu->step = 0;
+
     // Initialize triangle sequencer.
     apu->triangle.sequencer = 15;
     apu->triangle.desc = true;
@@ -88,6 +93,11 @@ void apu_destroy(apu_t *apu) {
     free(apu);
 }
 
+void apu_reset(apu_t *apu) {
+    // Clear $4015.
+    apu->status.value = 0;
+}
+
 void apu_update(apu_t *apu, int hcycles) {
     // Update length counter when the appropriate register is loaded with a value.
     len_counter_load(&apu->pulse[0].len_counter, apu->pulse[0].len_counter_load, apu->status.p1, apu->pulse[0].len_counter_reload);
@@ -106,11 +116,12 @@ void apu_update(apu_t *apu, int hcycles) {
         if (hcycles >= apu->frame_reset) {
             if (apu->frame.mode == 1) {
                 // Clock the half-frame and quarter-frame events if the mode is set to 5-step sequence.
-                apu->frame_counter = 2 * QUARTER_FRAME + 1;
+                apu->frame_counter = 2 * (QUARTER_FRAME - 2) - hcycles + 2; // Frame counter should be 0 after the update.
                 apu->step = 4;
             }
             else {
-                apu->frame_counter = 0;
+                apu->frame_counter = -hcycles; // Frame counter should be 0 after the update.
+                apu->step = 0;
             }
             apu->frame_reset = 0;
         }
@@ -134,15 +145,24 @@ void apu_update(apu_t *apu, int hcycles) {
             sweep_mute[i] = true; // Silence the channel.
         }
     }
+
+    // Calculate the increment between quarter-frames.
+    const int frame_step = apu->step == 4 ? 2 * (QUARTER_FRAME - 2) : apu->step < 2 ? 2 * QUARTER_FRAME : 2 * (QUARTER_FRAME + 1);
     
     // Handle sequencer events.
     apu->frame_counter += hcycles;
-    if (apu->frame.mode == 0 && apu->step == 3 && apu->frame_counter >= 2 * QUARTER_FRAME && !apu->irq_occurred && !apu->frame.irq) {
-        apu->status.f_irq = 1;
-        apu->irq_flag = true;
+    if (apu->frame.mode == 0 && apu->step == 3 && apu->frame_counter >= frame_step && !apu->irq_occurred) {
+        if (apu->frame.irq) {
+            apu->status.f_irq = 0;
+        }
+        else {
+            apu->status.f_irq = 1;
+            apu->irq_flag = true;
+        }
         apu->irq_occurred = true;
+        printf("IRQ: %lld ~ %lld (%d >= %d)\n", cpu->cycles, cpu->cycles + hcycles, apu->frame_counter, frame_step);
     }
-    if (apu->frame_counter >= 2 * QUARTER_FRAME + 1) {
+    if (apu->frame_counter > frame_step) {
         // Check if the current step is a half-frame.
         bool half_frame = apu->step == 1 || (apu->frame.mode == 0 && apu->step == 3) || (apu->frame.mode == 1 && apu->step == 4);
 
@@ -206,8 +226,10 @@ void apu_update(apu_t *apu, int hcycles) {
             }
         }
 
+        //printf("step %d: %lld ~ %lld (%d > %d) ", apu->step + 1, cpu->cycles, cpu->cycles + hcycles, apu->frame_counter, frame_step);
+        
         // Decrement the frame counter and increment the step.
-        apu->frame_counter -= 2 * QUARTER_FRAME;
+        apu->frame_counter -= frame_step;
         if ((apu->frame.mode == 0 && apu->step == 3) || (apu->frame.mode == 1 && apu->step == 4)) {
             apu->irq_occurred = false;
             apu->step = 0;
@@ -218,6 +240,8 @@ void apu_update(apu_t *apu, int hcycles) {
         else {
             apu->step++;
         }
+
+        //printf("frame counter now %d\n", apu->frame_counter);
     }
 
     // Get the number of APU cycles to process.

@@ -81,7 +81,11 @@ void sys_poweroff(void) {
 }
 
 void sys_reset(void) {
+    // Reset CPU.
     cpu_reset(cpu);
+
+    // Reset APU.
+    apu_reset(apu);
 }
 
 void sys_insert(prog_t *prog) {
@@ -193,7 +197,7 @@ void sys_run(handlers_t *handlers) {
 
         // Check for IRQ.
         if (apu->irq_flag) {
-            printf("IRQ %lld\n", cpu->cycles);
+            //printf("IRQ %lld ~ %lld\n", cpu->cycles, cpu->cycles + cycles);
             apu->irq_flag = false;
             cpu_irq(cpu);
 
@@ -402,8 +406,8 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
             status.d_irq = false;
 
             // Reset timers.
-            apu->frame_counter = 0;
-            apu->step = 0;
+            //apu->frame_counter = 0;
+            //apu->step = 0;
 
             value = status.value;
         }
@@ -418,13 +422,14 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
             // Set the interrupt flags.
             status.f_irq = apu->status.f_irq;
             status.d_irq = apu->status.d_irq;
-            //printf("frame irq r: %d\n", status.f_irq);
 
             // Reading clears the frame interrupt flag.
             apu->status.f_irq = false;
 
             // Return the correct value.
             value = (status.d_irq << 7) | (status.f_irq << 6) | (status.dmc << 4) | (status.noise << 3) | (status.tri << 2) | (status.p2 << 1) | status.p1;
+
+            printf("@%lld %c: $%.4x - %.2x\n", cpu->cycles, read ? 'r' : 'w', vaddr, value);
         }
     }
     else {
@@ -446,7 +451,13 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
                     apu->frame.mode = (value & 0x80) > 0;
                     apu->frame.irq = (value & 0x40) > 0;
                     apu->frame_reset = 3 + apu->cyc_carry;
-                    printf("irq inhibit w: %d\n", apu->frame.irq);
+                    
+                    // If the interrupt inhibit flag gets set, then clear the frame interrupt flag.
+                    if (apu->frame.irq) {
+                        apu->status.f_irq = false;
+                    }
+
+                    printf("@%lld %c: $%.4x - %.2x\n", cpu->cycles, read ? 'r' : 'w', vaddr, value);
                 }
                 else if (read) {
                     // This is the input from Joypad 2.

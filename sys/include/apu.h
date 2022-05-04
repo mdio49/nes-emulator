@@ -10,10 +10,8 @@
 #define APU_NOISE       0x400C
 #define APU_DMC         0x4010
 #define APU_STATUS      0x4015
-#define APU_FRAME       0x4017
 
 #define QUARTER_FRAME   3728
-
 #define MIXER_BUFFER    65536
 
 typedef struct envelope {
@@ -262,6 +260,13 @@ apu_t *apu_create(void);
  * @param apu The APU to destroy.
  */
 void apu_destroy(apu_t *apu);
+
+/**
+ * @brief Resets the given APU.
+ * 
+ * @param apu The APU to reset.
+ */
+void apu_reset(apu_t *apu);
 
 /**
  * @brief Updates the given APU by a specified number of frames.

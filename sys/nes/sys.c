@@ -109,44 +109,49 @@ void sys_insert(prog_t *prog) {
     }
 
     // Setup PPU address space.
-    if (prog->chr_rom != NULL) {
-        as_add_segment(ppu->as, 0x0000, 0x2000, (uint8_t*)prog->chr_rom);
-    }
-    else {
-        as_add_segment(ppu->as, 0x0000, 0x2000, chr_ram);
-    }
-    as_add_segment(ppu->as, 0x2000, 0x0400, ppu->vram);
-    as_add_segment(ppu->as, 0x3000, 0x0400, ppu->vram);
-    if (prog->header.mirroring == 1) {
-        // Vertical mirroring.
-        as_add_segment(ppu->as, 0x2400, 0x0400, ppu->vram + 0x0400);
-        as_add_segment(ppu->as, 0x2800, 0x0400, ppu->vram);
-        as_add_segment(ppu->as, 0x2C00, 0x0400, ppu->vram + 0x0400);
+    for (int i = 0; i < 4; i++) {
+        // Address space is mirrored every 0x4000 bytes.
+        addr_t mirror = 0x4000 * i;
+    
+        if (prog->chr_rom != NULL) {
+            as_add_segment(ppu->as, mirror + 0x0000, 0x2000, (uint8_t*)prog->chr_rom);
+        }
+        else {
+            as_add_segment(ppu->as, mirror + 0x0000, 0x2000, chr_ram);
+        }
+        as_add_segment(ppu->as, mirror + 0x2000, 0x0400, ppu->vram);
+        as_add_segment(ppu->as, mirror + 0x3000, 0x0400, ppu->vram);
+        if (prog->header.mirroring == 1) {
+            // Vertical mirroring.
+            as_add_segment(ppu->as, mirror + 0x2400, 0x0400, ppu->vram + 0x0400);
+            as_add_segment(ppu->as, mirror + 0x2800, 0x0400, ppu->vram);
+            as_add_segment(ppu->as, mirror + 0x2C00, 0x0400, ppu->vram + 0x0400);
 
-        as_add_segment(ppu->as, 0x3400, 0x0400, ppu->vram + 0x0400);
-        as_add_segment(ppu->as, 0x3800, 0x0400, ppu->vram);
-        as_add_segment(ppu->as, 0x3C00, 0x0300, ppu->vram + 0x0400);
-    }
-    else {
-        // Horizontal mirroring.
-        as_add_segment(ppu->as, 0x2400, 0x0400, ppu->vram);
-        as_add_segment(ppu->as, 0x2800, 0x0400, ppu->vram + 0x0400);
-        as_add_segment(ppu->as, 0x2C00, 0x0400, ppu->vram + 0x0400);
+            as_add_segment(ppu->as, mirror + 0x3400, 0x0400, ppu->vram + 0x0400);
+            as_add_segment(ppu->as, mirror + 0x3800, 0x0400, ppu->vram);
+            as_add_segment(ppu->as, mirror + 0x3C00, 0x0300, ppu->vram + 0x0400);
+        }
+        else {
+            // Horizontal mirroring.
+            as_add_segment(ppu->as, mirror + 0x2400, 0x0400, ppu->vram);
+            as_add_segment(ppu->as, mirror + 0x2800, 0x0400, ppu->vram + 0x0400);
+            as_add_segment(ppu->as, mirror + 0x2C00, 0x0400, ppu->vram + 0x0400);
 
-        as_add_segment(ppu->as, 0x3400, 0x0400, ppu->vram);
-        as_add_segment(ppu->as, 0x3800, 0x0400, ppu->vram + 0x0400);
-        as_add_segment(ppu->as, 0x3C00, 0x0300, ppu->vram + 0x0400);
-    }
+            as_add_segment(ppu->as, mirror + 0x3400, 0x0400, ppu->vram);
+            as_add_segment(ppu->as, mirror + 0x3800, 0x0400, ppu->vram + 0x0400);
+            as_add_segment(ppu->as, mirror + 0x3C00, 0x0300, ppu->vram + 0x0400);
+        }
 
-    // Palette memory.
-    for (int i = 0; i < 8; i++) {
-        addr_t offset = 0x3F00 + (i * 0x20);
-        as_add_segment(ppu->as, offset, 1, &ppu->bkg_color);
-        as_add_segment(ppu->as, offset + 1, 15, ppu->bkg_palette);
-        for (int j = 0; j < 4; j++) {
-            addr_t start = offset + 0x10 + (j << 2);
-            as_add_segment(ppu->as, start, 1, j > 0 ? &ppu->bkg_palette[j * 4 - 1] : &ppu->bkg_color);
-            as_add_segment(ppu->as, start + 1, 3, &ppu->spr_palette[j * 3]);
+        // Palette memory.
+        for (int i = 0; i < 8; i++) {
+            addr_t offset = mirror + 0x3F00 + (i * 0x20);
+            as_add_segment(ppu->as, offset, 1, &ppu->bkg_color);
+            as_add_segment(ppu->as, offset + 1, 15, ppu->bkg_palette);
+            for (int j = 0; j < 4; j++) {
+                addr_t start = offset + 0x10 + (j << 2);
+                as_add_segment(ppu->as, start, 1, j > 0 ? &ppu->bkg_palette[j * 4 - 1] : &ppu->bkg_color);
+                as_add_segment(ppu->as, start + 1, 3, &ppu->spr_palette[j * 3]);
+            }
         }
     }
 
@@ -429,7 +434,7 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
             // Return the correct value.
             value = (status.d_irq << 7) | (status.f_irq << 6) | (status.dmc << 4) | (status.noise << 3) | (status.tri << 2) | (status.p2 << 1) | status.p1;
 
-            printf("@%lld %c: $%.4x - %.2x\n", cpu->cycles, read ? 'r' : 'w', vaddr, value);
+            //printf("@%lld %c: $%.4x - %.2x\n", cpu->cycles, read ? 'r' : 'w', vaddr, value);
         }
     }
     else {
@@ -457,7 +462,7 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
                         apu->status.f_irq = false;
                     }
 
-                    printf("@%lld %c: $%.4x - %.2x\n", cpu->cycles, read ? 'r' : 'w', vaddr, value);
+                    //printf("@%lld %c: $%.4x - %.2x\n", cpu->cycles, read ? 'r' : 'w', vaddr, value);
                 }
                 else if (read) {
                     // This is the input from Joypad 2.

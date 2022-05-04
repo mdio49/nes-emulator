@@ -160,7 +160,7 @@ void apu_update(apu_t *apu, int hcycles) {
             apu->irq_flag = true;
         }
         apu->irq_occurred = true;
-        printf("IRQ: %lld ~ %lld (%d >= %d)\n", cpu->cycles, cpu->cycles + hcycles, apu->frame_counter, frame_step);
+        //printf("IRQ: %lld ~ %lld (%d >= %d)\n", cpu->cycles, cpu->cycles + hcycles, apu->frame_counter, frame_step);
     }
     if (apu->frame_counter > frame_step) {
         // Check if the current step is a half-frame.

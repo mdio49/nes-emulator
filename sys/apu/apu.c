@@ -22,7 +22,25 @@ static inline void envelope_clock(envelope_t *env, uint8_t vol, uint8_t loop);
  * @param cons The constant volume flag.
  * @return The envelope's output. 
  */
-static inline uint8_t envelope_out(envelope_t *env, uint8_t vol, uint8_t cons);
+static inline uint8_t envelope_out(const envelope_t *env, uint8_t vol, uint8_t cons);
+
+/**
+ * @brief Reloads a length counter.
+ * 
+ * @param counter The length counter.
+ * @param load The load.
+ * @param status The status of the channel.
+ * @param reload The reload flag.
+ */
+static inline void len_counter_load(uint8_t *counter, uint8_t load, bool status, bool reload);
+
+/**
+ * @brief Clocks a length counter.
+ * 
+ * @param counter The length counter.
+ * @param halt The halt flag.
+ */
+static inline void len_counter_clock(uint8_t *counter, bool halt);
 
 static const uint8_t PULSE_DUTY[4] = {
     0x01, 0x03, 0x0F, 0xFC
@@ -33,17 +51,36 @@ static const uint8_t LENGTH_TABLE[32] = {
     12,  16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30
 };
 
-static inline void load_counter(uint8_t *counter, uint8_t load, bool status) {
-    if (status && *counter == 0) {
-        *counter = LENGTH_TABLE[load];
-    }
-    else {
-        *counter = 0;
-    }
-}
+static const uint16_t NOISE_PERIODS[16] = {
+    4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068
+};
 
 apu_t *apu_create(void) {
     apu_t *apu = malloc(sizeof(struct apu));
+    
+    // Initialize triangle sequencer.
+    apu->triangle.sequencer = 15;
+    apu->triangle.desc = true;
+    
+    // Initialize noise shift register.
+    apu->noise.shift_register = 1;
+
+    // Generate lookup tables.
+    apu->pulse_table[0] = 0;
+    for (int i = 1; i <= 30; i++) {
+        apu->pulse_table[i] = 95.88 / ((8128.0 / i) + 100.0);
+    }
+    apu->tnd_table[0][0][0] = 0;
+    for (int t = 0; t < 16; t++) {
+        for (int n = 0; n < 16; n++) {  
+            for (int d = 0; d < 16; d++) {
+                if (t == 0 && n == 0 && d == 0)
+                    continue;
+                apu->tnd_table[t][n][d] = 159.79 / ((1.0 / ((t / 8227.0) + (n / 12241.0) + (d / 22638.0))) + 100.0);
+            }
+        }
+    }
+
     return apu;
 }
 
@@ -53,20 +90,16 @@ void apu_destroy(apu_t *apu) {
 
 void apu_update(apu_t *apu, int hcycles) {
     // Update length counter when the appropriate register is loaded with a value.
-    if (!apu->status.p1) {
-        apu->pulse[0].len_counter = 0;
-    }
-    else if (apu->pulse[0].len_counter_load > 0) {
-        apu->pulse[0].len_counter = LENGTH_TABLE[apu->pulse[0].len_counter_load];
-    }
-    if (!apu->status.p2) {
-        apu->pulse[1].len_counter = 0;
-    }
-    else if (apu->pulse[1].len_counter_load > 0) {
-        apu->pulse[1].len_counter = LENGTH_TABLE[apu->pulse[1].len_counter_load];
-    }
-    apu->pulse[0].len_counter_load = 0;
-    apu->pulse[1].len_counter_load = 0;
+    len_counter_load(&apu->pulse[0].len_counter, apu->pulse[0].len_counter_load, apu->status.p1, apu->pulse[0].len_counter_reload);
+    len_counter_load(&apu->pulse[1].len_counter, apu->pulse[1].len_counter_load, apu->status.p2, apu->pulse[1].len_counter_reload);
+    len_counter_load(&apu->triangle.len_counter, apu->triangle.len_counter_load, apu->status.tri, apu->triangle.len_counter_reload);
+    len_counter_load(&apu->noise.len_counter, apu->noise.len_counter_load, apu->status.noise, apu->noise.len_counter_reload);
+
+    // Reset the length counter reload flags.
+    apu->pulse[0].len_counter_reload = false;
+    apu->pulse[1].len_counter_reload = false;
+    apu->triangle.len_counter_reload = false;
+    apu->noise.len_counter_reload = false;
 
     // Check if the frame counter should be reset.
     if (apu->frame_reset > 0) {
@@ -104,7 +137,7 @@ void apu_update(apu_t *apu, int hcycles) {
     
     // Handle sequencer events.
     apu->frame_counter += hcycles;
-    if (apu->step == 3 && !apu->irq_occurred && apu->frame_counter >= 2 * QUARTER_FRAME && !apu->frame.irq && !apu->status.f_irq && apu->frame.mode == 0) {
+    if (apu->frame.mode == 0 && apu->step == 3 && apu->frame_counter >= 2 * QUARTER_FRAME && !apu->irq_occurred && !apu->frame.irq) {
         apu->status.f_irq = 1;
         apu->irq_flag = true;
         apu->irq_occurred = true;
@@ -113,37 +146,67 @@ void apu_update(apu_t *apu, int hcycles) {
         // Check if the current step is a half-frame.
         bool half_frame = apu->step == 1 || (apu->frame.mode == 0 && apu->step == 3) || (apu->frame.mode == 1 && apu->step == 4);
 
-        // Update pulse channels.
-        for (int i = 0; i < 2; i++) {
-            pulse_t *pulse = &apu->pulse[i];
+        // Don't clock on the 4th step in 5-step mode.
+        if (apu->frame.mode == 0 || apu->step != 3) {
+            /* Update pulse channels. */
+            for (int i = 0; i < 2; i++) {
+                pulse_t *pulse = &apu->pulse[i];
+
+                // Clock envelope.
+                envelope_clock(&pulse->envelope, pulse->vol, pulse->loop);
+
+                // Clock every half-frame.
+                if (half_frame) {
+                    // Adjust the period of the pulse if applicable if the sweep unit is not currently silencing the channel.
+                    if (!sweep_mute[i] && pulse->sweep_u.divider == 0 && pulse->sweep.enabled && pulse->sweep.shift != 0) {
+                        pulse->timer_high = (target[i] & 0x300) >> 8;
+                        pulse->timer_low = target[i] & 0x0FF;
+                    }
+
+                    // Clock the sweep unit divider.
+                    if (pulse->sweep_u.divider == 0 || pulse->sweep_u.reload_flag) {
+                        pulse->sweep_u.divider = pulse->sweep.period;
+                        pulse->sweep_u.reload_flag = false;
+                    }
+                    else {
+                        pulse->sweep_u.divider--;
+                    }
+
+                    // Clock length counter.
+                    len_counter_clock(&pulse->len_counter, pulse->loop);
+                }
+            }
+
+            /* Update triangle channel. */
+
+            // Clock linear counter.
+            if (apu->triangle.lin_counter_reload) {
+                apu->triangle.lin_counter = apu->triangle.lin_counter_load;
+            }
+            else if (apu->triangle.lin_counter > 0) {
+                apu->triangle.lin_counter--;
+            }
+            if (apu->triangle.loop) {
+                apu->triangle.lin_counter_reload = false;
+            }
+
+            // Clock length counter (every half-frame).
+            if (half_frame) {
+                len_counter_clock(&apu->triangle.len_counter, apu->triangle.loop);
+            }
+
+            /* Update noise channel. */
 
             // Clock envelope.
-            envelope_clock(&pulse->envelope, pulse->vol, apu->pulse->duty);
+            envelope_clock(&apu->noise.envelope, apu->noise.vol, apu->noise.loop);
 
-            // Clock every half-frame.
+            // Clock length counter.
             if (half_frame) {
-                // Adjust the period of the pulse if applicable if the sweep unit is not currently silencing the channel.
-                if (!sweep_mute[i] && pulse->sweep_u.divider == 0 && pulse->sweep.enabled && pulse->sweep.shift != 0) {
-                    pulse->timer_high = (target[i] & 0x300) >> 8;
-                    pulse->timer_low = target[i] & 0x0FF;
-                }
-
-                // Clock the sweep unit divider.
-                if (pulse->sweep_u.divider == 0 || pulse->sweep_u.reload_flag) {
-                    pulse->sweep_u.divider = pulse->sweep.period;
-                    pulse->sweep_u.reload_flag = false;
-                }
-                else {
-                    pulse->sweep_u.divider--;
-                }
-
-                // Clock length counter.
-                if (!pulse->loop && pulse->len_counter > 0) {
-                    pulse->len_counter--;
-                }
+                len_counter_clock(&apu->noise.len_counter, apu->noise.loop);
             }
         }
 
+        // Decrement the frame counter and increment the step.
         apu->frame_counter -= 2 * QUARTER_FRAME;
         if ((apu->frame.mode == 0 && apu->step == 3) || (apu->frame.mode == 1 && apu->step == 4)) {
             apu->irq_occurred = false;
@@ -157,11 +220,41 @@ void apu_update(apu_t *apu, int hcycles) {
         }
     }
 
-    // Produce the waveform.
-    hcycles += apu->cyc_carry;
-    while (hcycles > 1) {
+    // Get the number of APU cycles to process.
+    int cycles = (hcycles + apu->cyc_carry) / 2;
+    apu->cyc_carry = (hcycles + apu->cyc_carry) % 2;
+
+    // This clocks at the rate of the CPU clock.
+    while (hcycles > 0) {
+        // Update triangle timer.
+        if (apu->triangle.timer == 0) {
+            // Reload timer.
+            apu->triangle.timer = (apu->triangle.timer_high << 8) | apu->triangle.timer_low;
+
+            // Clock the sequencer if both the length counter and linear counter are non-zero.
+            if (apu->triangle.len_counter > 0 && apu->triangle.lin_counter > 0) {
+                if (apu->triangle.sequencer == 0 && apu->triangle.desc) {
+                    apu->triangle.desc = false;
+                }
+                else if (apu->triangle.sequencer == 15 && !apu->triangle.desc) {
+                    apu->triangle.desc = true;
+                }
+                else {
+                    apu->triangle.sequencer += apu->triangle.desc ? -1 : 1;
+                }
+            }
+        }
+        else {
+            apu->triangle.timer--;
+        }
+
+        hcycles--;
+    }    
+
+    // This clocks at the rate of the APU clock.
+    while (cycles > 0) {
         // Output of each channel.
-        uint8_t pulse1, pulse2; //, triangle, noise, dmc;
+        uint8_t pulse1, pulse2, triangle, noise, dmc;
 
         // Pulse channels.
         for (int i = 0; i < 2; i++) {
@@ -203,14 +296,51 @@ void apu_update(apu_t *apu, int hcycles) {
             }
         }
 
-        float pulse_out = pulse1 + pulse2 > 0 ? 95.88 / ((8128 / (pulse1 + pulse2)) + 100) : 0;
-        apu->mixer_out[apu->mixer_ptr] = pulse_out;
+        // Get output of triangle channel.
+        if (apu->triangle.len_counter > 0 && apu->triangle.lin_counter > 0) {
+            triangle = apu->triangle.sequencer;
+        }
+        else {
+            triangle = 0;
+        }
+
+        // Update noise timer.
+        if (apu->noise.timer == 0) {
+            // Calculate feedback.
+            uint8_t bit0 = apu->noise.shift_register & 0x01;
+            uint8_t bit1 = (apu->noise.shift_register >> (apu->noise.mode ? 6 : 1)) & 0x01;
+            uint8_t feedback = bit0 ^ bit1;
+
+            // Update shift register.
+            apu->noise.shift_register >>= 1;
+            apu->noise.shift_register |= feedback << 14;
+
+            // Reload timer.
+            apu->noise.timer = NOISE_PERIODS[apu->noise.period];
+        }
+        else {
+            apu->noise.timer--;
+        }
+
+        // Get output of noise channel.
+        if ((apu->noise.shift_register & 0x01) == 0 && apu->noise.len_counter > 0) {
+            noise = envelope_out(&apu->noise.envelope, apu->noise.vol, apu->noise.cons);
+        }
+        else {
+            noise = 0;
+        }
+
+        // TODO
+        dmc = 0;
+
+        // Get mixer output.
+        float pulse_out = apu->pulse_table[pulse1 + pulse2];
+        float tnd_out = apu->tnd_table[triangle][noise][dmc];
+        apu->mixer_out[apu->mixer_ptr] = pulse_out + tnd_out;
         apu->mixer_ptr = (apu->mixer_ptr + 1) % MIXER_BUFFER;
 
-        hcycles -= 2;
+        cycles--;
     }
-
-    apu->cyc_carry = (hcycles == 1);
 }
 
 static inline void envelope_clock(envelope_t *env, uint8_t vol, uint8_t loop) {
@@ -233,7 +363,22 @@ static inline void envelope_clock(envelope_t *env, uint8_t vol, uint8_t loop) {
     }
 }
 
-static inline uint8_t envelope_out(envelope_t *env, uint8_t vol, uint8_t cons) {
+static inline uint8_t envelope_out(const envelope_t *env, uint8_t vol, uint8_t cons) {
     // If using constant volume, then envelope output is volume; otherwise, it is the decay level of the envelope.
     return cons ? vol : env->decay_level;
+}
+
+static inline void len_counter_load(uint8_t *counter, uint8_t load, bool status, bool reload) {
+    if (!status) {
+        *counter = 0; // If the channel is disabled, then force the length counter to 0.
+    }
+    else if (reload) {
+        *counter = LENGTH_TABLE[load]; // Otherwise, if the reload flag is set, load it with a value from the table.
+    }
+}
+
+static inline void len_counter_clock(uint8_t *counter, bool halt) {
+    if (!halt && *counter > 0) {
+        (*counter)--;
+    }
 }

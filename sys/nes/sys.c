@@ -189,10 +189,11 @@ void sys_run(handlers_t *handlers) {
         }        
 
         // Cycle the APU.
-        apu_update(apu, cycles * 2);
+        apu_update(apu, cycles);
 
         // Check for IRQ.
         if (apu->irq_flag) {
+            printf("IRQ %lld\n", cpu->cycles);
             apu->irq_flag = false;
             cpu_irq(cpu);
 
@@ -295,6 +296,7 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
                     break;
                 case APU_PULSE1 + 0x03:
                     apu->pulse[0].envelope.start_flag = true;
+                    apu->pulse[0].len_counter_reload = true;
                     apu->pulse[0].sequencer = 0;
                     break;
                 case APU_PULSE2 + 0x01:
@@ -302,10 +304,18 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
                     break;
                 case APU_PULSE2 + 0x03:
                     apu->pulse[1].envelope.start_flag = true;
+                    apu->pulse[1].len_counter_reload = true;
                     apu->pulse[1].sequencer = 0;
                     break;
                 case APU_TRIANGLE + 0x03:
-                    // TODO
+                    apu->triangle.lin_counter_reload = true;
+                    apu->triangle.len_counter_reload = true;
+                    break;
+                case APU_NOISE + 0x02:
+                    //apu->noise.timer_reload = true;
+                    break;
+                case APU_NOISE + 0x03:
+                    apu->noise.len_counter_reload = true;
                     break;
             }
 
@@ -335,27 +345,27 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
                     break;
                 case APU_TRIANGLE:
                     triangle.lin_counter_load = value & 0x7F;
-                    triangle.lin_counter_ctrl = value >> 7;
+                    triangle.loop = value >> 7;
                     value = triangle.reg0;
                     break;
                 case APU_TRIANGLE + 0x03:
                     triangle.timer_high = value & 0x07;
-                    triangle.len_counter = value >> 3;
+                    triangle.len_counter_load = value >> 3;
                     value = triangle.reg3;
                     break;
                 case APU_NOISE:
                     noise.vol = value & 0x0F;
                     noise.cons = (value >> 4) & 0x01;
-                    noise.len_counter_halt = (value >> 5) & 0x01;
+                    noise.loop = (value >> 5) & 0x01;
                     value = noise.reg0;
                     break;
                 case APU_NOISE + 0x02:
                     noise.period = value & 0x0F;
-                    noise.loop = value >> 7;
+                    noise.mode = value >> 7;
                     value = noise.reg2;
                     break;
                 case APU_NOISE + 0x03:
-                    noise.len_counter = value >> 3;
+                    noise.len_counter_load = value >> 3;
                     value = noise.reg3;
                     break;
                 case APU_DMC:
@@ -384,12 +394,12 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
             status.tri = (value & 0x04) > 0;
             status.noise = (value & 0x08) > 0;
             status.dmc = (value & 0x10) > 0;
-
+            
             // Writing doesn't change frame interrupt flag.
             status.f_irq = apu->status.f_irq;
 
             // Writing clears DMC interrupt flag.
-            status.d_irq = 0;
+            status.d_irq = false;
 
             // Reset timers.
             apu->frame_counter = 0;
@@ -403,11 +413,15 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
             status.p2 = apu->pulse[1].len_counter > 0;
             status.tri = apu->triangle.len_counter > 0;
             status.noise = apu->noise.len_counter > 0;
-            status.dmc = 0; // TODO
+            status.dmc = false; // TODO
 
             // Set the interrupt flags.
             status.f_irq = apu->status.f_irq;
             status.d_irq = apu->status.d_irq;
+            //printf("frame irq r: %d\n", status.f_irq);
+
+            // Reading clears the frame interrupt flag.
+            apu->status.f_irq = false;
 
             // Return the correct value.
             value = (status.d_irq << 7) | (status.f_irq << 6) | (status.dmc << 4) | (status.noise << 3) | (status.tri << 2) | (status.p2 << 1) | status.p1;
@@ -432,6 +446,7 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
                     apu->frame.mode = (value & 0x80) > 0;
                     apu->frame.irq = (value & 0x40) > 0;
                     apu->frame_reset = 3 + apu->cyc_carry;
+                    printf("irq inhibit w: %d\n", apu->frame.irq);
                 }
                 else if (read) {
                     // This is the input from Joypad 2.

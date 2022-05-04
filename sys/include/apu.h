@@ -61,7 +61,7 @@ typedef struct pulse {
     union {
         struct {
             unsigned    timer_high          : 3;
-            unsigned    len_counter_load    : 5;
+            unsigned    len_counter_load    : 5;    // Length counter load.
         };
         uint8_t reg3;
     };
@@ -73,7 +73,7 @@ typedef struct pulse {
 
     /* other variables */
 
-    uint8_t         len_counter;
+    uint8_t         len_counter;                // Length counter.
     unsigned        sequencer           : 3;    // The sequencer.
     unsigned        timer               : 11;   // The sequencer's timer/divider.
     unsigned        len_counter_reload  : 1;    // Set if the length counter should be reloaded.
@@ -85,10 +85,11 @@ typedef struct pulse {
  * @brief A struct that contains data for a triangle channel.
  */
 typedef struct triangle {
+    /* registers */
     union {
         struct {
-            unsigned    lin_counter_load    : 7;
-            unsigned    lin_counter_ctrl    : 1;
+            unsigned    lin_counter_load    : 7;    // Linear counter load.
+            unsigned    loop                : 1;    // Linear counter control / length counter halt.
         };
         uint8_t reg0;
     };
@@ -99,11 +100,23 @@ typedef struct triangle {
     };
     union {
         struct {
-            unsigned    timer_high  : 3;
-            unsigned    len_counter : 5;
+            unsigned    timer_high          : 3;
+            unsigned    len_counter_load    : 5;    // Length counter load.
         };
         uint8_t reg3;
     };
+
+    /* other variables */
+
+    uint8_t     len_counter;                // Length counter.
+    uint8_t     lin_counter;                // Linear counter.
+    unsigned    sequencer           : 4;    // The current value in the sequencer.
+    unsigned    desc                : 1;    // Set if the sequencer is currently descending.
+    unsigned    timer               : 11;   // The sequencer's timer/divider.
+    unsigned    len_counter_reload  : 1;    // Set if the length counter should be reloaded.
+    unsigned    lin_counter_reload  : 1;    // Set if the linear counter should be reloaded.
+    unsigned                        : 6;
+
 } triangle_t;
 
 /**
@@ -112,10 +125,10 @@ typedef struct triangle {
 typedef struct noise {
     union {
         struct {
-            unsigned    vol                 : 4;    // Volume/envelope.
-            unsigned    cons                : 1;    // Constant volume.
-            unsigned    len_counter_halt    : 1;    // Length counter halt.
-            unsigned                        : 2;
+            unsigned    vol     : 4;    // Volume/envelope.
+            unsigned    cons    : 1;    // Constant volume.
+            unsigned    loop    : 1;    // Envelope loop / length counter halt.
+            unsigned            : 2;
         };
         uint8_t reg0;
     };
@@ -124,17 +137,32 @@ typedef struct noise {
         struct {
             unsigned    period  : 4;    // Noise period.
             unsigned            : 3;
-            unsigned    loop    : 1;    // Loop noise.
+            unsigned    mode    : 1;    // Noise mode.
         };
         uint8_t reg2;
     };
     union {
         struct {
-            unsigned                : 3;
-            unsigned    len_counter : 5;
+            unsigned                        : 3;
+            unsigned    len_counter_load    : 5;    // Length counter load.
         };
         uint8_t reg3;
     };
+
+    /* units */
+    
+    envelope_t  envelope;   // Envelope unit.
+
+    /* other variables */
+
+    uint8_t     len_counter;                // Length counter.
+    unsigned    shift_register      : 15;   // Shift register.
+    unsigned                        : 1;
+    unsigned    timer               : 12;   // Timer used to clock shift register.
+    unsigned    len_counter_reload  : 1;    // Set if the length counter should be reloaded.
+    //unsigned    timer_reload        : 1;    // Set if the timer period should be reloaded.
+    unsigned                        : 3;
+
 } noise_t;
 
 /**
@@ -187,8 +215,8 @@ typedef struct apu {
             unsigned    noise   : 1;    // Noise channel.
             unsigned    dmc     : 1;    // DMC channel.
             unsigned            : 1;
-            unsigned    f_irq   : 1;    // Frame IRQ.
-            unsigned    d_irq   : 1;    // DMC IRQ.
+            unsigned    f_irq   : 1;    // Frame IRQ flag.
+            unsigned    d_irq   : 1;    // DMC IRQ flag.
         };
         uint8_t value;
     } status;
@@ -215,6 +243,9 @@ typedef struct apu {
 
     float           mixer_out[MIXER_BUFFER];
     uint32_t        mixer_ptr;
+
+    float           pulse_table[31];        // Pulse output lookup table.
+    float           tnd_table[16][16][16];  // Triangle-noise-DMC output lookup table.
 
 } apu_t;
 

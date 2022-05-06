@@ -215,12 +215,15 @@ void sys_run(handlers_t *handlers) {
 
         // Cycle the PPU.
         ppu_render(ppu, cycles * 3);
-        if (ppu->nmi_occurred) {
-            ppu->nmi_occurred = false;
+        if (ppu->vbl_occurred) {
             handlers->update_screen(ppu->out);
-            if (ppu->controller.nmi) {
-                cpu_nmi(cpu);
-            }
+            ppu->vbl_occurred = false;
+        }
+
+        // Check for NMI.
+        if (ppu->status.vblank && ppu->controller.nmi && !ppu->nmi_suppress && !ppu->nmi_occurred) {
+            ppu->nmi_occurred = true;
+            cpu_nmi(cpu);
         }
 
         // Check for input.

@@ -137,19 +137,32 @@ void ppu_destroy(ppu_t *ppu) {
 }
 
 void ppu_render(ppu_t *ppu, int cycles) {
+    bool vbl_suppress = false;
+
     // PPUCONTROL
     if (ppu->ppucontrol_flags.write) {
+        // Update nametable.
         ppu->t.nt_x = ppu->controller.nt_addr & 0x01;
         ppu->t.nt_y = (ppu->controller.nt_addr >> 1) & 0x01;
+
+        // Update NMI status.
+        if (!ppu->controller.nmi) {
+            ppu->nmi_occurred = false;
+        }
+
         ppu->ppucontrol_flags.write = 0;
     }
 
     // PPUSTATUS
     if (ppu->ppustatus_flags.read) {
+        // Clear VBL flag and write toggle bit.
         ppu->status.vblank = 0;
-        ppu->nmi_occurred = false;
-        ppu->ppustatus_flags.read = 0;
         ppu->w = 0;
+
+        // Suppress VBL flag if set in the next PPU cycle.
+        vbl_suppress = true;
+
+        ppu->ppustatus_flags.read = 0;
     }
 
     // PPUSCROLL
@@ -215,7 +228,7 @@ void ppu_render(ppu_t *ppu, int cycles) {
         ppu->ppudata_flags.write = 0;
         ppu->ppudata_flags.read = 0;
     }
-
+    
     // Rendering.
     //printf("PPU: %d, %d\n", ppu->draw_x, ppu->draw_y);
     while (cycles > 0) {
@@ -227,7 +240,6 @@ void ppu_render(ppu_t *ppu, int cycles) {
                 ppu->status.vblank = 0;
                 ppu->status.overflow = 0;
                 ppu->status.hit = 0;
-                ppu->nmi_occurred = false;
             }
             else if (ppu->draw_x >= 280 && ppu->draw_x <= 304) {
                 // Reset y.
@@ -235,7 +247,16 @@ void ppu_render(ppu_t *ppu, int cycles) {
                 ppu->v.fine_y = ppu->t.fine_y;
                 ppu->v.nt_y = ppu->t.nt_y;
             }
-            else if (ppu->draw_x == 340) {
+            else if (ppu->draw_x == 339) {
+                // Skip a frame at x=339 on odd frames if background rendering is enabled.
+                if (ppu->mask.background) {
+                    if (ppu->odd_frame) {
+                        ppu->draw_x++;
+                    }
+                }
+                ppu->odd_frame = !ppu->odd_frame;
+
+                // Fetch tile for next frame.
                 fetch_tile_into_sr(ppu);
             }
         }
@@ -245,14 +266,20 @@ void ppu_render(ppu_t *ppu, int cycles) {
         else if (ppu->draw_y == 241) {
             // Vblank.
             if (ppu->draw_x == 1) {
-                ppu->status.vblank = 1;
-                ppu->nmi_occurred = true;
+                // Set VBL flag if not suppressed.
+                ppu->status.vblank = !vbl_suppress;
+
+                // Suppress NMI for 3 PPU cycles (1 CPU cycle) after reading.
+                ppu->nmi_suppress = 3;
+
+                ppu->vbl_occurred = true;
+                ppu->nmi_occurred = false;
             }
         }
         else if (ppu->draw_y < 240) {
             // Normal rendering.
             if (ppu->draw_x == 0) {
-                // Idle
+                // Idle.
             }
             else if (ppu->draw_x <= 256) {
                 // Get the x-coordinate of the pixel on the screen.
@@ -501,6 +528,10 @@ void ppu_render(ppu_t *ppu, int cycles) {
             ppu->draw_y = -1;
         }
 
+        vbl_suppress = false;
+        if (ppu->nmi_suppress > 0) {
+            ppu->nmi_suppress--;
+        }
         cycles--;
     }
 }

@@ -93,8 +93,8 @@ typedef struct ppu {
     vram_reg_t      v;                  // Current VRAM address.
     vram_reg_t      t;                  // Temporary VRAM address.
 
-    uint8_t         x : 3;              // Fine X scroll.
-    uint8_t         w : 1;              // First or second write toggle bit.
+    unsigned        x : 3;              // Fine X scroll.
+    unsigned        w : 1;              // First or second write toggle bit.
     unsigned          : 4;
     
     uint16_t        sr16[2];            // 16-bit shift registers.
@@ -199,9 +199,12 @@ typedef struct ppu {
     int16_t     draw_x, draw_y;                     // Current screen position of render.
     char out[SCREEN_WIDTH * SCREEN_HEIGHT * 3];     // Pixel output (3 bytes per pixel; RGB order).
 
-    unsigned    nmi_occurred    : 1;                // A flag that is true if an NMI should occur on the next CPU instruction fetch.
-    unsigned    vbl_occurred    : 1;                // A flag that is true if a vblank just occured and the screen should be redrawn.
-    unsigned                    : 6;
+    //unsigned    nmi_output      : 1;                // Set if an NMI should occur on the next CPU instruction fetch.
+    unsigned    nmi_occurred    : 1;                // Set if an NMI has already occurred for the current frame.
+    unsigned    nmi_suppress    : 2;                // If set, then NMI will not occur for the given number of PPU cycles.
+    unsigned    vbl_occurred    : 1;                // Set if a vblank just occured and the screen should be redrawn.
+    unsigned    odd_frame       : 1;                // Set if currently on an odd frame.
+    unsigned                    : 3;
 
     /* temporary until interrupts are done correctly */
 

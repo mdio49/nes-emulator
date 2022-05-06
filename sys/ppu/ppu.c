@@ -195,20 +195,16 @@ void ppu_render(ppu_t *ppu, int cycles) {
     if (ppu->ppuaddr_flags.write) {
         if (ppu->w) {
             // second write
-            //ppu->t.coarse_x = ppu->ppu_addr & 0x1F;
-            //ppu->t.coarse_y = (ppu->t.coarse_y & ~0x07) | (ppu->ppu_addr >> 5);
-            //ppu->v = ppu->t;
-
-            ppu->vram_write_addr = (ppu->vram_write_addr & 0xFF00) | ppu->ppu_addr;
+            ppu->t.coarse_x = ppu->ppu_addr & 0x1F;
+            ppu->t.coarse_y = (ppu->t.coarse_y & ~0x07) | (ppu->ppu_addr >> 5);
+            ppu->v = ppu->t;
         }
         else {
             // first write
-            //ppu->t.coarse_y = (ppu->t.coarse_y & 0x07) | ((ppu->ppu_addr & 0x03) << 3);
-            //ppu->t.nt_x = (ppu->ppu_addr >> 2) & 0x01;
-            //ppu->t.nt_y = (ppu->ppu_addr >> 3) & 0x01;
-            //ppu->t.fine_y = (ppu->ppu_addr >> 4) & 0x03;
-
-            ppu->vram_write_addr = (ppu->vram_write_addr & 0x00FF) | (ppu->ppu_addr << 8);
+            ppu->t.coarse_y = (ppu->t.coarse_y & 0x07) | ((ppu->ppu_addr & 0x03) << 3);
+            ppu->t.nt_x = (ppu->ppu_addr >> 2) & 0x01;
+            ppu->t.nt_y = (ppu->ppu_addr >> 3) & 0x01;
+            ppu->t.fine_y = (ppu->ppu_addr >> 4) & 0x03;
         }
         ppu->ppuaddr_flags.write = 0;
         ppu->w = !ppu->w;
@@ -216,21 +212,21 @@ void ppu_render(ppu_t *ppu, int cycles) {
 
     // PPUDATA
     if (ppu->ppudata_flags.write || ppu->ppudata_flags.read) {
-        addr_t addr = ppu->vram_write_addr; //(ppu->t.fine_y << 12) | (ppu->t.nt_y << 11) | (ppu->t.nt_x << 10) | (ppu->t.coarse_y << 5) | ppu->t.coarse_x;
+        addr_t addr = (ppu->v.fine_y << 12) | (ppu->v.nt_y << 11) | (ppu->v.nt_x << 10) | (ppu->v.coarse_y << 5) | ppu->v.coarse_x;
         if (ppu->ppudata_flags.write) {
             as_write(ppu->as, addr, ppu->ppu_data);
         }
         if (ppu->ppudata_flags.read) {
             ppu->ppu_data = as_read(ppu->as, addr);
         }
-        //inc_vram_addr(ppu, &ppu->t);
-        ppu->vram_write_addr += ppu->controller.vram_inc ? 32 : 1;
+        inc_vram_addr(ppu, &ppu->v);
         ppu->ppudata_flags.write = 0;
         ppu->ppudata_flags.read = 0;
     }
     
     // Rendering.
     //printf("PPU: %d, %d\n", ppu->draw_x, ppu->draw_y);
+    bool rendering = ppu->mask.background || ppu->mask.sprites;
     while (cycles > 0) {
         // Render background.
         if (ppu->draw_y == -1) {
@@ -243,9 +239,11 @@ void ppu_render(ppu_t *ppu, int cycles) {
             }
             else if (ppu->draw_x >= 280 && ppu->draw_x <= 304) {
                 // Reset y.
-                ppu->v.coarse_y = ppu->t.coarse_y;
-                ppu->v.fine_y = ppu->t.fine_y;
-                ppu->v.nt_y = ppu->t.nt_y;
+                if (rendering) {
+                    ppu->v.coarse_y = ppu->t.coarse_y;
+                    ppu->v.fine_y = ppu->t.fine_y;
+                    ppu->v.nt_y = ppu->t.nt_y;
+                }
             }
             else if (ppu->draw_x == 339) {
                 // Skip a frame at x=339 on odd frames if background rendering is enabled.
@@ -276,7 +274,7 @@ void ppu_render(ppu_t *ppu, int cycles) {
                 ppu->nmi_occurred = false;
             }
         }
-        else if (ppu->draw_y < 240) {
+        else if (ppu->draw_y < 240 && rendering) {
             // Normal rendering.
             if (ppu->draw_x == 0) {
                 // Idle.

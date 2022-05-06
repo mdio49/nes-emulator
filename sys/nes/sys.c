@@ -169,6 +169,9 @@ void sys_run(handlers_t *handlers) {
     // Run the program.
     handlers->running = true;
     while (handlers->running) {
+        // Record the old state of the NMI enable flag as enabling it while VBL flag is set should delay NMI for one instruction.
+        bool nmi_delay = !ppu->status.vblank || !ppu->controller.nmi;
+
         int cycles;
         if (cpu->oam_upload) {
             const addr_t offset = cpu->oam_dma << 8;
@@ -210,6 +213,12 @@ void sys_run(handlers_t *handlers) {
             //cycles += 7;
         }
 
+        // Check for NMI.
+        if (ppu->status.vblank && ppu->controller.nmi && !(nmi_delay && ppu->controller.nmi) && !ppu->nmi_suppress && !ppu->nmi_occurred) {
+            ppu->nmi_occurred = true;
+            cpu_nmi(cpu);
+        }
+
         // Increment the CPU's cycle counter.
         cpu->cycles += cycles;
 
@@ -218,12 +227,6 @@ void sys_run(handlers_t *handlers) {
         if (ppu->vbl_occurred) {
             handlers->update_screen(ppu->out);
             ppu->vbl_occurred = false;
-        }
-
-        // Check for NMI.
-        if (ppu->status.vblank && ppu->controller.nmi && !ppu->nmi_suppress && !ppu->nmi_occurred) {
-            ppu->nmi_occurred = true;
-            cpu_nmi(cpu);
         }
 
         // Check for input.

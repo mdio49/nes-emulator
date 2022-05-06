@@ -206,10 +206,6 @@ typedef struct ppu {
     unsigned    odd_frame       : 1;                // Set if currently on an odd frame.
     unsigned                    : 3;
 
-    /* temporary until interrupts are done correctly */
-
-    addr_t      vram_write_addr;
-
 } ppu_t;
 
 #endif

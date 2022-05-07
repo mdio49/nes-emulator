@@ -174,7 +174,8 @@ void ppu_render(ppu_t *ppu, int cycles) {
         }
         else {
             // first write
-            ppu->x = ppu->scroll & 0x07;
+            //ppu->x = ppu->scroll & 0x07;
+            ppu->t_x = ppu->scroll & 0x07;
             ppu->t.coarse_x = ppu->scroll >> 3;
         }
         ppu->ppuscroll_flags.write = 0;
@@ -230,7 +231,6 @@ void ppu_render(ppu_t *ppu, int cycles) {
     while (cycles > 0) {
         // Render background.
         if (ppu->draw_y == -1) {
-            //printf("%d %d\n", ppu->t.coarse_y, ppu->t.nt_y);
             // Pre-render scanline.
             if (ppu->draw_x == 1) {
                 ppu->status.vblank = 0;
@@ -274,10 +274,11 @@ void ppu_render(ppu_t *ppu, int cycles) {
                 ppu->nmi_occurred = false;
             }
         }
-        else if (ppu->draw_y < 240 && rendering) {
+        else if (ppu->draw_y < 240) {
             // Normal rendering.
             if (ppu->draw_x == 0) {
                 // Idle.
+                ppu->x = ppu->t_x;
             }
             else if (ppu->draw_x <= 256) {
                 // Get the x-coordinate of the pixel on the screen.
@@ -352,19 +353,21 @@ void ppu_render(ppu_t *ppu, int cycles) {
                 }
                 else {
                     ppu->x = 0;
-                    if (ppu->v.coarse_x < 31) {
-                        ppu->v.coarse_x++;
-                    }
-                    else {
-                        ppu->v.coarse_x = 0;
-                        ppu->v.nt_x = !ppu->v.nt_x;
+                    if (rendering) {
+                        if (ppu->v.coarse_x < 31) {
+                            ppu->v.coarse_x++;
+                        }
+                        else {
+                            ppu->v.coarse_x = 0;
+                            ppu->v.nt_x = !ppu->v.nt_x;
+                        }
                     }
 
                     // Fetch the next tile.
                     fetch_tile_into_sr(ppu);
                 }
 
-                if (ppu->draw_x == 256) {
+                if (ppu->draw_x == 256 && rendering) {
                     // Increment y.
                     if (ppu->v.fine_y < 7) {
                         ppu->v.fine_y++;
@@ -386,8 +389,11 @@ void ppu_render(ppu_t *ppu, int cycles) {
             }
             else if (ppu->draw_x == 257) {
                 // Reset x.
-                ppu->v.coarse_x = ppu->t.coarse_x;
-                ppu->v.nt_x = ppu->t.nt_x;
+                ppu->x = ppu->t_x;
+                if (rendering) {
+                    ppu->v.coarse_x = ppu->t.coarse_x;
+                    ppu->v.nt_x = ppu->t.nt_x;
+                }
             }
             else if (ppu->draw_x == 340) {
                 fetch_tile_into_sr(ppu);

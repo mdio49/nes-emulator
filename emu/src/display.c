@@ -5,6 +5,8 @@ static SDL_Renderer *mainRenderer = NULL;
 static SDL_Texture *screen = NULL;
 
 static uint64_t last_update = 0;
+static uint64_t frame_counter = 0;
+static uint64_t last_fps = 0;
 
 bool init_display(void) {
     // Get the main window surface.
@@ -67,5 +69,18 @@ void update_screen(const char *data) {
         uint64_t ticks = SDL_GetTicks64();
         delta += ticks - last_update;
         last_update = ticks;
+    }
+
+    // Keep track of the FPS.
+    frame_counter++;
+    uint64_t ticks = SDL_GetTicks64();
+    delta = ticks - last_fps;
+    if (delta >= 1000) {
+        char title[50];
+        sprintf(title, "NES Emulator (FPS: %lld)", frame_counter);
+        SDL_SetWindowTitle(mainWindow, title);
+
+        last_fps += 1000;
+        frame_counter = 0;
     }
 }

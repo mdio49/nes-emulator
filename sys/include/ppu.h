@@ -92,7 +92,7 @@ typedef struct ppu {
     
     vram_reg_t      v;                  // Current VRAM address.
     vram_reg_t      t;                  // Temporary VRAM address.
-
+    
     unsigned        x : 3;              // Fine X scroll.
     unsigned        w : 1;              // First or second write toggle bit.
     unsigned          : 4;
@@ -205,6 +205,10 @@ typedef struct ppu {
     unsigned    vbl_occurred    : 1;                // Set if a vblank just occured and the screen should be redrawn.
     unsigned    odd_frame       : 1;                // Set if currently on an odd frame.
     unsigned                    : 3;
+
+    /* temporary until shift registers work properly */
+    unsigned    t_x     : 3;
+    unsigned            : 5;
 
 } ppu_t;
 

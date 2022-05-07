@@ -76,7 +76,7 @@ bool init(void) {
 	}
 
     // Create the main window.
-	mainWindow = SDL_CreateWindow("NES Emulator", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH * SCREEN_SCALE, SCREEN_HEIGHT * SCREEN_SCALE, SDL_WINDOW_SHOWN);
+	mainWindow = SDL_CreateWindow("NES Emulator (FPS: 0)", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH * SCREEN_SCALE, SCREEN_HEIGHT * SCREEN_SCALE, SDL_WINDOW_SHOWN);
 	if (mainWindow == NULL) {
 		printf("Window could not be created! SDL_Error: %s\n", SDL_GetError());
 		return false;

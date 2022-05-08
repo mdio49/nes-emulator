@@ -226,7 +226,6 @@ void ppu_render(ppu_t *ppu, int cycles) {
     }
     
     // Rendering.
-    //printf("PPU: %d, %d\n", ppu->draw_x, ppu->draw_y);
     bool rendering = ppu->mask.background || ppu->mask.sprites;
     while (cycles > 0) {
         // Render background.

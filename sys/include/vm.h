@@ -88,6 +88,12 @@ void as_write(const addrspace_t *as, addr_t vaddr, uint8_t value);
  */
 uint8_t *as_traverse(const addrspace_t *as, addr_t start, size_t nbytes);
 
+/**
+ * @brief Prints the address space, showing virtual memory ranges and the physical memory location
+ * that the segment references.
+ * 
+ * @param as The address space to print.
+ */
 void as_print(const addrspace_t *as);
 
 /**

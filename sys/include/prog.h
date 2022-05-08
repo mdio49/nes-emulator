@@ -1,9 +1,8 @@
 #ifndef PROG_H
 #define PROG_H
 
-#include <cpu.h>
-#include <ppu.h>
 #include <ines.h>
+#include <mapper.h>
 
 /**
  * @brief A struct that holds data about an NES program.
@@ -11,6 +10,7 @@
 typedef struct prog {
 
     ines_header_t   header;     // header
+    mapper_t        *mapper;    // mapper
     const char      *trainer;   // trainer (may not be present; 0 or 512 bytes)
     const char      *prg_rom;   // PRG-ROM data
     const char      *chr_rom;   // CHR-ROM data

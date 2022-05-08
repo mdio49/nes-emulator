@@ -35,6 +35,9 @@ main.o: emu/src/*.c sys.o
 sys.o: apu.o cpu.o ppu.o prog.o
 	$(CC) $(CFLAGS) -c sys/nes/*.c
 
+prog.o: sys/prog/*.c mappers.o
+	$(CC) $(CFLAGS) -c sys/prog/*.c
+
 apu.o: sys/apu/*.c cpu.o
 	$(CC) $(CFLAGS) -c sys/apu/*.c
 
@@ -44,11 +47,11 @@ cpu.o: sys/cpu/*.c memory.o
 ppu.o: sys/ppu/*.c memory.o
 	$(CC) $(CFLAGS) -c sys/ppu/*.c
 
+mappers.o: sys/mappers/*.c memory.o
+	$(CC) $(CFLAGS) -c sys/mappers/*.c
+
 memory.o: sys/memory/*.c
 	$(CC) $(CFLAGS) -c sys/memory/*.c
-
-prog.o: sys/prog/*.c
-	$(CC) $(CFLAGS) -c sys/prog/*.c
 
 clean:
 	rm *.o *.exe -rf

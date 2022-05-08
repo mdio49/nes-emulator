@@ -24,7 +24,8 @@ static void load_ines(prog_t *prog, const char *src) {
 
     // Get mapper number.
     prog->header.mapper_no = (flag7.flags.mapper_high << 4) + flag6.flags.mapper_low;
-    if (prog->header.mapper_no != 0) {
+    prog->mapper = get_mapper(prog->header.mapper_no);
+    if (prog->mapper == NULL) {
         printf("Emulator does not support mapper number %d.\n", prog->header.mapper_no);
         exit(1);
     }

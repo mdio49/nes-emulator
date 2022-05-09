@@ -11,20 +11,7 @@
  * this primarily via bank switching, which changes the memory that the CPU points to
  * at a particular instance of time during the program's execution.
  */
-typedef struct mapper {
-
-    /**
-     * @brief Initialization constructor. The new instance will not have a reference to
-     * this function (i.e. it cannot create new instances of itself).
-     * 
-     * @return The new instance of the mapper.
-     */
-    struct mapper   *(*init)(void);
-
-    uint8_t         sr[16];     // Shift registers (16 available).
-    uint8_t         *banks;     // Bank registers (mapper can allocate as many as needed).
-
-} mapper_t;
+typedef struct mapper mapper_t;
 
 /**
  * @brief Gets the mapper that corresponds to the given mapper number, or NULL if the
@@ -34,5 +21,22 @@ typedef struct mapper {
  * @return A new instance of the mapper (or NULL if not supported).
  */
 mapper_t *get_mapper(int number);
+
+/**
+ * @brief Initializes the mapper. The mapper is unusable before this function is called.
+ * 
+ * @param mapper The mapper to initialize.
+ * @param cpuas The CPU address space.
+ * @param ppuas The PPU address space.
+ * @param vram The PPU's VRAM.
+ */
+void mapper_init(mapper_t *mapper, addrspace_t *cpuas, addrspace_t *ppuas, uint8_t *vram);
+
+/**
+ * @brief Destroys the mapper, freeing any associated resources.
+ * 
+ * @param mapper The mapper to free.
+ */
+void mapper_destroy(mapper_t *mapper);
 
 #endif 

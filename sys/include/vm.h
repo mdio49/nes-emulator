@@ -36,6 +36,13 @@ typedef uint8_t (*update_rule_t)(const addrspace_t *as, addr_t vaddr, uint8_t va
 addrspace_t *as_create();
 
 /**
+ * @brief Destroys the given address space. Does not free any underlying memory that this address space references.
+ * 
+ * @param as The address space to destroy.
+ */
+void as_destroy(addrspace_t *as);
+
+/**
  * @brief Adds a segment of memory to the given address space. If the segment overlaps with any
  * existing segments, then those segments will be resized in order to fit the new segment.
  * 
@@ -45,6 +52,19 @@ addrspace_t *as_create();
  * @param target The target memory that the segment points to.
  */
 void as_add_segment(addrspace_t *as, addr_t start, size_t size, uint8_t *target);
+
+/**
+ * @brief Adds a mirror to the address space that causes a segment of memory to link to another
+ * segment of memory within the address space. When resolving virtual addresses, the address
+ * is first passed through all mirrors before resolving the address to a segment.
+ * 
+ * @param as The address space to modify.
+ * @param start The start of the mirror.
+ * @param end The end of the mirror (inclusive).
+ * @param repeat The interval to repeat within the mirror (set to 0 to use entire region).
+ * @param target The target virtual address within the address space.
+ */
+void as_add_mirror(addrspace_t *as, addr_t start, addr_t end, size_t repeat, addr_t target);
 
 /**
  * @brief Sets the update rule that is called whenever a memory address in the given address
@@ -95,12 +115,5 @@ uint8_t *as_traverse(const addrspace_t *as, addr_t start, size_t nbytes);
  * @param as The address space to print.
  */
 void as_print(const addrspace_t *as);
-
-/**
- * @brief Destroys the given address space. Does not free any underlying memory that this address space references.
- * 
- * @param as The address space to destroy.
- */
-void as_destroy(addrspace_t *as);
 
 #endif

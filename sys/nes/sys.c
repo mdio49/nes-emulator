@@ -1,4 +1,5 @@
 #include <sys.h>
+#include <mappers.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -10,20 +11,22 @@ cpu_t *cpu = NULL;
 ppu_t *ppu = NULL;
 prog_t *curprog = NULL;
 
-static uint8_t mapper_regs[0x1FE0];
-static uint8_t prg_ram[0x2000];
-static uint8_t chr_ram[0x2000];
+static uint8_t spare_memory[0x1FE0];
 
 void sys_poweron(void) {
-    // Create CPU and PPU.
+    /* Create CPU and PPU. */
     apu = apu_create();
     cpu = cpu_create();
     ppu = ppu_create();
 
-    // Setup CPU address space.
+    /* Setup CPU address space. */
+
+    // Work memory.
     for (int i = 0; i < 4; i++) {
         as_add_segment(cpu->as, i * WMEM_SIZE, WMEM_SIZE, cpu->wmem);
     }
+
+    // PPU memory-mapped registers.
     for (int i = 0x2000; i < 0x4000; i += 8) {
         as_add_segment(cpu->as, i, 1, &ppu->controller.value);
         as_add_segment(cpu->as, i + 1, 1, &ppu->mask.value);
@@ -70,7 +73,26 @@ void sys_poweron(void) {
     // Memory not normally used.
     as_add_segment(cpu->as, TEST_MODE, sizeof(cpu->test_mode), cpu->test_mode);
 
+    /* Setup PPU address space. */
+
+    // Palette memory (not configurable by mapper).
+    for (int i = 0; i < 4; i++) {
+        addr_t mirror = 0x4000 * i;
+        for (int i = 0; i < 8; i++) {
+            addr_t offset = mirror + 0x3F00 + (i * 0x20);
+            as_add_segment(ppu->as, offset, 1, &ppu->bkg_color);
+            as_add_segment(ppu->as, offset + 1, 15, ppu->bkg_palette);
+            for (int j = 0; j < 4; j++) {
+                addr_t start = offset + 0x10 + (j << 2);
+                as_add_segment(ppu->as, start, 1, j > 0 ? &ppu->bkg_palette[j * 4 - 1] : &ppu->bkg_color);
+                as_add_segment(ppu->as, start + 1, 3, &ppu->spr_palette[j * 3]);
+            }
+        }
+    }
+
+    /* Set address space update rules. */
     as_set_update_rule(cpu->as, cpu_update_rule);
+    as_set_update_rule(ppu->as, ppu_update_rule);
 }
 
 void sys_poweroff(void) {
@@ -92,70 +114,15 @@ void sys_insert(prog_t *prog) {
     // Set the program as the current program in the NES.
     curprog = prog;
 
-    // TODO: Make the mapper responsible for this.
-    //  |
-    //  |
-    // \|/
+    // Spare memory that may be used by the cartridge (not sure what this
+    // is for yet; haven't implemented enough mappers to figure it out).
+    as_add_segment(cpu->as, CRTG_START, 0x1FE0, spare_memory);
 
-    // Setup CPU address space.
-    as_add_segment(cpu->as, 0x4020, 0x1FE0, mapper_regs);
-    as_add_segment(cpu->as, 0x6000, 0x2000, prg_ram);
-    as_add_segment(cpu->as, 0x8000, 0x4000, (uint8_t*)prog->prg_rom);
-    if (prog->header.prg_rom_size > 1) {
-        as_add_segment(cpu->as, 0xC000, 0x4000, (uint8_t*)prog->prg_rom + 0x4000);
-    }
-    else {
-        as_add_segment(cpu->as, 0xC000, 0x4000, (uint8_t*)prog->prg_rom);
-    }
+    // Initialize the program's mapper.
+    mapper_init(prog->mapper, cpu->as, ppu->as, ppu->vram);
 
-    // Setup PPU address space.
-    for (int i = 0; i < 4; i++) {
-        // Address space is mirrored every 0x4000 bytes.
-        addr_t mirror = 0x4000 * i;
-    
-        if (prog->chr_rom != NULL) {
-            as_add_segment(ppu->as, mirror + 0x0000, 0x2000, (uint8_t*)prog->chr_rom);
-        }
-        else {
-            as_add_segment(ppu->as, mirror + 0x0000, 0x2000, chr_ram);
-        }
-        as_add_segment(ppu->as, mirror + 0x2000, 0x0400, ppu->vram);
-        as_add_segment(ppu->as, mirror + 0x3000, 0x0400, ppu->vram);
-        if (prog->header.mirroring == 1) {
-            // Vertical mirroring.
-            as_add_segment(ppu->as, mirror + 0x2400, 0x0400, ppu->vram + 0x0400);
-            as_add_segment(ppu->as, mirror + 0x2800, 0x0400, ppu->vram);
-            as_add_segment(ppu->as, mirror + 0x2C00, 0x0400, ppu->vram + 0x0400);
-
-            as_add_segment(ppu->as, mirror + 0x3400, 0x0400, ppu->vram + 0x0400);
-            as_add_segment(ppu->as, mirror + 0x3800, 0x0400, ppu->vram);
-            as_add_segment(ppu->as, mirror + 0x3C00, 0x0300, ppu->vram + 0x0400);
-        }
-        else {
-            // Horizontal mirroring.
-            as_add_segment(ppu->as, mirror + 0x2400, 0x0400, ppu->vram);
-            as_add_segment(ppu->as, mirror + 0x2800, 0x0400, ppu->vram + 0x0400);
-            as_add_segment(ppu->as, mirror + 0x2C00, 0x0400, ppu->vram + 0x0400);
-
-            as_add_segment(ppu->as, mirror + 0x3400, 0x0400, ppu->vram);
-            as_add_segment(ppu->as, mirror + 0x3800, 0x0400, ppu->vram + 0x0400);
-            as_add_segment(ppu->as, mirror + 0x3C00, 0x0300, ppu->vram + 0x0400);
-        }
-
-        // Palette memory.
-        for (int i = 0; i < 8; i++) {
-            addr_t offset = mirror + 0x3F00 + (i * 0x20);
-            as_add_segment(ppu->as, offset, 1, &ppu->bkg_color);
-            as_add_segment(ppu->as, offset + 1, 15, ppu->bkg_palette);
-            for (int j = 0; j < 4; j++) {
-                addr_t start = offset + 0x10 + (j << 2);
-                as_add_segment(ppu->as, start, 1, j > 0 ? &ppu->bkg_palette[j * 4 - 1] : &ppu->bkg_color);
-                as_add_segment(ppu->as, start + 1, 3, &ppu->spr_palette[j * 3]);
-            }
-        }
-    }
-
-    as_set_update_rule(ppu->as, ppu_update_rule);
+    // Invoke the mapper to initialize the address space.
+    mapper_insert(prog->mapper, prog);
 }
 
 void sys_run(handlers_t *handlers) {
@@ -476,6 +443,12 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
                 }
                 break;
         }
+    }
+
+    // Cartridge space.
+    if (write && vaddr >= CRTG_START) {
+        // Let the mapper detect the write so that it may update any registers.
+        mapper_write(curprog->mapper, curprog, vaddr, value);
     }
 
     //printf("cpu %c: $%.4x - %.2x\n", read ? 'r' : 'w', vaddr, value);

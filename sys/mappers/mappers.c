@@ -1,4 +1,5 @@
 #include <mappers.h>
+#include <stdlib.h>
 
 #define N_MAPPERS 256
 
@@ -28,4 +29,22 @@ mapper_t *get_mapper(int number) {
 
     // Initialize a new instance of the mapper if it is supported; otherwise return NULL.
     return mapper.init != NULL ? mapper.init() : NULL;
+}
+
+void mapper_init(mapper_t *mapper, addrspace_t *cpuas, addrspace_t *ppuas, uint8_t *vram) {
+    mapper->cpuas = cpuas;
+    mapper->ppuas = ppuas;
+    mapper->vram = vram;
+}
+
+void mapper_destroy(mapper_t *mapper) {
+    free(mapper);
+}
+
+void mapper_insert(mapper_t *mapper, prog_t *prog) {
+    mapper->insert(mapper, prog);
+}
+
+void mapper_write(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t value) {
+    mapper->write(mapper, prog, vaddr, value);
 }

@@ -8,7 +8,11 @@
 #define PAGE_MASK       0x00FF
 #define PAGE_SIZE       0x0100
 #define WMEM_SIZE       0x0800
+
 #define STACK_START     0x0100
+#define CRTG_START      0x4200
+#define PRG_RAM_START   0x6000
+#define PRG_ROM_START   0x8000
 
 #define SR_CARRY        0x01
 #define SR_ZERO         0x02

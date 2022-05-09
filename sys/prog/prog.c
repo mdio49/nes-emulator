@@ -116,6 +116,7 @@ prog_t *prog_create(const char *src) {
 }
 
 void prog_destroy(prog_t *prog) {
+    mapper_destroy(prog->mapper);
     if (prog->chr_rom != NULL)
         free((void*)prog->chr_rom);
     if (prog->prg_rom != NULL)

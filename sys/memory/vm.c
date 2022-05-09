@@ -22,9 +22,21 @@ typedef struct mem_seg {
 
 } mem_seg_t;
 
+typedef struct mem_mirror {
+    
+    addr_t          start;          // The start of the mirror (inclusive).
+    addr_t          end;            // The end of the the mirror (inclusive).
+    addr_t          target;         // The target virtual address.
+    size_t          repeat;         // The amount to repeat by.
+
+    struct mem_mirror   *next;      // A pointer to the next mirror.
+
+} mem_mirror_t;
+
 struct addrspace {
 
     mem_seg_t       *segs[N_SEGS];  // A pointer to the head of the list of segments for each 2KB block.
+    mem_mirror_t    *mirrors;       // A pointer to the head of the list of mirrors in the address space.
     update_rule_t   update_rule;    // The update rule that is called whenever a virtual address is accessed.
 
 };
@@ -63,8 +75,22 @@ addrspace_t *as_create() {
     for (int i = 0; i < N_SEGS; i++) {
         as->segs[i] = NULL;
     }
+    as->mirrors = NULL;
     as->update_rule = NULL;
     return as;
+}
+
+void as_destroy(addrspace_t *as) {
+    for (int i = 0; i < N_SEGS; i++) {
+        mem_seg_t *seg = as->segs[i];
+        while (seg != NULL) {
+            mem_seg_t *next = seg->next;
+            free(seg);
+            seg = next;
+        }
+    }
+    
+    free(as);
 }
 
 void as_add_segment(addrspace_t *as, addr_t start, size_t size, uint8_t *target) {
@@ -141,6 +167,10 @@ void as_add_segment(addrspace_t *as, addr_t start, size_t size, uint8_t *target)
     }
 }
 
+void as_add_mirror(addrspace_t *as, addr_t start, addr_t end, size_t repeat, addr_t target) {
+    // TODO
+}
+
 void as_set_update_rule(addrspace_t *as, update_rule_t rule) {
     as->update_rule = rule;
 }
@@ -182,17 +212,4 @@ void as_print(const addrspace_t *as) {
             printf("$%.4x - $%.4x -> 0x%p\n", seg->start, seg->end, seg->target);
         }
     }
-}
-
-void as_destroy(addrspace_t *as) {
-    for (int i = 0; i < N_SEGS; i++) {
-        mem_seg_t *seg = as->segs[i];
-        while (seg != NULL) {
-            mem_seg_t *next = seg->next;
-            free(seg);
-            seg = next;
-        }
-    }
-    
-    free(as);
 }

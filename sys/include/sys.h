@@ -5,7 +5,6 @@
 #include <cpu.h>
 #include <ppu.h>
 #include <prog.h>
-#include <mapper.h>
 #include <stdbool.h>
 
 typedef struct handlers {

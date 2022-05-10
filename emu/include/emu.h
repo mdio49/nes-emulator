@@ -52,6 +52,7 @@ uint8_t poll_input_p2(void);
 /* util functions */
 
 const char *load_rom(const char *path);
+const char *load_save(const char *path);
 
 void dump_state();
 

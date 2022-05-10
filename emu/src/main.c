@@ -3,12 +3,17 @@
 void exit_handler(void);
 void keyboard_interupt_handler(int signum);
 
+static char *get_sav_path(const char *rom_path);
+
 SDL_Window *mainWindow = NULL;
 
 history_t history[HIST_LEN] = { 0 };
 handlers_t handlers = {
     .interrupted = false
 };
+
+char *sav_path = NULL;
+size_t sav_data_size;
 
 int status = 0x00;
 int msg_ptr = 0x6004;
@@ -99,6 +104,14 @@ void exit_handler() {
         fclose(log_fp);
     }
 
+    // Save PRG-RAM data.
+    if (sav_path != NULL) {
+        FILE *fp = fopen(sav_path, "wb");
+        fwrite(curprog->prg_ram, sizeof(char), sav_data_size, fp);
+        fclose(fp);
+        free(sav_path);
+    }
+
     // Turn off the system.
     sys_poweroff();
 
@@ -151,6 +164,23 @@ void run_bin(const char *path, bool test) {
     if (prog == NULL) {
         fprintf(stderr, "Unable to load ROM.");
         exit(1);
+    }
+
+    // Load save data.
+    if (prog->header.prg_ram) {
+        // Determine size of save data.
+        sav_data_size = prog->header.prg_ram_size * INES_PGR_RAM_UNIT;
+        if (sav_data_size == 0) {
+            sav_data_size = INES_PGR_RAM_UNIT; // Value of 0 in header infers 8KB for compatibility.
+        }
+
+        // Read the save data into PRG-RAM.
+        sav_path = get_sav_path(path);
+        const char *sav = load_save(sav_path);
+        if (sav != NULL) {
+            memcpy(prog->prg_ram, sav, sav_data_size);
+            free((void*)sav); // Free the save data buffer.
+        }
     }
 
     // Attach the program to the system.
@@ -306,4 +336,44 @@ const char *load_rom(const char *path) {
     fclose(fp);
 
     return src;
+}
+
+const char *load_save(const char *path) {
+    // Open the save data.
+    FILE *fp = fopen(path, "rb");
+    if (fp == NULL)
+        return NULL; // If the file couldn't be opened, then return NULL.
+
+    // Get the length of the file.
+    fseek(fp, 0L, SEEK_END);
+    long size = ftell(fp);
+    rewind(fp);
+
+    // Allocate memory for the buffer and read in the data.
+    char *sav = malloc(size);
+    fread(sav, size, 1, fp);
+    fclose(fp);
+
+    return sav;
+}
+
+static char *get_sav_path(const char *rom_path) {
+    // Allocate memory for save path.
+    char *sav_path = malloc(strlen(rom_path) + 5);
+    strcpy(sav_path, rom_path);
+
+    // Replace the filename extension with '.sav'.
+    char *end = sav_path + strlen(rom_path);
+    char *p = end;
+    while (p > sav_path && *p != '.') {
+        p--;
+    }
+    if (p == sav_path && *p != '.') {
+        p = end;
+    }
+    *p = '\0';
+    strcat(p, ".sav");
+    
+    // Return the save path.
+    return sav_path;
 }

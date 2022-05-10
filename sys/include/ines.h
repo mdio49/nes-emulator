@@ -55,7 +55,7 @@ typedef struct ines_header {
     uint16_t    mapper_no;              // mapper number
 
     unsigned    mirroring       : 1;    // 0: horizontal, 1: vertical
-    unsigned    prg_ram         : 1;    // whether cartridge contains battery-backed PGR-RAM
+    unsigned    prg_ram         : 1;    // whether cartridge contains battery-backed PRG-RAM
     unsigned    trainer         : 1;    // whether cartridge contains 512-byte "trainer"
     unsigned    four_screen     : 1;    // whether to ignore mirroring control and provide 4-screen VRAM
 

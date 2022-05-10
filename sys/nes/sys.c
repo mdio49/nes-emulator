@@ -14,7 +14,7 @@ cpu_t *cpu = NULL;
 ppu_t *ppu = NULL;
 prog_t *curprog = NULL;
 
-static uint8_t spare_memory[0x1FE0];
+//static uint8_t spare_memory[0x1FE0];
 
 void sys_poweron(void) {
     /* Create CPU and PPU. */
@@ -131,7 +131,7 @@ void sys_insert(prog_t *prog) {
 
     // Spare memory that may be used by the cartridge (not sure what this
     // is for yet; haven't implemented enough mappers to figure it out).
-    as_add_segment(cpu->as, CRTG_START, 0x1FE0, spare_memory, 0x00);
+    //as_add_segment(cpu->as, CRTG_START, 0x1FE0, spare_memory, 0x00);
 
     // Initialize the program's mapper.
     mapper_init(prog->mapper, cpu->as, ppu->as, ppu->vram);

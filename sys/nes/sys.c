@@ -26,67 +26,71 @@ void sys_poweron(void) {
 
     // Work memory.
     for (int i = 0; i < 4; i++) {
-        as_add_segment(cpu->as, i * WMEM_SIZE, WMEM_SIZE, cpu->wmem);
+        as_add_segment(cpu->as, i * WMEM_SIZE, WMEM_SIZE, cpu->wmem, AS_READ | AS_WRITE);
     }
 
     // PPU memory-mapped registers.
     for (int i = 0x2000; i < 0x4000; i += 8) {
-        as_add_segment(cpu->as, i, 1, &ppu->controller.value);
-        as_add_segment(cpu->as, i + 1, 1, &ppu->mask.value);
-        as_add_segment(cpu->as, i + 2, 1, &ppu->status.value);
-        as_add_segment(cpu->as, i + 3, 5, &ppu->oam_addr);
+        as_add_segment(cpu->as, i, 1, &ppu->controller.value, AS_WRITE);
+        as_add_segment(cpu->as, i + 1, 1, &ppu->mask.value, AS_WRITE);
+        as_add_segment(cpu->as, i + 2, 1, &ppu->status.value, AS_READ);
+        as_add_segment(cpu->as, i + 3, 1, &ppu->oam_addr, AS_WRITE);
+        as_add_segment(cpu->as, i + 4, 1, &ppu->oam_data, AS_READ | AS_WRITE);
+        as_add_segment(cpu->as, i + 5, 1, &ppu->scroll, AS_WRITE);
+        as_add_segment(cpu->as, i + 6, 1, &ppu->ppu_addr, AS_WRITE);
+        as_add_segment(cpu->as, i + 7, 1, &ppu->ppu_data, AS_READ | AS_WRITE);
     }
 
     // APU registers.
-    as_add_segment(cpu->as, APU_PULSE1 + 0, 1, &apu->pulse[0].reg0);
-    as_add_segment(cpu->as, APU_PULSE1 + 1, 1, &apu->pulse[0].reg1);
-    as_add_segment(cpu->as, APU_PULSE1 + 2, 1, &apu->pulse[0].reg2);
-    as_add_segment(cpu->as, APU_PULSE1 + 3, 1, &apu->pulse[0].reg3);
+    as_add_segment(cpu->as, APU_PULSE1 + 0, 1, &apu->pulse[0].reg0, AS_WRITE);
+    as_add_segment(cpu->as, APU_PULSE1 + 1, 1, &apu->pulse[0].reg1, AS_WRITE);
+    as_add_segment(cpu->as, APU_PULSE1 + 2, 1, &apu->pulse[0].reg2, AS_WRITE);
+    as_add_segment(cpu->as, APU_PULSE1 + 3, 1, &apu->pulse[0].reg3, AS_WRITE);
 
-    as_add_segment(cpu->as, APU_PULSE2 + 0, 1, &apu->pulse[1].reg0);
-    as_add_segment(cpu->as, APU_PULSE2 + 1, 1, &apu->pulse[1].reg1);
-    as_add_segment(cpu->as, APU_PULSE2 + 2, 1, &apu->pulse[1].reg2);
-    as_add_segment(cpu->as, APU_PULSE2 + 3, 1, &apu->pulse[1].reg3);
+    as_add_segment(cpu->as, APU_PULSE2 + 0, 1, &apu->pulse[1].reg0, AS_WRITE);
+    as_add_segment(cpu->as, APU_PULSE2 + 1, 1, &apu->pulse[1].reg1, AS_WRITE);
+    as_add_segment(cpu->as, APU_PULSE2 + 2, 1, &apu->pulse[1].reg2, AS_WRITE);
+    as_add_segment(cpu->as, APU_PULSE2 + 3, 1, &apu->pulse[1].reg3, AS_WRITE);
 
-    as_add_segment(cpu->as, APU_TRIANGLE + 0, 1, &apu->triangle.reg0);
-    as_add_segment(cpu->as, APU_TRIANGLE + 1, 1, &apu->triangle.reg1);
-    as_add_segment(cpu->as, APU_TRIANGLE + 2, 1, &apu->triangle.reg2);
-    as_add_segment(cpu->as, APU_TRIANGLE + 3, 1, &apu->triangle.reg3);
+    as_add_segment(cpu->as, APU_TRIANGLE + 0, 1, &apu->triangle.reg0, AS_WRITE);
+    as_add_segment(cpu->as, APU_TRIANGLE + 1, 1, &apu->triangle.reg1, AS_WRITE);
+    as_add_segment(cpu->as, APU_TRIANGLE + 2, 1, &apu->triangle.reg2, AS_WRITE);
+    as_add_segment(cpu->as, APU_TRIANGLE + 3, 1, &apu->triangle.reg3, AS_WRITE);
 
-    as_add_segment(cpu->as, APU_NOISE + 0, 1, &apu->noise.reg0);
-    as_add_segment(cpu->as, APU_NOISE + 1, 1, &apu->noise.reg1);
-    as_add_segment(cpu->as, APU_NOISE + 2, 1, &apu->noise.reg2);
-    as_add_segment(cpu->as, APU_NOISE + 3, 1, &apu->noise.reg3);
+    as_add_segment(cpu->as, APU_NOISE + 0, 1, &apu->noise.reg0, AS_WRITE);
+    as_add_segment(cpu->as, APU_NOISE + 1, 1, &apu->noise.reg1, AS_WRITE);
+    as_add_segment(cpu->as, APU_NOISE + 2, 1, &apu->noise.reg2, AS_WRITE);
+    as_add_segment(cpu->as, APU_NOISE + 3, 1, &apu->noise.reg3, AS_WRITE);
 
-    as_add_segment(cpu->as, APU_DMC + 0, 1, &apu->dmc.reg0);
-    as_add_segment(cpu->as, APU_DMC + 1, 1, &apu->dmc.reg1);
-    as_add_segment(cpu->as, APU_DMC + 2, 1, &apu->dmc.reg2);
-    as_add_segment(cpu->as, APU_DMC + 3, 1, &apu->dmc.reg3);
+    as_add_segment(cpu->as, APU_DMC + 0, 1, &apu->dmc.reg0, AS_WRITE);
+    as_add_segment(cpu->as, APU_DMC + 1, 1, &apu->dmc.reg1, AS_WRITE);
+    as_add_segment(cpu->as, APU_DMC + 2, 1, &apu->dmc.reg2, AS_WRITE);
+    as_add_segment(cpu->as, APU_DMC + 3, 1, &apu->dmc.reg3, AS_WRITE);
 
     // OAM DMA.
-    as_add_segment(cpu->as, OAM_DMA, 1, &cpu->oam_dma);
+    as_add_segment(cpu->as, OAM_DMA, 1, &cpu->oam_dma, AS_WRITE);
 
     // APU status.
-    as_add_segment(cpu->as, APU_STATUS, 1, &apu->status.value);
+    as_add_segment(cpu->as, APU_STATUS, 1, &apu->status.value, AS_READ | AS_WRITE);
 
     // Joypad registers.
-    as_add_segment(cpu->as, JOYPAD1, 1, &cpu->joypad1);
-    as_add_segment(cpu->as, JOYPAD2, 1, &cpu->joypad2);
+    as_add_segment(cpu->as, JOYPAD1, 1, &cpu->joypad1, AS_READ | AS_WRITE);
+    as_add_segment(cpu->as, JOYPAD2, 1, &cpu->joypad2, AS_READ | AS_WRITE);
 
     // Memory not normally used.
-    as_add_segment(cpu->as, TEST_MODE, sizeof(cpu->test_mode), cpu->test_mode);
+    as_add_segment(cpu->as, TEST_MODE, sizeof(cpu->test_mode), cpu->test_mode, 0x00);
 
     /* Setup PPU address space. */
 
     // Palette memory (not configurable by mapper).
     for (int i = 0; i < 8; i++) {
         addr_t offset = 0x3F00 + (i * 0x20);
-        as_add_segment(ppu->as, offset, 1, &ppu->bkg_color);
-        as_add_segment(ppu->as, offset + 1, 15, ppu->bkg_palette);
+        as_add_segment(ppu->as, offset, 1, &ppu->bkg_color, AS_READ | AS_WRITE);
+        as_add_segment(ppu->as, offset + 1, 15, ppu->bkg_palette, AS_READ | AS_WRITE);
         for (int j = 0; j < 4; j++) {
             addr_t start = offset + 0x10 + (j << 2);
-            as_add_segment(ppu->as, start, 1, j > 0 ? &ppu->bkg_palette[j * 4 - 1] : &ppu->bkg_color);
-            as_add_segment(ppu->as, start + 1, 3, &ppu->spr_palette[j * 3]);
+            as_add_segment(ppu->as, start, 1, j > 0 ? &ppu->bkg_palette[j * 4 - 1] : &ppu->bkg_color, AS_READ | AS_WRITE);
+            as_add_segment(ppu->as, start + 1, 3, &ppu->spr_palette[j * 3], AS_READ | AS_WRITE);
         }
     }
 
@@ -127,7 +131,7 @@ void sys_insert(prog_t *prog) {
 
     // Spare memory that may be used by the cartridge (not sure what this
     // is for yet; haven't implemented enough mappers to figure it out).
-    as_add_segment(cpu->as, CRTG_START, 0x1FE0, spare_memory);
+    as_add_segment(cpu->as, CRTG_START, 0x1FE0, spare_memory, 0x00);
 
     // Initialize the program's mapper.
     mapper_init(prog->mapper, cpu->as, ppu->as, ppu->vram);
@@ -163,6 +167,11 @@ void sys_run(handlers_t *handlers) {
             // Fetch and decode the next instruction.
             uint8_t opc = cpu_fetch(cpu);
             operation_t ins = cpu_decode(cpu, opc);
+
+            if (opc == 0xFF) {
+                printf("Instruction $FF executed.\n");
+                exit(1);
+            }
 
             // Handle any events that occur before the instruction is executed.
             if (handlers->before_execute != NULL) {
@@ -491,5 +500,8 @@ static uint8_t ppu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
     //bool read = mode & AS_READ;
     //bool write = mode & AS_WRITE;
     //printf("ppu %c: $%.4x - %.2x\n", read ? 'r' : 'w', vaddr, value);
+    /*if (write && vaddr >= NAMETABLE0 && vaddr < NAMETABLE3 + NT_SIZE) {
+        printf("ppu %c: $%.4x - %.2x\n", read ? 'r' : 'w', vaddr, value);
+    }*/
     return value;
 }

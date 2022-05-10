@@ -36,7 +36,7 @@ void test_virtual_memory() {
 
     /* Test a single segment of memory. */
     as = as_create();
-    as_add_segment(as, 256, 1024, a);
+    as_add_segment(as, 256, 1024, a, AS_READ | AS_WRITE);
 
     a[0] = 5;
     a[100] = 40;
@@ -57,8 +57,8 @@ void test_virtual_memory() {
     assert(a[1023] == 30);
 
     /* Now add another segmnet before and after. */
-    as_add_segment(as, 0, 256, b);
-    as_add_segment(as, 1280, 256, b + 256);
+    as_add_segment(as, 0, 256, b, AS_READ | AS_WRITE);
+    as_add_segment(as, 1280, 256, b + 256, AS_READ | AS_WRITE);
 
     b[0] = 1;
     b[64] = 2;
@@ -98,7 +98,7 @@ void test_address_modes(tframe_t *frame) {
 
     // Set up a very simple 1KB address space.
     addrspace_t *as = as_create();
-    as_add_segment(as, 0, 1024, mem);
+    as_add_segment(as, 0, 1024, mem, AS_READ | AS_WRITE);
 
     // Immediate.
     args[0] = 0xFF;
@@ -263,7 +263,7 @@ void test_instructions(tframe_t *frame) {
 
     // Set up a simple address space that uses a single 64KB segment.
     addrspace_t *as = as_create();
-    as_add_segment(as, 0, 65536, mem);
+    as_add_segment(as, 0, 65536, mem, AS_READ | AS_WRITE);
 
     /**
      * Test load store.

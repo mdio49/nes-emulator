@@ -61,8 +61,10 @@ void as_destroy(addrspace_t *as);
  * @param start The start address.
  * @param size The size of the segment.
  * @param target The target memory that the segment points to.
+ * @param mode The read/write permissions of the segment (read-only segments will not update the
+ * target when written to and write-only segments won't fetch the value in the target).
  */
-void as_add_segment(addrspace_t *as, addr_t start, size_t size, uint8_t *target);
+void as_add_segment(addrspace_t *as, addr_t start, size_t size, uint8_t *target, uint8_t mode);
 
 /**
  * @brief Adds a mirror to the address space that causes a segment of memory to link to another

@@ -23,6 +23,9 @@ typedef struct mem_seg {
     uint8_t         *target;        // The target emulator address that the start of this segment points to.
     size_t          offset;         // The offset added to the target when resolving.
 
+    /* read/write permissions */
+    uint8_t         mode;           // The read/write permissions of the segment.
+
     /* linked list */
     struct mem_seg  *next;          // A pointer to the next segment.
 
@@ -51,7 +54,7 @@ struct addrspace {
 
 };
 
-static inline uint8_t *resolve_vaddr(const addrspace_t *as, addr_t vaddr) {
+static inline uint8_t *resolve_vaddr(const addrspace_t *as, addr_t vaddr, uint8_t mode) {
     uint8_t *target = NULL;
     size_t offset = 0;
 
@@ -74,22 +77,26 @@ static inline uint8_t *resolve_vaddr(const addrspace_t *as, addr_t vaddr) {
             continue;
         if (vaddr < seg->start)
             break;
+        if ((mode & AS_READ) && !(seg->mode & AS_READ))
+            break;
+        if ((mode & AS_WRITE) && !(seg->mode & AS_WRITE))
+            break;
 
         offset = seg->offset + (vaddr - seg->start);
         target = seg->target + offset;
     }
 
     // Apply the resolve rule (if it exists).
-    if (as->resolve_rule != NULL) {
+    if (target != NULL && as->resolve_rule != NULL) {
         target = as->resolve_rule(as, vaddr, target, offset);
     }
 
     // Exit with a "segmentation fault" if the address couldn't be resolved.
-    if (target == NULL) {
+    /*if (target == NULL) {
         printf("Segmentation fault ($%.4x).\n", vaddr);
         as_print(as);
         exit(1);
-    }
+    }*/
 
     return target;
 }
@@ -119,7 +126,7 @@ void as_destroy(addrspace_t *as) {
     free(as);
 }
 
-void as_add_segment(addrspace_t *as, addr_t start, size_t size, uint8_t *target) {
+void as_add_segment(addrspace_t *as, addr_t start, size_t size, uint8_t *target, uint8_t mode) {
     const uint32_t end = start + size;
     for (int i = start / SEG_SIZE; i <= (end - 1) / SEG_SIZE; i++) {
         // Determine the start and end of the new segment.
@@ -132,6 +139,7 @@ void as_add_segment(addrspace_t *as, addr_t start, size_t size, uint8_t *target)
         new_seg->end = new_end;
         new_seg->offset = new_start - start;
         new_seg->target = target;
+        new_seg->mode = mode;
         new_seg->next = NULL;
 
         // If this is the first segment in the region, then add it and continue.
@@ -229,8 +237,8 @@ void as_set_update_rule(addrspace_t *as, update_rule_t rule) {
 }
 
 uint8_t as_read(const addrspace_t *as, addr_t vaddr) {
-    //printf("R %p: $%.4x\n", as, vaddr);
-    uint8_t value = *resolve_vaddr(as, vaddr);
+    uint8_t *target = resolve_vaddr(as, vaddr, AS_READ);
+    uint8_t value = target != NULL ? *target : 0; // Only read if the segment has read permissions.
     if (as->update_rule != NULL) {
         value = as->update_rule(as, vaddr, value, AS_READ);
     }
@@ -238,11 +246,13 @@ uint8_t as_read(const addrspace_t *as, addr_t vaddr) {
 }
 
 void as_write(const addrspace_t *as, addr_t vaddr, uint8_t value) {
-    //printf("W: %p $%.4x\n", as, vaddr);
+    uint8_t *target = resolve_vaddr(as, vaddr, AS_WRITE);
     if (as->update_rule != NULL) {
         value = as->update_rule(as, vaddr, value, AS_WRITE);
     }
-    *resolve_vaddr(as, vaddr) = value;
+    if (target != NULL) {
+        *target = value; // Only write if the segment has write permissions.
+    }
 }
 
 uint8_t *as_traverse(const addrspace_t *as, addr_t start, size_t nbytes) {

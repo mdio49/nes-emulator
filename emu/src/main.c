@@ -174,7 +174,7 @@ void run_hex(int argc, char *bytes[]) {
     // Setup a simple address space that uses a single 64KB segment.
     uint8_t mem[65536];
     addrspace_t *as = as_create();
-    as_add_segment(as, 0, 65536, mem);
+    as_add_segment(as, 0, 65536, mem, AS_READ | AS_WRITE);
     as_destroy(cpu->as);
     cpu->as = as;
 

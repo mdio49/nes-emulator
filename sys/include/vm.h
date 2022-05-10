@@ -18,6 +18,17 @@ typedef uint16_t addr_t;
 typedef struct addrspace addrspace_t;
 
 /**
+ * @brief A resolve rule (occurs whenever a virtual address is resolved).
+ * 
+ * @param as The address space.
+ * @param vaddr The virtual address that is being resolved.
+ * @param target The current target address (can be remapped via the return value).
+ * @param offset The offset of the virtual address from the start of the segment.
+ * @return The resolved physical/emulator address.
+ */
+typedef uint8_t *(*resolve_rule_t)(const addrspace_t *as, addr_t vaddr, uint8_t *target, size_t offset);
+
+/**
  * @brief An update rule (occurs whenever an address is read from or written to).
  * 
  * @param as The address space that was updated.
@@ -56,7 +67,8 @@ void as_add_segment(addrspace_t *as, addr_t start, size_t size, uint8_t *target)
 /**
  * @brief Adds a mirror to the address space that causes a segment of memory to link to another
  * segment of memory within the address space. When resolving virtual addresses, the address
- * is first passed through all mirrors before resolving the address to a segment.
+ * is first passed through all mirrors before resolving the address to a segment. Mirrors are
+ * evaluated once in the order that they are defined.
  * 
  * @param as The address space to modify.
  * @param start The start of the mirror.
@@ -65,6 +77,15 @@ void as_add_segment(addrspace_t *as, addr_t start, size_t size, uint8_t *target)
  * @param target The target virtual address within the address space.
  */
 void as_add_mirror(addrspace_t *as, addr_t start, addr_t end, size_t repeat, addr_t target);
+
+/**
+ * @brief Sets the resolve rule that is called whenever a virtual address in the given address
+ * space is resolved into a "physical" address in the emulator's virtual address space.
+ * 
+ * @param as The address space.
+ * @param rule The resolve rule (or `NULL` to clear the rule).
+ */
+void as_set_resolve_rule(addrspace_t *as, resolve_rule_t rule);
 
 /**
  * @brief Sets the update rule that is called whenever a memory address in the given address

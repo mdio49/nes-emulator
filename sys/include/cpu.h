@@ -10,7 +10,7 @@
 #define WMEM_SIZE       0x0800
 
 #define STACK_START     0x0100
-#define CRTG_START      0x4200
+#define CRTG_START      0x4020
 #define PRG_RAM_START   0x6000
 #define PRG_ROM_START   0x8000
 

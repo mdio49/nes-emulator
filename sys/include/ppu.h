@@ -7,6 +7,16 @@
 #include <vm.h>
 
 #define VRAM_SIZE   0x0800
+#define NT_SIZE     0x0400
+
+#define NAMETABLE0  0x2000
+#define NAMETABLE1  0x2400
+#define NAMETABLE2  0x2800
+#define NAMETABLE3  0x2C00
+
+#define NT(V)       ((V >> 10) & 0x03);
+#define NT_X(V)     ((V >> 10) & 0x01);
+#define NT_Y(V)     ((V >> 11) & 0x01);
 
 #define PPU_CTRL    0x2000
 #define PPU_MASK    0x2001
@@ -199,7 +209,7 @@ typedef struct ppu {
     int16_t     draw_x, draw_y;                     // Current screen position of render.
     char out[SCREEN_WIDTH * SCREEN_HEIGHT * 3];     // Pixel output (3 bytes per pixel; RGB order).
 
-    //unsigned    nmi_output      : 1;                // Set if an NMI should occur on the next CPU instruction fetch.
+    //unsigned    nmi_output      : 1;              // Set if an NMI should occur on the next CPU instruction fetch.
     unsigned    nmi_occurred    : 1;                // Set if an NMI has already occurred for the current frame.
     unsigned    nmi_suppress    : 2;                // If set, then NMI will not occur for the given number of PPU cycles.
     unsigned    vbl_occurred    : 1;                // Set if a vblank just occured and the screen should be redrawn.

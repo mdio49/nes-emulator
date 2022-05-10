@@ -9,6 +9,7 @@ static mapper_t mappers[N_MAPPERS] = {
 
 static inline void init_mappers(void) {
     mappers[0] = nrom;
+    mappers[1] = mmc1;
     // ...
 }
 
@@ -38,6 +39,8 @@ void mapper_init(mapper_t *mapper, addrspace_t *cpuas, addrspace_t *ppuas, uint8
 }
 
 void mapper_destroy(mapper_t *mapper) {
+    if (mapper->banks != NULL)
+        free(mapper->banks);
     free(mapper);
 }
 

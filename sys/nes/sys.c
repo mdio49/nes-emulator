@@ -3,6 +3,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+static uint8_t *cpu_resolve_rule(const addrspace_t *as, addr_t vaddr, uint8_t *target, size_t offset);
+static uint8_t *ppu_resolve_rule(const addrspace_t *as, addr_t vaddr, uint8_t *target, size_t offset);
+
 static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t value, uint8_t mode);
 static uint8_t ppu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t value, uint8_t mode);
 
@@ -76,21 +79,29 @@ void sys_poweron(void) {
     /* Setup PPU address space. */
 
     // Palette memory (not configurable by mapper).
-    for (int i = 0; i < 4; i++) {
-        addr_t mirror = 0x4000 * i;
-        for (int i = 0; i < 8; i++) {
-            addr_t offset = mirror + 0x3F00 + (i * 0x20);
-            as_add_segment(ppu->as, offset, 1, &ppu->bkg_color);
-            as_add_segment(ppu->as, offset + 1, 15, ppu->bkg_palette);
-            for (int j = 0; j < 4; j++) {
-                addr_t start = offset + 0x10 + (j << 2);
-                as_add_segment(ppu->as, start, 1, j > 0 ? &ppu->bkg_palette[j * 4 - 1] : &ppu->bkg_color);
-                as_add_segment(ppu->as, start + 1, 3, &ppu->spr_palette[j * 3]);
-            }
+    for (int i = 0; i < 8; i++) {
+        addr_t offset = 0x3F00 + (i * 0x20);
+        as_add_segment(ppu->as, offset, 1, &ppu->bkg_color);
+        as_add_segment(ppu->as, offset + 1, 15, ppu->bkg_palette);
+        for (int j = 0; j < 4; j++) {
+            addr_t start = offset + 0x10 + (j << 2);
+            as_add_segment(ppu->as, start, 1, j > 0 ? &ppu->bkg_palette[j * 4 - 1] : &ppu->bkg_color);
+            as_add_segment(ppu->as, start + 1, 3, &ppu->spr_palette[j * 3]);
         }
     }
 
-    /* Set address space update rules. */
+    // Nametables are mirrored (i.e. $3000-$3EFF is a mirror of $2000-$2EFF).
+    as_add_mirror(ppu->as, 0x3000, 0x3EFF, 0, 0x2000);
+
+    // PPU address space is mirrored every 0x4000 bytes.
+    as_add_mirror(ppu->as, 0x4000, 0x7FFF, 0, 0x0000);
+    as_add_mirror(ppu->as, 0x8000, 0xBFFF, 0, 0x0000);
+    as_add_mirror(ppu->as, 0xC000, 0xFFFF, 0, 0x0000);
+
+    /* Set address space resolve and update rules. */
+    as_set_resolve_rule(cpu->as, cpu_resolve_rule);
+    as_set_resolve_rule(ppu->as, ppu_resolve_rule);
+    
     as_set_update_rule(cpu->as, cpu_update_rule);
     as_set_update_rule(ppu->as, ppu_update_rule);
 }
@@ -209,6 +220,27 @@ void sys_run(handlers_t *handlers) {
         // Spin while an interrupt is taking place.
         while (handlers->interrupted);
     }
+}
+
+static uint8_t *cpu_resolve_rule(const addrspace_t *as, addr_t vaddr, uint8_t *target, size_t offset) {
+    // Let the mapper remap PRG-ROM.
+    if (vaddr >= PRG_ROM_START) {
+        target = curprog->mapper->map_prg(curprog->mapper, curprog, vaddr, target, offset);
+    }
+
+    return target;
+}
+
+static uint8_t *ppu_resolve_rule(const addrspace_t *as, addr_t vaddr, uint8_t *target, size_t offset) {
+    // Let the mapper remap CHR-ROM (i.e. pattern tables).
+    if (vaddr < NAMETABLE0) {
+        target = curprog->mapper->map_chr(curprog->mapper, curprog, vaddr, target, offset);
+    }
+    else if (vaddr < NAMETABLE3 + NT_SIZE) {
+        target = curprog->mapper->map_nts(curprog->mapper, curprog, vaddr, target, offset);
+    }
+
+    return target;
 }
 
 static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t value, uint8_t mode) {

@@ -4,6 +4,23 @@
 #include <mapper.h>
 #include <prog.h>
 
+#define PRG_RAM_START   0x6000
+#define PRG_ROM_START   0x8000
+
+
+/**
+ * @brief Mapper rule (takes a similar form to an address space resolve rule).
+ * 
+ * @param mapper The mapper.
+ * @param prog The NES program that is using the mapper.
+ * @param vaddr The virtual address that is being mapped.
+ * @param target The mapped address prior to performing any mapping.
+ * @param offset The offset of the virtual address from the start of the segment
+ *               that the address is contained in within the address space.
+ * @return The resultant physical/emulator address that gets mapped.
+ */
+typedef uint8_t *(*map_rule_t)(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset);
+
 /* mapper implementation */
 struct mapper {
 
@@ -20,6 +37,12 @@ struct mapper {
     void            (*insert)(mapper_t *mapper, prog_t *prog);
     void            (*write)(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t value);
 
+    /* mapper functions */
+
+    map_rule_t      map_prg;    // Maps PRG-ROM.
+    map_rule_t      map_chr;    // Maps CHR-ROM/RAM.
+    map_rule_t      map_nts;    // Maps nametables.
+
     /* system pointers */
 
     addrspace_t     *cpuas;     // Reference to CPU address space.
@@ -32,9 +55,6 @@ struct mapper {
     uint8_t         *banks;     // Bank registers (mapper can allocate as many as needed).
 
 };
-
-/* mapper singletons */
-extern const mapper_t nrom;
 
 /**
  * @brief Invoked when the cartridge is inserted into the system, allowing the mapper
@@ -55,5 +75,9 @@ void mapper_insert(mapper_t *mapper, prog_t *prog);
  * @param value The value that was written.
  */
 void mapper_write(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t value);
+
+/* mapper singletons */
+extern const mapper_t nrom,
+    mmc1;
 
 #endif

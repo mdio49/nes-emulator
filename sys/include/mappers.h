@@ -53,6 +53,10 @@ struct mapper {
     uint8_t         sr[16];     // Shift registers (16 available).
     uint8_t         *banks;     // Bank registers (mapper can allocate as many as needed).
 
+    /* extra data */
+    
+    void            *data;      // Additional data that the mapper may allocate.
+
 };
 
 /**
@@ -76,6 +80,6 @@ void mapper_insert(mapper_t *mapper, prog_t *prog);
 void mapper_write(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t value);
 
 /* mapper singletons */
-extern const mapper_t nrom, mmc1, uxrom, ines003;
+extern const mapper_t nrom, mmc1, uxrom, ines003, mmc3;
 
 #endif

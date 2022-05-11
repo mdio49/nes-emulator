@@ -12,6 +12,7 @@ static inline void init_mappers(void) {
     mappers[1] = mmc1;
     mappers[2] = uxrom;
     mappers[3] = ines003;
+    mappers[4] = mmc3;
     // ...
 }
 
@@ -43,6 +44,8 @@ void mapper_init(mapper_t *mapper, addrspace_t *cpuas, addrspace_t *ppuas, uint8
 void mapper_destroy(mapper_t *mapper) {
     if (mapper->banks != NULL)
         free(mapper->banks);
+    if (mapper->data != NULL)
+        free(mapper->data);
     free(mapper);
 }
 

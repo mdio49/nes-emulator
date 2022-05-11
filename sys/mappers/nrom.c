@@ -34,6 +34,12 @@ static mapper_t *init(void) {
     
     /* setup registers */
     mapper->banks = NULL;
+
+    /* additional data */
+    mapper->data = NULL;
+
+    /* additional data */
+    mapper->data = NULL;
     
     return mapper;
 }

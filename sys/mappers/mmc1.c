@@ -44,6 +44,9 @@ static mapper_t *init(void) {
     /* setup registers */
     mapper->banks = calloc(N_BANKS, sizeof(uint8_t));
     mapper->sr[0] = MMC1_SR_RESET;
+
+    /* additional data */
+    mapper->data = NULL;
     
     return mapper;
 }

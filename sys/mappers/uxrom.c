@@ -38,6 +38,9 @@ static mapper_t *init(void) {
     
     /* setup registers */
     mapper->banks = calloc(N_BANKS, sizeof(uint8_t));
+
+    /* additional data */
+    mapper->data = NULL;
     
     return mapper;
 }

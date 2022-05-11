@@ -46,7 +46,8 @@ struct mmc3_data {
     uint8_t     irq_latch;          // irq reload value
     unsigned    irq_enable  : 1;    // irq enable flag
     unsigned    irq_reload  : 1;    // irq reload flag
-    unsigned                : 6;
+    unsigned    old_a12     : 1;
+    unsigned                : 5;
 
 };
 
@@ -65,11 +66,13 @@ const mapper_t mmc3 = {
 
 static mapper_t *init(void) {
     /* create mapper */
-    mapper_t *mapper = malloc(sizeof(struct mapper));
+    mapper_t *mapper = mapper_create();
 
     /* set functions */
     mapper->insert = insert;
     mapper->write = write;
+
+    /* set mapper rules */
     mapper->map_prg = map_prg;
     mapper->map_chr = map_chr;
     mapper->map_nts = map_nts;
@@ -150,6 +153,25 @@ static uint8_t *map_prg(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *t
 }
 
 static uint8_t *map_chr(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset) {
+    struct mmc3_data *data = (struct mmc3_data*)mapper->data;
+    if (!data->old_a12 && (vaddr & 0x1000) > 0) {
+        if (data->irq_reload) {
+            data->irq_counter = data->irq_latch;
+        }
+        else {
+            if (data->irq_counter == 0) {
+                data->irq_counter = data->irq_latch;
+                if (data->irq_enable) {
+                    mapper->irq = true;
+                }
+            }
+            else {
+                data->irq_counter--;
+            }
+        }
+    }
+    data->old_a12 = (vaddr & 0x1000) > 0;
+
     uint8_t bank = vaddr / CHR_BANK_SIZE;
     if ((mapper->banks[0] & 0x80) > 0) {
         // R2 - R3 - R4 - R5 - R0/R0 - R1/R1

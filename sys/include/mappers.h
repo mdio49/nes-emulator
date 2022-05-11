@@ -38,6 +38,7 @@ struct mapper {
 
     /* mapper functions */
 
+    map_rule_t      map_ram;    // Maps PRG-RAM.
     map_rule_t      map_prg;    // Maps PRG-ROM.
     map_rule_t      map_chr;    // Maps CHR-ROM/RAM.
     map_rule_t      map_nts;    // Maps nametables.
@@ -53,11 +54,20 @@ struct mapper {
     uint8_t         sr[16];     // Shift registers (16 available).
     uint8_t         *banks;     // Bank registers (mapper can allocate as many as needed).
 
-    /* extra data */
-    
+    /* other variables */
+
+    bool            irq;        // Set if the CPU should generate an IRQ on its next instruction fetch.    
     void            *data;      // Additional data that the mapper may allocate.
 
 };
+
+/**
+ * @brief Creates a new instance of an empty mapper with all necessary variables
+ * initialized to their default values.
+ * 
+ * @return The new mapper instance.
+ */
+mapper_t *mapper_create(void);
 
 /**
  * @brief Invoked when the cartridge is inserted into the system, allowing the mapper

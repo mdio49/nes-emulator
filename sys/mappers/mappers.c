@@ -16,6 +16,10 @@ static inline void init_mappers(void) {
     // ...
 }
 
+static uint8_t *default_map(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset) {
+    return target; // Default mapping behaviour where banks are fixed.
+}
+
 mapper_t *get_mapper(int number) {
     // Lazy loading of mappers.
     static bool mapper_init = false;
@@ -33,6 +37,26 @@ mapper_t *get_mapper(int number) {
 
     // Initialize a new instance of the mapper if it is supported; otherwise return NULL.
     return mapper.init != NULL ? mapper.init() : NULL;
+}
+
+mapper_t *mapper_create(void) {
+    // Allocate memory for the mapper.
+    mapper_t *mapper = malloc(sizeof(struct mapper));
+    
+    // Mapper functions default to fixed banks if the mapper doesn't assign them to anything.
+    mapper->map_ram = default_map;
+    mapper->map_prg = default_map;
+    mapper->map_chr = default_map;
+    mapper->map_nts = default_map;
+    
+    // By default, the mapper contains no bank registers and uses no additional data.
+    mapper->banks = NULL;
+    mapper->data = NULL;
+
+    // Ensure that IRQ flag is clear.
+    mapper->irq = false;
+    
+    return mapper;
 }
 
 void mapper_init(mapper_t *mapper, addrspace_t *cpuas, addrspace_t *ppuas, uint8_t *vram) {

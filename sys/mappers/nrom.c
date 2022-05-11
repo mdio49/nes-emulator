@@ -13,9 +13,9 @@
 #define PRG_BANK_SIZE   0x4000
 
 static mapper_t *init(void);
+
 static void insert(mapper_t *mapper, prog_t *prog);
 static void write(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t value);
-static uint8_t *map(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset);
 
 const mapper_t nrom = {
     .init = init
@@ -23,23 +23,11 @@ const mapper_t nrom = {
 
 static mapper_t *init(void) {
     /* create mapper */
-    mapper_t *mapper = malloc(sizeof(struct mapper));
+    mapper_t *mapper = mapper_create();
 
     /* set functions */
     mapper->insert = insert;
     mapper->write = write;
-    mapper->map_prg = map;
-    mapper->map_chr = map;
-    mapper->map_nts = map;
-    
-    /* setup registers */
-    mapper->banks = NULL;
-
-    /* additional data */
-    mapper->data = NULL;
-
-    /* additional data */
-    mapper->data = NULL;
     
     return mapper;
 }
@@ -83,10 +71,6 @@ static void insert(mapper_t *mapper, prog_t *prog) {
         as_add_segment(mapper->ppuas, NAMETABLE2, NT_SIZE, mapper->vram + NT_SIZE, AS_READ | AS_WRITE);
         as_add_segment(mapper->ppuas, NAMETABLE3, NT_SIZE, mapper->vram + NT_SIZE, AS_READ | AS_WRITE);
     }
-}
-
-static uint8_t *map(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset) {
-    return target; // Banks are fixed for both PRG and CHR, and nametable mirroring is also fixed.
 }
 
 static void write(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t value) {

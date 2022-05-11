@@ -18,8 +18,6 @@ static void insert(mapper_t *mapper, prog_t *prog);
 static void write(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t value);
 
 static uint8_t *map_prg(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset);
-static uint8_t *map_chr(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset);
-static uint8_t *map_nts(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset);
 
 const mapper_t uxrom = {
     .init = init
@@ -27,20 +25,17 @@ const mapper_t uxrom = {
 
 static mapper_t *init(void) {
     /* create mapper */
-    mapper_t *mapper = malloc(sizeof(struct mapper));
+    mapper_t *mapper = mapper_create();
 
     /* set functions */
     mapper->insert = insert;
     mapper->write = write;
+
+    /* set mapper rules */
     mapper->map_prg = map_prg;
-    mapper->map_chr = map_chr;
-    mapper->map_nts = map_nts;
     
     /* setup registers */
     mapper->banks = calloc(N_BANKS, sizeof(uint8_t));
-
-    /* additional data */
-    mapper->data = NULL;
     
     return mapper;
 }
@@ -80,14 +75,6 @@ static void insert(mapper_t *mapper, prog_t *prog) {
 static uint8_t *map_prg(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset) {
     // If the address targets the first bank, then offset target depending on the value in the bank register.
     return vaddr < PRG_BANK1 ? target + mapper->banks[0] * PRG_BANK_SIZE : target;
-}
-
-static uint8_t *map_chr(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset) {
-    return target; // CHR memory is fixed.
-}
-
-static uint8_t *map_nts(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset) {
-    return target; // Nametables are fixed.
 }
 
 static void write(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t value) {

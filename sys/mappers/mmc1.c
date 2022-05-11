@@ -32,11 +32,13 @@ const mapper_t mmc1 = {
 
 static mapper_t *init(void) {
     /* create mapper */
-    mapper_t *mapper = malloc(sizeof(struct mapper));
+    mapper_t *mapper = mapper_create();
 
     /* set functions */
     mapper->insert = insert;
     mapper->write = write;
+
+    /* set mapper rules */
     mapper->map_prg = map_prg;
     mapper->map_chr = map_chr;
     mapper->map_nts = map_nts;
@@ -44,9 +46,6 @@ static mapper_t *init(void) {
     /* setup registers */
     mapper->banks = calloc(N_BANKS, sizeof(uint8_t));
     mapper->sr[0] = MMC1_SR_RESET;
-
-    /* additional data */
-    mapper->data = NULL;
     
     return mapper;
 }

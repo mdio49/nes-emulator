@@ -22,9 +22,9 @@ static mapper_t *init(void);
 static void insert(mapper_t *mapper, prog_t *prog);
 static void write(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t value);
 
-static uint8_t *map_prg(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *start, size_t offset);
-static uint8_t *map_chr(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *start, size_t offset);
-static uint8_t *map_nts(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *start, size_t offset);
+static uint8_t *map_prg(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset);
+static uint8_t *map_chr(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset);
+static uint8_t *map_nts(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset);
 
 const mapper_t mmc1 = {
     .init = init
@@ -89,7 +89,8 @@ static uint8_t *map_prg(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *t
             target += bank * PRG_BANK_SIZE;
         }
         else {
-            target += (prog->header.prg_rom_size - 1) * PRG_BANK_SIZE;
+            const int nbanks = prog->header.prg_rom_size * INES_PRG_ROM_UNIT / PRG_BANK_SIZE;
+            target += (nbanks - 1) * PRG_BANK_SIZE;
         }
     }
     else {

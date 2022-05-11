@@ -10,6 +10,8 @@ static mapper_t mappers[N_MAPPERS] = {
 static inline void init_mappers(void) {
     mappers[0] = nrom;
     mappers[1] = mmc1;
+    mappers[2] = uxrom;
+    mappers[3] = ines003;
     // ...
 }
 

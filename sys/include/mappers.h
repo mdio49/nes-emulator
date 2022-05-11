@@ -7,7 +7,6 @@
 #define PRG_RAM_START   0x6000
 #define PRG_ROM_START   0x8000
 
-
 /**
  * @brief Mapper rule (takes a similar form to an address space resolve rule).
  * 
@@ -77,7 +76,6 @@ void mapper_insert(mapper_t *mapper, prog_t *prog);
 void mapper_write(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t value);
 
 /* mapper singletons */
-extern const mapper_t nrom,
-    mmc1;
+extern const mapper_t nrom, mmc1, uxrom, ines003;
 
 #endif

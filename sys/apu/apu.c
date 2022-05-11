@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include <sys.h>
 
 /**
  * @brief Clocks an envelope.
@@ -56,6 +55,10 @@ static const uint16_t NOISE_PERIODS[16] = {
     4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068
 };
 
+static const uint16_t DMC_RATES[16] = {
+    428, 380, 340, 320, 286, 254, 226, 214, 190, 160, 142, 128, 106,  84,  72,  54
+};
+
 apu_t *apu_create(void) {
     apu_t *apu = malloc(sizeof(struct apu));
     
@@ -70,6 +73,10 @@ apu_t *apu_create(void) {
     // Initialize noise shift register.
     apu->noise.shift_register = 1;
 
+    // Initialize DMC.
+    apu->dmc.output = 0 ;
+    apu->dmc.bits_remaining = 1;
+
     // Generate lookup tables.
     apu->pulse_table[0] = 0;
     for (int i = 1; i <= 30; i++) {
@@ -78,7 +85,7 @@ apu_t *apu_create(void) {
     apu->tnd_table[0][0][0] = 0;
     for (int t = 0; t < 16; t++) {
         for (int n = 0; n < 16; n++) {  
-            for (int d = 0; d < 16; d++) {
+            for (int d = 0; d < 128; d++) {
                 if (t == 0 && n == 0 && d == 0)
                     continue;
                 apu->tnd_table[t][n][d] = 159.79 / ((1.0 / ((t / 8227.0) + (n / 12241.0) + (d / 22638.0))) + 100.0);
@@ -98,7 +105,7 @@ void apu_reset(apu_t *apu) {
     apu->status.value = 0;
 }
 
-void apu_update(apu_t *apu, int hcycles) {
+void apu_update(apu_t *apu, addrspace_t *cpuas, int hcycles) {
     // Update length counter when the appropriate register is loaded with a value.
     len_counter_load(&apu->pulse[0].len_counter, apu->pulse[0].len_counter_load, apu->status.p1, apu->pulse[0].len_counter_reload);
     len_counter_load(&apu->pulse[1].len_counter, apu->pulse[1].len_counter_load, apu->status.p2, apu->pulse[1].len_counter_reload);
@@ -110,6 +117,31 @@ void apu_update(apu_t *apu, int hcycles) {
     apu->pulse[1].len_counter_reload = false;
     apu->triangle.len_counter_reload = false;
     apu->noise.len_counter_reload = false;
+
+    // Reload DMC output if necessary.
+    if (apu->dmc.output_reload) {
+        apu->dmc.output = apu->dmc.load;
+        apu->dmc.output_reload = false;
+    }
+
+    // If DMC is disabled, then set bytes remaining to 0.
+    if (!apu->status.dmc) {
+        apu->dmc.bytes_remaining = 0;
+    }
+
+    // If the DMC start flag is set, then restart the sample.
+    if (apu->dmc.start_flag) {
+        if (apu->dmc.bytes_remaining == 0) {
+            apu->dmc.addr_counter = 0xC000 | (apu->dmc.addr << 6);
+            apu->dmc.bytes_remaining = apu->dmc.length * 16 + 1;
+        }
+        apu->dmc.start_flag = false;
+    }
+
+    // Clear DMC IRQ flag if IRQ is disabled.
+    if (!apu->dmc.irq) {
+        apu->status.d_irq = false;
+    }
 
     // Check if the frame counter should be reset.
     if (apu->frame_reset > 0) {
@@ -206,7 +238,7 @@ void apu_update(apu_t *apu, int hcycles) {
             else if (apu->triangle.lin_counter > 0) {
                 apu->triangle.lin_counter--;
             }
-            if (apu->triangle.loop) {
+            if (!apu->triangle.loop) {
                 apu->triangle.lin_counter_reload = false;
             }
 
@@ -354,8 +386,72 @@ void apu_update(apu_t *apu, int hcycles) {
             noise = 0;
         }
 
-        // TODO
-        dmc = 0;
+        // Update DMC timer.
+        if (apu->dmc.timer == 0) {
+            // Reload the timer.
+            apu->dmc.timer = DMC_RATES[apu->dmc.rate] / 2;
+
+            // Change output level if silence flag is clear.
+            if (!apu->dmc.silence) {
+                uint8_t delta = apu->dmc.shift_register & 0x01;
+                if (delta > 0 && apu->dmc.output <= 125) {
+                    apu->dmc.output += 2;
+                }
+                else if (delta == 0 && apu->dmc.output >= 2) {
+                    apu->dmc.output -= 2;
+                }
+            }
+
+            // Clock the shift register and decrement the bits remaining.
+            apu->dmc.shift_register >>= 1;
+            apu->dmc.bits_remaining--;
+
+            // If there are no bits remaining in the shift register, then load the next sample.
+            if (apu->dmc.bits_remaining == 0) {
+                if (apu->dmc.bytes_remaining > 0) {
+                    // Load next sample byte.
+                    apu->dmc.shift_register = as_read(cpuas, apu->dmc.addr_counter);
+                    apu->dmc.bytes_remaining--;
+
+                    // Increment address counter.
+                    if (apu->dmc.addr_counter == 0xFFFF) {
+                        apu->dmc.addr_counter = 0x8000;
+                    }
+                    else {
+                        apu->dmc.addr_counter++;
+                    }
+
+                    // Check if sample buffer is empty.
+                    if (apu->dmc.bytes_remaining == 0) {
+                        // Restart the channel if the loop flag is set.
+                        if (apu->dmc.loop) {
+                            apu->dmc.addr_counter = 0xC000 | (apu->dmc.addr << 6);
+                            apu->dmc.bytes_remaining = apu->dmc.length * 16 + 1;
+                        }
+                        else if (apu->dmc.irq) {
+                            // Generate IRQ if enabled and if not looping.
+                            apu->status.d_irq = true;
+                            apu->irq_flag = true;
+                        }
+                    }
+                    else {
+                        // Clear the silence flag.
+                        apu->dmc.silence = false;
+                    }
+                }
+                else {
+                    // Silence the channel if the sample buffer is empty (or if $4015 was cleared).
+                    apu->dmc.silence = true;
+                }
+                apu->dmc.bits_remaining = 8;
+            }
+        }
+        else {
+            apu->dmc.timer--;
+        }
+
+        // Get output of DMC.
+        dmc = apu->dmc.output;
 
         // Get mixer output.
         float pulse_out = apu->pulse_table[pulse1 + pulse2];

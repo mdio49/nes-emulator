@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <vm.h>
 
 #define APU_PULSE1      0x4000
 #define APU_PULSE2      0x4004
@@ -121,6 +122,7 @@ typedef struct triangle {
  * @brief A struct that contains data for a noise channel.
  */
 typedef struct noise {
+    /* registers */
     union {
         struct {
             unsigned    vol     : 4;    // Volume/envelope.
@@ -167,11 +169,12 @@ typedef struct noise {
  * @brief A struct that contains data for a delta modulation channel (DMC).
  */
 typedef struct dmc {
+    /* registers */
     union {
         struct {
-            unsigned    freq    : 4;    // Frequency.
+            unsigned    rate    : 4;    // Rate.
             unsigned            : 2;
-            unsigned    loop    : 1;    // Loop.
+            unsigned    loop    : 1;    // Loop flag.
             unsigned    irq     : 1;    // IRQ enable.
         };
         uint8_t reg0;
@@ -191,6 +194,28 @@ typedef struct dmc {
         uint8_t length; // Sample length.
         uint8_t reg3;
     };
+
+    /* memory reader */
+
+    addr_t      addr_counter;           // Current address.
+    uint16_t    bytes_remaining;        // Bytes remaining in the sample.
+
+    /* output unit */
+
+    uint8_t     shift_register;         // Shift register.
+    unsigned    bits_remaining  : 4;    // Bits remaining in the shift register.
+    unsigned    output_reload   : 1;    // Output reload flag.
+    unsigned    silence         : 1;    // Silence flag.
+    unsigned                    : 2;
+    unsigned    output          : 7;    // Output level (set to 0 on power-up).
+    unsigned                    : 1;
+
+    /* other variables */
+
+    uint8_t     timer;                  // Timer (clocked every APU cycle).
+    unsigned    start_flag      : 1;    // Set if the sample should be (re)started.
+    unsigned                    : 7;
+
 } dmc_t;
 
 /**
@@ -243,7 +268,7 @@ typedef struct apu {
     uint32_t        mixer_ptr;
 
     float           pulse_table[31];        // Pulse output lookup table.
-    float           tnd_table[16][16][16];  // Triangle-noise-DMC output lookup table.
+    float           tnd_table[16][16][128]; // Triangle-noise-DMC output lookup table.
 
 } apu_t;
 
@@ -272,8 +297,9 @@ void apu_reset(apu_t *apu);
  * @brief Updates the given APU by a specified number of frames.
  * 
  * @param apu The APU to update.
+ * @param cpuas The CPU's address space.
  * @param hcycles The number of half-cycles that have passed (2 CPU cycles = 1 APU cycle).
  */
-void apu_update(apu_t *apu, int hcycles);
+void apu_update(apu_t *apu, addrspace_t *cpuas, int hcycles);
 
 #endif

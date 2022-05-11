@@ -168,11 +168,6 @@ void sys_run(handlers_t *handlers) {
             uint8_t opc = cpu_fetch(cpu);
             operation_t ins = cpu_decode(cpu, opc);
 
-            if (opc == 0xFF) {
-                printf("Instruction $FF executed.\n");
-                exit(1);
-            }
-
             // Handle any events that occur before the instruction is executed.
             if (handlers->before_execute != NULL) {
                 handlers->before_execute(ins);
@@ -188,7 +183,7 @@ void sys_run(handlers_t *handlers) {
         }        
 
         // Cycle the APU.
-        apu_update(apu, cycles);
+        apu_update(apu, cpu->as, cycles);
 
         // Check for IRQ.
         if (apu->irq_flag) {
@@ -340,6 +335,9 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
                 case APU_NOISE + 0x03:
                     apu->noise.len_counter_reload = true;
                     break;
+                case APU_DMC + 0x01:
+                    apu->dmc.output_reload = true;
+                    break;
             }
 
             // Ensure that the correct value is put into the register after evaluating bitmasks.
@@ -360,6 +358,11 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
                     pulse.sweep.enabled = (value >> 7) & 0x01;
                     value = pulse.reg1;
                     break;
+                case APU_PULSE1 + 0x02:
+                case APU_PULSE2 + 0x02:
+                    pulse.timer_low = value;
+                    value = pulse.reg2;
+                    break;
                 case APU_PULSE1 + 0x03:
                 case APU_PULSE2 + 0x03:
                     pulse.timer_high = value & 0x07;
@@ -370,6 +373,10 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
                     triangle.lin_counter_load = value & 0x7F;
                     triangle.loop = value >> 7;
                     value = triangle.reg0;
+                    break;
+                case APU_TRIANGLE + 0x02:
+                    triangle.timer_low = value;
+                    value = triangle.reg2;
                     break;
                 case APU_TRIANGLE + 0x03:
                     triangle.timer_high = value & 0x07;
@@ -392,14 +399,22 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
                     value = noise.reg3;
                     break;
                 case APU_DMC:
-                    dmc.freq = value & 0x0F;
+                    dmc.rate = value & 0x0F;
                     dmc.loop = (value >> 6) & 0x01;
-                    dmc.loop = (value >> 7) & 0x01;
+                    dmc.irq = (value >> 7) & 0x01;
                     value = dmc.reg0;
                     break;
                 case APU_DMC + 0x01:
                     dmc.load = value & 0x7F;
                     value = dmc.reg1;
+                    break;
+                case APU_DMC + 0x02:
+                    dmc.addr = value;
+                    value = dmc.reg2;
+                    break;
+                case APU_DMC + 0x03:
+                    dmc.length = value;
+                    value = dmc.reg3;
                     break;
             }
         }
@@ -424,6 +439,11 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
             // Writing clears DMC interrupt flag.
             status.d_irq = false;
 
+            // Restart the DMC sample if necessary.
+            if (status.dmc) {
+                apu->dmc.start_flag = true;
+            }
+
             // Reset timers.
             //apu->frame_counter = 0;
             //apu->step = 0;
@@ -436,7 +456,9 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
             status.p2 = apu->pulse[1].len_counter > 0;
             status.tri = apu->triangle.len_counter > 0;
             status.noise = apu->noise.len_counter > 0;
-            status.dmc = false; // TODO
+
+            // Set the DMC status flag if its bytes remaining is greater than 0.
+            status.dmc = apu->dmc.bytes_remaining > 0;
 
             // Set the interrupt flags.
             status.f_irq = apu->status.f_irq;

@@ -157,19 +157,19 @@ static uint8_t *map_chr(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *t
             target += mapper->banks[R2 + bank] * CHR_BANK_SIZE;
         }
         else if (bank < 6) {
-            target += (mapper->banks[R0] + (bank % 2)) * CHR_BANK_SIZE;
+            target += ((mapper->banks[R0] & 0xFE) + (bank % 2)) * CHR_BANK_SIZE;
         }
         else {
-            target += (mapper->banks[R1] + (bank % 2)) * CHR_BANK_SIZE;
+            target += ((mapper->banks[R1] & 0xFE) + (bank % 2)) * CHR_BANK_SIZE;
         }
     }
     else {
         // R0/R0 - R1/R1 - R2 - R3 - R4 - R5
         if (bank < 2) {
-            target += (mapper->banks[R0] + (bank % 2)) * CHR_BANK_SIZE;
+            target += ((mapper->banks[R0] & 0xFE) + (bank % 2)) * CHR_BANK_SIZE;
         }
         else if (bank < 4) {
-            target += (mapper->banks[R1] + (bank % 2)) * CHR_BANK_SIZE;
+            target += ((mapper->banks[R1] & 0xFE) + (bank % 2)) * CHR_BANK_SIZE;
         }
         else {
             target += mapper->banks[R2 + (bank - 4)] * CHR_BANK_SIZE;

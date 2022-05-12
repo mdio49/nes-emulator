@@ -334,9 +334,20 @@ void apu_update(apu_t *apu, addrspace_t *cpuas, int hcycles) {
             if (pulse->timer == 0) {
                 pulse->timer = (pulse->timer_high << 8) | pulse->timer_low;
                 pulse->sequencer--;
+
+                if (i == 0) {
+                    apu->pulse1_out[apu->mixer_ptr].clocked = true;
+                    apu->pulse1_out[apu->mixer_ptr].period = pulse->timer;
+                }
+                
             }
             else {
                 pulse->timer--;
+
+                if (i == 0) {
+                    apu->pulse1_out[apu->mixer_ptr].clocked = false;
+                    apu->pulse1_out[apu->mixer_ptr].period = 0;
+                }
             }
 
             // Get the output pulse to send to the mixer.
@@ -452,6 +463,9 @@ void apu_update(apu_t *apu, addrspace_t *cpuas, int hcycles) {
 
         // Get output of DMC.
         dmc = apu->dmc.output;
+
+        apu->pulse1_out[apu->mixer_ptr].vol = pulse1;
+        apu->pulse1_out[apu->mixer_ptr].duty = apu->pulse[0].duty;
 
         // Get mixer output.
         float pulse_out = apu->pulse_table[pulse1 + pulse2];

@@ -218,6 +218,17 @@ typedef struct dmc {
 
 } dmc_t;
 
+typedef struct pulse_out {
+
+    unsigned    period  : 11;
+    unsigned            : 5;
+    unsigned    vol     : 4;
+    unsigned    duty    : 2;
+    unsigned    clocked : 1;
+    unsigned            : 1;
+
+} pulse_out_t;
+
 /**
  * @brief A struct that contains data for an APU.
  */
@@ -263,6 +274,9 @@ typedef struct apu {
     unsigned        irq_occurred    : 1;    // Set if an IRQ has already occurred for the current frame.
     unsigned        irq_flag        : 1;    // Set if an IRQ should occur.
     unsigned                        : 2;    
+
+    pulse_out_t     pulse1_out[MIXER_BUFFER];
+    pulse_out_t     pulse2_out[MIXER_BUFFER];
 
     float           mixer_out[MIXER_BUFFER];
     uint32_t        mixer_ptr;

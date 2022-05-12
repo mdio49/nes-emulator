@@ -163,11 +163,11 @@ static void monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vadd
                 }
             }
         }
-        else if (vaddr == PPU_STATUS) {
+        else if (!write && vaddr == PPU_STATUS) {
             // Reset write toggle flag.
             ((struct mmc3_data*)mapper->data)->w = false;
         }
-        else if (vaddr == PPU_ADDR) {
+        else if (write && vaddr == PPU_ADDR) {
             // Monitor changes to A12 via writes to PPUADDR.
             struct mmc3_data *data = (struct mmc3_data*)mapper->data;
             if (!data->w) {

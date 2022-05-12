@@ -332,9 +332,10 @@ void ppu_render(ppu_t *ppu, int cycles) {
                             ppu->status.hit = 1;
                         }
 
-                        // Decide whether it should override the background.
+                        // At this stage, if there is an opaque background pixel and the sprite's priority bit is set,
+                        // then the background pixel should be drawn regardless of the priority of any remaining sprites.
                         if (bkg > 0 && ppu->oam_attr[i].priority)
-                            continue;
+                            break;
                         
                         // Update the color and break as any subsequent sprites would be displayed behind this sprite.
                         col_index = ppu->spr_palette[ppu->oam_attr[i].palette * 3 + spr - 1];

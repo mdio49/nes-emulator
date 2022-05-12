@@ -7,19 +7,27 @@
 #include <prog.h>
 #include <stdbool.h>
 
+typedef enum tv_sys {
+    TV_SYS_NTSC,
+    TV_SYS_PAL
+} tv_sys_t;
+
 typedef struct handlers {
 
-    bool        interrupted;
-    bool        running;
+    /* system flags */
+    bool        interrupted;                            // Set if emulation is currently paused.
+    bool        running;                                // Set if the system is currently running.
 
-    void        (*before_execute)(operation_t ins);
-    void        (*after_execute)(operation_t ins);
+    /* cpu handlers */
+    void        (*before_execute)(operation_t ins);     // Run before an instruction is executed.
+    void        (*after_execute)(operation_t ins);      // Run after an instruction is executed.
+
+    /* ppu handlers */
+    void        (*update_screen)(const char *data);     // Flushes the PPU data to the screen.
     
-    void        (*update_screen)(const char *data);
-    void        (*flush_apu)(const float *data, int len);
-    
-    uint8_t     (*poll_input_p1)(void);
-    uint8_t     (*poll_input_p2)(void);
+    /* input handlers */
+    uint8_t     (*poll_input_p1)(void);                 // Polls for input for player 1.
+    uint8_t     (*poll_input_p2)(void);                 // Polls for input for player 2.
 
 } handlers_t;
 
@@ -59,5 +67,6 @@ extern apu_t    *apu;                   // The APU.
 extern cpu_t    *cpu;                   // The CPU.
 extern ppu_t    *ppu;                   // The PPU.
 extern prog_t   *curprog;               // The cartridge inserted into the system.
+extern tv_sys_t tv_sys;                 // TV system used.
 
 #endif

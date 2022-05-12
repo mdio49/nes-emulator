@@ -13,6 +13,7 @@ apu_t *apu = NULL;
 cpu_t *cpu = NULL;
 ppu_t *ppu = NULL;
 prog_t *curprog = NULL;
+tv_sys_t tv_sys = TV_SYS_NTSC;
 
 void sys_poweron(void) {
     /* Create CPU and PPU. */

@@ -32,13 +32,14 @@ static void load_ines(prog_t *prog, const char *src) {
 
     // Decode remaining flags depending on format.
     ines_flag8_t flag8 = { .bits = (uint8_t)src[8] };
-    //ines_flag9_t flag9 = { .bits = (uint8_t)src[9] };
+    ines_flag9_t flag9 = { .bits = (uint8_t)src[9] };
     if (prog->header.format == 2) {
         printf("Emulator does not support NES 2.0 file format.\n");
         exit(1);
     }
     else {
         prog->header.prg_ram_size = flag8.flags.prg_ram_size;
+        prog->header.tv_sys = flag9.flags.tv_sys;
     }
 
     // Prepare copying of data.

@@ -221,7 +221,8 @@ typedef struct dmc {
 typedef struct pulse_out {
 
     unsigned    period  : 11;
-    unsigned            : 5;
+    unsigned    step    : 3;
+    unsigned            : 2;
     unsigned    vol     : 4;
     unsigned    duty    : 2;
     unsigned    clocked : 1;
@@ -275,8 +276,8 @@ typedef struct apu {
     unsigned        irq_flag        : 1;    // Set if an IRQ should occur.
     unsigned                        : 2;    
 
-    pulse_out_t     pulse1_out[MIXER_BUFFER];
-    pulse_out_t     pulse2_out[MIXER_BUFFER];
+    //pulse_out_t     pulse1_out[MIXER_BUFFER];
+    //pulse_out_t     pulse2_out[MIXER_BUFFER];
 
     float           mixer_out[MIXER_BUFFER];
     uint32_t        mixer_ptr;

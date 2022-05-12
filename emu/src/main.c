@@ -183,6 +183,11 @@ void run_bin(const char *path, bool test) {
         }
     }
 
+    // Set to PAL if there is an '(E)' in the filename.
+    if (strstr(path, "(E)")) {
+        tv_sys = TV_SYS_PAL;
+    }
+
     // Attach the program to the system.
     sys_insert(prog);
 

@@ -20,7 +20,7 @@
 static mapper_t *init(void);
 
 static void insert(mapper_t *mapper, prog_t *prog);
-static void write(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t value);
+static void monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vaddr, uint8_t value, bool write);
 
 static uint8_t *map_prg(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset);
 static uint8_t *map_chr(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset);
@@ -36,7 +36,7 @@ static mapper_t *init(void) {
 
     /* set functions */
     mapper->insert = insert;
-    mapper->write = write;
+    mapper->monitor = monitor;
 
     /* set mapper rules */
     mapper->map_prg = map_prg;
@@ -73,6 +73,35 @@ static void insert(mapper_t *mapper, prog_t *prog) {
     as_add_segment(mapper->ppuas, NAMETABLE1, NT_SIZE, mapper->vram, AS_READ | AS_WRITE);
     as_add_segment(mapper->ppuas, NAMETABLE2, NT_SIZE, mapper->vram, AS_READ | AS_WRITE); 
     as_add_segment(mapper->ppuas, NAMETABLE3, NT_SIZE, mapper->vram, AS_READ | AS_WRITE);
+}
+
+static void monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vaddr, uint8_t value, bool write) {
+    if (!write)
+        return;
+    if (as != mapper->cpuas)
+        return;
+    if (vaddr < PRG_ROM_START)
+        return;
+    
+    if ((value & 0x70) > 0) {
+        // Reset shift register.
+        mapper->sr[0] = MMC1_SR_RESET;
+    }
+    else {
+        // Check if the shift register is full.
+        bool full = (mapper->sr[0] & 0x01) > 0;
+        
+        // Shift bit 0 into the register.
+        mapper->sr[0] = ((value & 0x01) << 4) | (mapper->sr[0] >> 1);
+
+        // If the shift register is full, then move the contents of the register into the
+        // bank register and reset the shift register.
+        if (full) {
+            uint8_t bank = (vaddr >> 13) & 0x03;
+            mapper->banks[bank] = mapper->sr[0];
+            mapper->sr[0] = MMC1_SR_RESET;
+        }
+    }
 }
 
 static uint8_t *map_prg(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset) {
@@ -146,29 +175,4 @@ static uint8_t *map_nts(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *t
     }
 
     return target;
-}
-
-static void write(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t value) {
-    if (vaddr < PRG_ROM_START)
-        return;
-    
-    if ((value & 0x70) > 0) {
-        // Reset shift register.
-        mapper->sr[0] = MMC1_SR_RESET;
-    }
-    else {
-        // Check if the shift register is full.
-        bool full = (mapper->sr[0] & 0x01) > 0;
-        
-        // Shift bit 0 into the register.
-        mapper->sr[0] = ((value & 0x01) << 4) | (mapper->sr[0] >> 1);
-
-        // If the shift register is full, then move the contents of the register into the
-        // bank register and reset the shift register.
-        if (full) {
-            uint8_t bank = (vaddr >> 13) & 0x03;
-            mapper->banks[bank] = mapper->sr[0];
-            mapper->sr[0] = MMC1_SR_RESET;
-        }
-    }
 }

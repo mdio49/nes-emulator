@@ -15,7 +15,7 @@
 static mapper_t *init(void);
 
 static void insert(mapper_t *mapper, prog_t *prog);
-static void write(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t value);
+static void monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vaddr, uint8_t value, bool write);
 
 static uint8_t *map_prg(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset);
 
@@ -29,7 +29,7 @@ static mapper_t *init(void) {
 
     /* set functions */
     mapper->insert = insert;
-    mapper->write = write;
+    mapper->monitor = monitor;
 
     /* set mapper rules */
     mapper->map_prg = map_prg;
@@ -72,15 +72,20 @@ static void insert(mapper_t *mapper, prog_t *prog) {
     }
 }
 
-static uint8_t *map_prg(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset) {
-    // If the address targets the first bank, then offset target depending on the value in the bank register.
-    return vaddr < PRG_BANK1 ? target + mapper->banks[0] * PRG_BANK_SIZE : target;
-}
-
-static void write(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t value) {
+static void monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vaddr, uint8_t value, bool write) {
+    if (!write)
+        return;
+    if (as != mapper->cpuas)
+        return;
     if (vaddr < PRG_ROM_START)
         return;
     
     // Bank 0 simply gets set to the value given.
     mapper->banks[0] = value;
 }
+
+static uint8_t *map_prg(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset) {
+    // If the address targets the first bank, then offset target depending on the value in the bank register.
+    return vaddr < PRG_BANK1 ? target + mapper->banks[0] * PRG_BANK_SIZE : target;
+}
+

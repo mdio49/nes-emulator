@@ -77,6 +77,6 @@ void mapper_insert(mapper_t *mapper, prog_t *prog) {
     mapper->insert(mapper, prog);
 }
 
-void mapper_write(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t value) {
-    mapper->write(mapper, prog, vaddr, value);
+void mapper_monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vaddr, uint8_t value, bool write) {
+    mapper->monitor(mapper, prog, as, vaddr, value, write);
 }

@@ -14,8 +14,6 @@ cpu_t *cpu = NULL;
 ppu_t *ppu = NULL;
 prog_t *curprog = NULL;
 
-//static uint8_t spare_memory[0x1FE0];
-
 void sys_poweron(void) {
     /* Create CPU and PPU. */
     apu = apu_create();
@@ -129,10 +127,6 @@ void sys_insert(prog_t *prog) {
     // Set the program as the current program in the NES.
     curprog = prog;
 
-    // Spare memory that may be used by the cartridge (not sure what this
-    // is for yet; haven't implemented enough mappers to figure it out).
-    //as_add_segment(cpu->as, CRTG_START, 0x1FE0, spare_memory, 0x00);
-
     // Initialize the program's mapper.
     mapper_init(prog->mapper, cpu->as, ppu->as, ppu->vram);
 
@@ -186,9 +180,10 @@ void sys_run(handlers_t *handlers) {
         apu_update(apu, cpu->as, cycles);
 
         // Check for IRQ.
-        if (apu->irq_flag) {
+        if (apu->irq_flag || curprog->mapper->irq) {
             //printf("IRQ %lld ~ %lld\n", cpu->cycles, cpu->cycles + cycles);
             apu->irq_flag = false;
+            curprog->mapper->irq = false;
             cpu_irq(cpu);
 
             // Add 7 cycles for the IRQ to occur.
@@ -227,8 +222,11 @@ void sys_run(handlers_t *handlers) {
 }
 
 static uint8_t *cpu_resolve_rule(const addrspace_t *as, addr_t vaddr, uint8_t *target, size_t offset) {
-    // Let the mapper remap PRG-ROM.
-    if (vaddr >= PRG_ROM_START) {
+    // Let the mapper remap PRG-ROM and PRG-RAM.
+    if (vaddr >= PRG_RAM_START && vaddr < PRG_ROM_START) {
+        target = curprog->mapper->map_ram(curprog->mapper, curprog, vaddr, target, offset);
+    }
+    else if (vaddr >= PRG_ROM_START) {
         target = curprog->mapper->map_prg(curprog->mapper, curprog, vaddr, target, offset);
     }
 
@@ -236,7 +234,7 @@ static uint8_t *cpu_resolve_rule(const addrspace_t *as, addr_t vaddr, uint8_t *t
 }
 
 static uint8_t *ppu_resolve_rule(const addrspace_t *as, addr_t vaddr, uint8_t *target, size_t offset) {
-    // Let the mapper remap CHR-ROM (i.e. pattern tables).
+    // Let the mapper remap CHR-ROM (i.e. pattern tables) and nametaables.
     if (vaddr < NAMETABLE0) {
         target = curprog->mapper->map_chr(curprog->mapper, curprog, vaddr, target, offset);
     }
@@ -250,6 +248,12 @@ static uint8_t *ppu_resolve_rule(const addrspace_t *as, addr_t vaddr, uint8_t *t
 static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t value, uint8_t mode) {
     bool read = mode & AS_READ;
     bool write = mode & AS_WRITE;
+
+    // Allow the mapper to monitor writes.
+    if (write) {
+        mapper_monitor(curprog->mapper, curprog, cpu->as, vaddr, value, true);
+    }
+
     if ((vaddr & 0xC000) == 0 && (vaddr & 0x2000) > 0) {
         // PPU memory-mapped registers.
         switch (vaddr & 0x2007) {
@@ -283,21 +287,17 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
             case PPU_ADDR:
                 if (write) {
                     ppu->ppuaddr_flags.write = 1;
-                    //printf("w: $%.4x - %.2x\n", vaddr, value);
                 }
                 break;
             case PPU_DATA:
                 if (read) {
                     ppu->ppudata_flags.read = 1;
-                    //printf("r: $%.4x - %.2x\n", vaddr, value);
                 }
                 if (write) {
                     ppu->ppudata_flags.write = 1;
-                    //printf("w: $%.4x - %.2x\n", vaddr, value);
                 }
                 break;
         }
-        //printf("cpu %c: $%.4x - %.2x\n", read ? 'r' : 'w', vaddr, value);
     }
     else if (vaddr >= APU_PULSE1 && vaddr <= APU_DMC + 0x03) {
         // APU memory-mapped registers (excluding status).
@@ -444,10 +444,6 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
                 apu->dmc.start_flag = true;
             }
 
-            // Reset timers.
-            //apu->frame_counter = 0;
-            //apu->step = 0;
-
             value = status.value;
         }
         else if (read) {
@@ -469,8 +465,6 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
 
             // Return the correct value.
             value = (status.d_irq << 7) | (status.f_irq << 6) | (status.dmc << 4) | (status.noise << 3) | (status.tri << 2) | (status.p2 << 1) | status.p1;
-
-            //printf("@%lld %c: $%.4x - %.2x\n", cpu->cycles, read ? 'r' : 'w', vaddr, value);
         }
     }
     else {
@@ -497,8 +491,6 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
                     if (apu->frame.irq) {
                         apu->status.f_irq = false;
                     }
-
-                    //printf("@%lld %c: $%.4x - %.2x\n", cpu->cycles, read ? 'r' : 'w', vaddr, value);
                 }
                 else if (read) {
                     // This is the input from Joypad 2.
@@ -508,22 +500,20 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
         }
     }
 
-    // Cartridge space.
-    if (write && vaddr >= CRTG_START) {
-        // Let the mapper detect the write so that it may update any registers.
-        mapper_write(curprog->mapper, curprog, vaddr, value);
+    // Allow the mapper to monitor reads.
+    if (read) {
+        mapper_monitor(curprog->mapper, curprog, cpu->as, vaddr, value, false);
     }
 
-    //printf("cpu %c: $%.4x - %.2x\n", read ? 'r' : 'w', vaddr, value);
+    //printf("cpu %c: $%.4x - %.2x\n", write ? 'w' : 'r', vaddr, value);
     return value;
 }
 
 static uint8_t ppu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t value, uint8_t mode) {
-    //bool read = mode & AS_READ;
-    //bool write = mode & AS_WRITE;
-    //printf("ppu %c: $%.4x - %.2x\n", read ? 'r' : 'w', vaddr, value);
-    /*if (write && vaddr >= NAMETABLE0 && vaddr < NAMETABLE3 + NT_SIZE) {
-        printf("ppu %c: $%.4x - %.2x\n", read ? 'r' : 'w', vaddr, value);
-    }*/
+    // Allow the mapper to monitor reads and writes.
+    bool write = mode & AS_WRITE;
+    mapper_monitor(curprog->mapper, curprog, ppu->as, vaddr, value, write);
+
+    //printf("ppu %c: $%.4x - %.2x\n", write ? 'w' : 'r', vaddr, value);
     return value;
 }

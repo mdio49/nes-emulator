@@ -34,7 +34,7 @@ struct mapper {
     /* function pointers */
 
     void            (*insert)(mapper_t *mapper, prog_t *prog);
-    void            (*write)(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t value);
+    void            (*monitor)(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vaddr, uint8_t value, bool write);
 
     /* mapper functions */
 
@@ -79,15 +79,19 @@ mapper_t *mapper_create(void);
 void mapper_insert(mapper_t *mapper, prog_t *prog);
 
 /**
- * @brief Invoked when a CPU write occurs in the catridge's address range, allowing
- * the mapper to update its state and perform any bank switching.
+ * @brief Invoked whenever a read or write occurs to either the CPU or PPU's address
+ * space, allowing the mapper to monitor reads and writes on the bus so that it may
+ * update its state and perform any bank switching. As the mapper doesn't have a clock,
+ * this is the only way that the mapper can keep track of its state.
  * 
  * @param mapper The mapper.
  * @param prog The NES program that is using the mapper.
- * @param vaddr The virtual address that was written to.
- * @param value The value that was written.
+ * @param as The address space that was modified.
+ * @param vaddr The virtual address that was accessed.
+ * @param value The value that was read or written.
+ * @param write Set if the access was a write.
  */
-void mapper_write(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t value);
+void mapper_monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vaddr, uint8_t value, bool write);
 
 /* mapper singletons */
 extern const mapper_t nrom, mmc1, uxrom, ines003, mmc3;

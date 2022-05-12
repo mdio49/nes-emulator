@@ -15,7 +15,7 @@
 static mapper_t *init(void);
 
 static void insert(mapper_t *mapper, prog_t *prog);
-static void write(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t value);
+static void monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vaddr, uint8_t value, bool write);
 
 static uint8_t *map_chr(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset);
 
@@ -29,7 +29,7 @@ static mapper_t *init(void) {
 
     /* set functions */
     mapper->insert = insert;
-    mapper->write = write;
+    mapper->monitor = monitor;
 
     /* set mapper rules */
     mapper->map_chr = map_chr;
@@ -74,14 +74,18 @@ static void insert(mapper_t *mapper, prog_t *prog) {
     }
 }
 
-static uint8_t *map_chr(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset) {
-    return target + mapper->banks[0] * CHR_BANK_SIZE; // Offset based on value in bank register.
-}
-
-static void write(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t value) {
+static void monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vaddr, uint8_t value, bool write) {
+    if (!write)
+        return;
+    if (as != mapper->cpuas)
+        return;
     if (vaddr < PRG_ROM_START)
         return;
     
     // Bank 0 gets set to the lower 2 bits of the value given.
     mapper->banks[0] = value & 0x03;
+}
+
+static uint8_t *map_chr(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset) {
+    return target + mapper->banks[0] * CHR_BANK_SIZE; // Offset based on value in bank register.
 }

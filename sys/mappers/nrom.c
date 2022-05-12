@@ -15,7 +15,7 @@
 static mapper_t *init(void);
 
 static void insert(mapper_t *mapper, prog_t *prog);
-static void write(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t value);
+static void monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vaddr, uint8_t value, bool write);
 
 const mapper_t nrom = {
     .init = init
@@ -27,7 +27,7 @@ static mapper_t *init(void) {
 
     /* set functions */
     mapper->insert = insert;
-    mapper->write = write;
+    mapper->monitor = monitor;
     
     return mapper;
 }
@@ -73,6 +73,6 @@ static void insert(mapper_t *mapper, prog_t *prog) {
     }
 }
 
-static void write(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t value) {
+static void monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vaddr, uint8_t value, bool write) {
     // Do nothing.
 }

@@ -47,18 +47,21 @@ struct mmc3_data {
     unsigned    irq_enable  : 1;    // irq enable flag
     unsigned    irq_reload  : 1;    // irq reload flag
     unsigned    old_a12     : 1;
-    unsigned                : 5;
+    unsigned    w           : 1;
+    unsigned                : 4;
 
 };
 
 static mapper_t *init(void);
 
 static void insert(mapper_t *mapper, prog_t *prog);
-static void write(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t value);
+static void monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vaddr, uint8_t value, bool write);
 
 static uint8_t *map_prg(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset);
 static uint8_t *map_chr(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset);
 static uint8_t *map_nts(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset);
+
+static void clock_irq_counter(mapper_t *mapper, struct mmc3_data *data);
 
 const mapper_t mmc3 = {
     .init = init
@@ -70,7 +73,7 @@ static mapper_t *init(void) {
 
     /* set functions */
     mapper->insert = insert;
-    mapper->write = write;
+    mapper->monitor = monitor;
 
     /* set mapper rules */
     mapper->map_prg = map_prg;
@@ -116,6 +119,78 @@ static void insert(mapper_t *mapper, prog_t *prog) {
     as_add_segment(mapper->ppuas, NAMETABLE3, NT_SIZE, mapper->vram, AS_READ | AS_WRITE);
 }
 
+static void monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vaddr, uint8_t value, bool write) {
+    if (as == mapper->cpuas) {
+        // Monitor CPU writes to PRG-ROM.
+        if (write && vaddr >= PRG_ROM_START) {
+            if (vaddr % 2 == 0) {
+                // even addresses
+                if (vaddr < 0xA000) {
+                    // bank select
+                    mapper->banks[0] = value;
+                }
+                else if (vaddr < 0xC000) {
+                    // mirroring
+                    mapper->banks[MIRROR_INDEX] = value;
+                }
+                else if (vaddr < 0xE000) {
+                    // irq latch
+                    ((struct mmc3_data*)mapper->data)->irq_latch = value;
+                }
+                else {
+                    // irq disable
+                    ((struct mmc3_data*)mapper->data)->irq_enable = false;
+                }
+            }
+            else {
+                // odd addresses
+                if (vaddr < 0xA000) {
+                    // bank data
+                    uint8_t r = mapper->banks[0] & 0x07;
+                    mapper->banks[R0 + r] = value;
+                }
+                else if (vaddr < 0xC000) {
+                    // prg-ram protect (not used)
+                    mapper->banks[PROTECT_INDEX] = value;
+                }
+                else if (vaddr < 0xE000) {
+                    // irq reload
+                    ((struct mmc3_data*)mapper->data)->irq_reload = true;
+                }
+                else {
+                    // irq enable
+                    ((struct mmc3_data*)mapper->data)->irq_enable = true;
+                }
+            }
+        }
+        else if (vaddr == PPU_STATUS) {
+            // Reset write toggle flag.
+            ((struct mmc3_data*)mapper->data)->w = false;
+        }
+        else if (vaddr == PPU_ADDR) {
+            // Monitor changes to A12 via writes to PPUADDR.
+            struct mmc3_data *data = (struct mmc3_data*)mapper->data;
+            if (!data->w) {
+                bool a12 = (value & 0x10) > 0;
+                if (!data->old_a12 && a12) {
+                    clock_irq_counter(mapper, data);
+                }
+                data->old_a12 = a12;
+            }
+            data->w = !data->w;
+        }
+    }
+    else {
+        // Monitor PPU reads and writes to CHR memory.
+        struct mmc3_data *data = (struct mmc3_data*)mapper->data;
+        bool a12 = (vaddr & 0x1000) > 0;
+        if (!data->old_a12 && a12) {
+            clock_irq_counter(mapper, data);
+        }
+        data->old_a12 = a12;
+    }
+}
+
 static uint8_t *map_prg(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset) {
     // Last bank is always fixed.
     if (vaddr >= PRG_BANK3)
@@ -153,25 +228,6 @@ static uint8_t *map_prg(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *t
 }
 
 static uint8_t *map_chr(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset) {
-    struct mmc3_data *data = (struct mmc3_data*)mapper->data;
-    if (!data->old_a12 && (vaddr & 0x1000) > 0) {
-        if (data->irq_reload) {
-            data->irq_counter = data->irq_latch;
-        }
-        else {
-            if (data->irq_counter == 0) {
-                data->irq_counter = data->irq_latch;
-                if (data->irq_enable) {
-                    mapper->irq = true;
-                }
-            }
-            else {
-                data->irq_counter--;
-            }
-        }
-    }
-    data->old_a12 = (vaddr & 0x1000) > 0;
-
     uint8_t bank = vaddr / CHR_BANK_SIZE;
     if ((mapper->banks[0] & 0x80) > 0) {
         // R2 - R3 - R4 - R5 - R0/R0 - R1/R1
@@ -217,47 +273,20 @@ static uint8_t *map_nts(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *t
     return target;
 }
 
-static void write(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t value) {
-    if (vaddr < PRG_ROM_START)
-        return;
-
-    if (vaddr % 2 == 0) {
-        // even addresses
-        if (vaddr < 0xA000) {
-            // bank select
-            mapper->banks[0] = value;
-        }
-        else if (vaddr < 0xC000) {
-            // mirroring
-            mapper->banks[MIRROR_INDEX] = value;
-        }
-        else if (vaddr < 0xE000) {
-            // irq latch
-            ((struct mmc3_data*)mapper->data)->irq_latch = value;
-        }
-        else {
-            // irq disable
-            ((struct mmc3_data*)mapper->data)->irq_enable = false;
-        }
+static void clock_irq_counter(mapper_t *mapper, struct mmc3_data *data) {
+    if (data->irq_reload) {
+        data->irq_counter = data->irq_latch;
+        data->irq_reload = false;
     }
     else {
-        // odd addresses
-        if (vaddr < 0xA000) {
-            // bank data
-            uint8_t r = mapper->banks[0] & 0x07;
-            mapper->banks[R0 + r] = value;
-        }
-        else if (vaddr < 0xC000) {
-            // prg-ram protect (not used)
-            mapper->banks[PROTECT_INDEX] = value;
-        }
-        else if (vaddr < 0xE000) {
-            // irq reload
-            ((struct mmc3_data*)mapper->data)->irq_reload = true;
+        if (data->irq_counter == 0) {
+            data->irq_counter = data->irq_latch;
+            if (data->irq_enable) {
+                mapper->irq = true;
+            }
         }
         else {
-            // irq enable
-            ((struct mmc3_data*)mapper->data)->irq_enable = true;
+            data->irq_counter--;
         }
     }
 }

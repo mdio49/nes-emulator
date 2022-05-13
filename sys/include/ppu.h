@@ -29,6 +29,7 @@
 
 #define SCREEN_WIDTH    256
 #define SCREEN_HEIGHT   240
+#define PIXEL_STRIDE    3
 
 #define NT_ROWS     30
 #define NT_COLS     32
@@ -41,6 +42,8 @@
 
 #define SCANLINE_END    340
 #define N_SCANLINES     260
+
+#define PPU_BUFFER      (SCREEN_WIDTH * SCREEN_HEIGHT * PIXEL_STRIDE)
 
 typedef struct {
     unsigned    read    : 1;
@@ -206,14 +209,14 @@ typedef struct ppu {
 
     /* variables used for background rendering */
 
-    int16_t     draw_x, draw_y;                     // Current screen position of render.
-    char out[SCREEN_WIDTH * SCREEN_HEIGHT * 3];     // Pixel output (3 bytes per pixel; RGB order).
+    int16_t     draw_x, draw_y;         // Current screen position of render.
+    char        out[PPU_BUFFER];        // Pixel output (3 bytes per pixel; RGB order).
 
-    //unsigned    nmi_output      : 1;              // Set if an NMI should occur on the next CPU instruction fetch.
-    unsigned    nmi_occurred    : 1;                // Set if an NMI has already occurred for the current frame.
-    unsigned    nmi_suppress    : 2;                // If set, then NMI will not occur for the given number of PPU cycles.
-    unsigned    vbl_occurred    : 1;                // Set if a vblank just occured and the screen should be redrawn.
-    unsigned    odd_frame       : 1;                // Set if currently on an odd frame.
+    //unsigned    nmi_output      : 1;   // Set if an NMI should occur on the next CPU instruction fetch.
+    unsigned    nmi_occurred    : 1;    // Set if an NMI has already occurred for the current frame.
+    unsigned    nmi_suppress    : 2;    // If set, then NMI will not occur for the given number of PPU cycles.
+    unsigned    vbl_occurred    : 1;    // Set if a vblank just occured and the screen should be redrawn.
+    unsigned    odd_frame       : 1;    // Set if currently on an odd frame.
     unsigned                    : 3;
 
     /* temporary until shift registers work properly */

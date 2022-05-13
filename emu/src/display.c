@@ -8,6 +8,10 @@ static uint64_t last_update = 0;
 static uint64_t frame_counter = 0;
 static uint64_t last_fps = 0;
 
+static bool fullscreen = false;
+
+static void poll_events(void);
+
 bool init_display(void) {
     // Get the main window surface.
 	mainSurface = SDL_GetWindowSurface(mainWindow);
@@ -31,8 +35,7 @@ void free_display(void) {
         SDL_FreeSurface(mainSurface);
 }
 
-void update_screen(const char *data) {
-    // Poll events.
+void poll_events(void) {
     SDL_Event e;
     while (SDL_PollEvent(&e) != 0) {
         switch (e.type) {
@@ -45,22 +48,45 @@ void update_screen(const char *data) {
                 }
                 if (e.key.keysym.scancode == SDL_SCANCODE_R) {
                     sys_reset();
-                } 
+                }
+                if (e.key.keysym.scancode == SDL_SCANCODE_F4) {
+                    SDL_SetWindowFullscreen(mainWindow, !fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+                    fullscreen = !fullscreen;
+                }
                 break;
         }
     }
+}
+
+void update_screen(const char *data) {
+    // Poll events.
+    poll_events();
 
     // Clear the rendering surface.
     SDL_SetRenderDrawColor(mainRenderer, 0, 0, 0, 0);
     SDL_RenderClear(mainRenderer);
 
+    // Get the window size.
+    int Sw, Sh;
+    SDL_GetWindowSize(mainWindow, &Sw, &Sh);
+
+    // Determine the scaling factor.
+    const double sx = (double)Sw / SCREEN_WIDTH;
+    const double sy = (double)Sh / SCREEN_HEIGHT;
+    const double scale = sx < sy ? sx : sy;
+
+    // Determine the viewport offset.
+    const int Vx = (Sw / scale - SCREEN_WIDTH) / 2;
+    const int Vy = (Sh / scale - SCREEN_HEIGHT) / 2;
+
     // Update and copy the texture to the surface.
-    SDL_Rect rect = { 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT };
-    SDL_UpdateTexture(screen, NULL, data, 3 * SCREEN_WIDTH);
+    SDL_Rect rect = { Vx, Vy, SCREEN_WIDTH, SCREEN_HEIGHT };
+    SDL_UpdateTexture(screen, NULL, data, PIXEL_STRIDE * SCREEN_WIDTH);
     SDL_RenderCopy(mainRenderer, screen, NULL, &rect);
 
     // Present the rendering surface.
-    SDL_RenderSetScale(mainRenderer, SCREEN_SCALE, SCREEN_SCALE);
+    SDL_RenderSetLogicalSize(mainRenderer, Sw, Sh);
+    SDL_RenderSetScale(mainRenderer, scale, scale);
     SDL_RenderPresent(mainRenderer);
 
     // Add a delay for the next frame.

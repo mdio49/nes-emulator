@@ -15,6 +15,9 @@
 #define FRAME_RATE      60
 #define TIME_STEP       (1000.0 / FRAME_RATE)
 
+#define WINDOW_WIDTH    (SCREEN_WIDTH * SCREEN_SCALE)
+#define WINDOW_HEIGHT   (SCREEN_HEIGHT * SCREEN_SCALE)
+
 #define HIST_LEN        50
 
 typedef struct history {

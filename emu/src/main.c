@@ -19,7 +19,6 @@ int status = 0x00;
 int msg_ptr = 0x6004;
 
 bool test = false;
-bool no_audio = false;
 FILE *log_fp = NULL;
 
 int main(int argc, char *argv[]) {
@@ -47,9 +46,6 @@ int main(int argc, char *argv[]) {
         }
         else if (strcmp(arg, "-nogui") == 0) {
             nogui = true;
-        }
-        else if (strcmp(arg, "-m") == 0) {
-            no_audio = true;
         }
         else if (!strprefix(arg, "-") && path == NULL) {
             path = arg;
@@ -81,14 +77,14 @@ bool init(void) {
 	}
 
     // Create the main window.
-	mainWindow = SDL_CreateWindow("NES Emulator (FPS: 0)", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH * SCREEN_SCALE, SCREEN_HEIGHT * SCREEN_SCALE, SDL_WINDOW_SHOWN);
+	mainWindow = SDL_CreateWindow("NES Emulator (FPS: 0)", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
 	if (mainWindow == NULL) {
 		printf("Window could not be created! SDL_Error: %s\n", SDL_GetError());
 		return false;
 	}
 
     // Initialize subsystems.
-    if (!no_audio && !init_audio()) {
+    if (!init_audio()) {
         return false;
     }
     if (!init_display()) {

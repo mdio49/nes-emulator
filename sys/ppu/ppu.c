@@ -81,7 +81,7 @@ static inline uint8_t get_tile_value(uint8_t p1, uint8_t p2, uint8_t fine_x) {
 }
 
 static inline void put_pixel(ppu_t *ppu, int screen_x, int screen_y, color_t color) {
-    int index = (screen_x + screen_y * SCREEN_WIDTH) * 3;
+    int index = (screen_x + screen_y * SCREEN_WIDTH) * PIXEL_STRIDE;
     ppu->out[index + OUT_R] = color.red;
     ppu->out[index + OUT_G] = color.green;
     ppu->out[index + OUT_B] = color.blue;

@@ -24,6 +24,11 @@ bool init_audio(void) {
     return true;
 }
 
+void free_audio(void) {
+    // Close the audio device.
+    SDL_CloseAudio();
+}
+
 static void audio_callback(void *udata, uint8_t *stream, int len) {
     float *output = (float*)stream;
 

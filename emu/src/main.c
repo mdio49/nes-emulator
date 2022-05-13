@@ -110,6 +110,9 @@ void exit_handler() {
     // Turn off the system.
     sys_poweroff();
 
+    // Free the audio.
+    free_audio();
+
     // Free the display.
     free_display();
 

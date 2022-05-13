@@ -34,6 +34,7 @@ bool init_display(void);
 
 /* free functions */
 
+void free_audio(void);
 void free_display(void);
 
 /* run functions */

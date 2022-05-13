@@ -30,7 +30,6 @@ int main(int argc, char *argv[]) {
     sys_poweron();
 
     // Parse CL arguments.
-    bool nogui = false;
     char *path = NULL;
     for (int i = 1; i < argc; i++) {
         char *arg = argv[i];
@@ -44,24 +43,21 @@ int main(int argc, char *argv[]) {
         else if (strcmp(arg, "-l") == 0) {
             log_fp = fopen("emu.log", "w");
         }
-        else if (strcmp(arg, "-nogui") == 0) {
-            nogui = true;
-        }
         else if (!strprefix(arg, "-") && path == NULL) {
             path = arg;
         }
         else {
-            printf("Usage: %s [<path|-x hex...>] [-l] [-m] [-nogui] [-t]\n", argv[0]);
+            printf("Usage: %s [<path|-x hex...>] [-l] [-t]\n", argv[0]);
             return EXIT_FAILURE;
         }
     }
     
     if (path == NULL) {
-        printf("Usage: %s [<path|-x hex...>] [-l] [-m] [-nogui] [-t]\n", argv[0]);
+        printf("Usage: %s [<path|-x hex...>] [-l] [-t]\n", argv[0]);
         return EXIT_FAILURE;
     }
 
-    if (!nogui && !init()) {
+    if (!init()) {
 		return EXIT_FAILURE;
     }
 
@@ -82,6 +78,9 @@ bool init(void) {
 		printf("Window could not be created! SDL_Error: %s\n", SDL_GetError());
 		return false;
 	}
+
+    // Ensure that the window can't be made smaller than the raw output of the PPU.
+    SDL_SetWindowMinimumSize(mainWindow, SCREEN_WIDTH, SCREEN_HEIGHT);
 
     // Initialize subsystems.
     if (!init_audio()) {

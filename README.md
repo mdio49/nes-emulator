@@ -43,7 +43,6 @@ The window may also be resized to any scale and put into fullscreen mode by pres
 
 ## References
 1. NESdev Wiki, https://www.nesdev.org/wiki/Nesdev_Wiki
-2. NESdev Forums, https://forums.nesdev.org/
-4. 6502 Instruction Set, https://www.masswerk.at/6502/6502_instruction_set.html
-5. Easy 6502 (for playing around and learning 6502), https://skilldrick.github.io/easy6502/
-6. Collection of test ROMs, https://github.com/christopherpow/nes-test-roms
+2. 6502 Instruction Set, https://www.masswerk.at/6502/6502_instruction_set.html
+3. Easy 6502 (for playing around and learning 6502), https://skilldrick.github.io/easy6502/
+4. Collection of test ROMs, https://github.com/christopherpow/nes-test-roms

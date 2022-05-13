@@ -1,5 +1,5 @@
 # NES Emulator
-An NES emulator written in C, developed for educational purposes. Code is written for clarity and understanding rather than performance and cycle-perfect accuracy. Currently only has proper support for NTSC ROMs, however PAL ROMs are still playable.
+An NES emulator written in C, developed for educational purposes. Code is written for clarity and understanding rather than performance and cycle-perfect accuracy.
 
 ## Compilation Instructions
 The emulator must be compiled from source, which requires `gcc` and `make` to be available on your platform. Has only been tested on a Windows 10 PC but it should work on other platforms.
@@ -9,7 +9,7 @@ The emulator must be compiled from source, which requires `gcc` and `make` to be
 4. If the build succeeded, then the output should be `emu`, potentially with a file extension that depends on your operating system.
 
 ## Usage Instructions
-Once you have a copy of the emulator, you can run it through the terminal by providing a ROM as the first command line argument, (i.e. `./emu <ROM>`). The emulator provides support up to as many mappers as it has implemented. If a particular mapper is not supported, then a message will be printed in the terminal and the emulator will not attempt to execute the ROM.
+Once you have a copy of the emulator, you can run it through the terminal by providing a ROM as the first command line argument, (i.e. `./emu <ROM>`). The emulator provides support up to as many mappers as it has implemented. If a particular mapper is not supported, then a message will be printed in the terminal and the emulator will not attempt to execute the ROM. Moreover, as the emulator has only been written to conform to NTSC timings, NTSC ROMs will generally work better than PAL ROMs, however PAL ROMs are still playable.
 
 There are other flags that may be included:
 - `-l`: Logs all CPU instructions to a file named `emu.log`. Will significantly slow down the emulator. Useful only for debugging purposes.
@@ -36,7 +36,7 @@ The window may also be resized to any scale and put into fullscreen mode by pres
 ## Possible Future Plans
 - Add more mappers.
 - Improve cycle accuracy.
-- Implement PAL and Dendy support.
+- Implement PAL and Dendy timings.
 - Implement support for the NES 2.0 file format.
 - Use harmonics for better quality audio.
 

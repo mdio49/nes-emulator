@@ -1,5 +1,5 @@
 # NES Emulator
-An NES emulator written in C, developed for educational purposes. Code is written for clarity and understanding rather than performance and cycle-perfect accuracy.
+An NES emulator written in C, developed for educational purposes. Code is written for clarity and understanding rather than performance and cycle-perfect accuracy. Currently only has proper support for NTSC ROMs, however PAL ROMs are still playable.
 
 ## Compilation Instructions
 The emulator must be compiled from source, which requires `gcc` and `make` to be available on your platform. Has only been tested on a Windows 10 PC but it should work on other platforms.

@@ -17,7 +17,7 @@ There are other flags that may be included:
 - `-x`: Runs the specific sequence of bytes given after the argument rather than executing a binary file. Does not produce a GUI and will instead print each instruction exeucted and halt once the `BRK` instruction is called. Only interacts with the 6502 CPU implementation and is only useful for very primitive testing.
 
 Keyboard interrupts are also possible in order to pause the emulation. During this state, the following commands can be typed into the terminal:
-- `reset`: Resets the emulator (i.e. invokes the RESET vector on the CPU). Note that this can also be done by pressing the `R` key.
+- `reset`: Resets the emulator. Note that this can also be done by pressing the `R` key.
 - `history`: Displays the last 50 instructions executed.
 - `state`: Dumps the current state of the processor.
 - `continue`: Continues emulation from where it was paused.

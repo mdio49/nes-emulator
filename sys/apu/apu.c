@@ -103,6 +103,10 @@ void apu_destroy(apu_t *apu) {
 void apu_reset(apu_t *apu) {
     // Clear $4015.
     apu->status.value = 0;
+
+    // Reset output buffer.
+    //apu->out.cons = 0;
+    //apu->out.prod = 0;
 }
 
 void apu_update(apu_t *apu, addrspace_t *cpuas, int hcycles) {
@@ -334,20 +338,9 @@ void apu_update(apu_t *apu, addrspace_t *cpuas, int hcycles) {
             if (pulse->timer == 0) {
                 pulse->timer = (pulse->timer_high << 8) | pulse->timer_low;
                 pulse->sequencer--;
-
-                /*if (i == 0) {
-                    apu->pulse1_out[apu->mixer_ptr].clocked = true;
-                    apu->pulse1_out[apu->mixer_ptr].period = pulse->timer;
-                }*/
-                
             }
             else {
                 pulse->timer--;
-
-                /*if (i == 0) {
-                    apu->pulse1_out[apu->mixer_ptr].clocked = false;
-                    apu->pulse1_out[apu->mixer_ptr].period = 0;
-                }*/
             }
 
             // Get the output pulse to send to the mixer.
@@ -464,15 +457,20 @@ void apu_update(apu_t *apu, addrspace_t *cpuas, int hcycles) {
         // Get output of DMC.
         dmc = apu->dmc.output;
 
-        /*apu->pulse1_out[apu->mixer_ptr].vol = pulse1;
-        apu->pulse1_out[apu->mixer_ptr].duty = apu->pulse[0].duty;
-        apu->pulse1_out[apu->mixer_ptr].step = apu->pulse[0].sequencer;*/
-
         // Get mixer output.
         float pulse_out = apu->pulse_table[pulse1 + pulse2];
         float tnd_out = apu->tnd_table[triangle][noise][dmc];
-        apu->mixer_out[apu->mixer_ptr] = pulse_out + tnd_out;
-        apu->mixer_ptr = (apu->mixer_ptr + 1) % MIXER_BUFFER;
+
+        // Block thread while producer pointer is too far ahead.
+        int delta;
+        do {
+            delta = (MIXER_BUFFER + apu->out.prod - apu->out.cons) % MIXER_BUFFER;
+        }
+        while (delta > MIXER_MAX_DELTA);
+
+        // Place output into buffer.
+        apu->out.buffer[apu->out.prod] = pulse_out + tnd_out;
+        apu->out.prod = (apu->out.prod + 1) % MIXER_BUFFER;
 
         cycles--;
     }

@@ -5,15 +5,23 @@
 #include <stdbool.h>
 #include <vm.h>
 
-#define APU_PULSE1      0x4000
-#define APU_PULSE2      0x4004
-#define APU_TRIANGLE    0x4008
-#define APU_NOISE       0x400C
-#define APU_DMC         0x4010
-#define APU_STATUS      0x4015
+#define APU_PULSE1          0x4000
+#define APU_PULSE2          0x4004
+#define APU_TRIANGLE        0x4008
+#define APU_NOISE           0x400C
+#define APU_DMC             0x4010
+#define APU_STATUS          0x4015
 
-#define QUARTER_FRAME   3728
-#define MIXER_BUFFER    65536
+#define QUARTER_FRAME       3728
+#define MIXER_BUFFER        65536
+#define MIXER_MAX_DELTA     32768
+
+typedef struct mixer_buffer {
+
+    uint32_t    prod, cons;             // Producer and consumer pointers.
+    float       buffer[MIXER_BUFFER];   // Output ring buffer.
+
+} mixer_buffer_t;
 
 typedef struct envelope {
 
@@ -218,18 +226,6 @@ typedef struct dmc {
 
 } dmc_t;
 
-typedef struct pulse_out {
-
-    unsigned    period  : 11;
-    unsigned    step    : 3;
-    unsigned            : 2;
-    unsigned    vol     : 4;
-    unsigned    duty    : 2;
-    unsigned    clocked : 1;
-    unsigned            : 1;
-
-} pulse_out_t;
-
 /**
  * @brief A struct that contains data for an APU.
  */
@@ -267,6 +263,7 @@ typedef struct apu {
     } frame;
 
     /* other variables */
+
     int16_t         frame_counter;          // The frame counter.
     uint8_t         frame_reset;            // Number of CPU cycles to reset timer.
 
@@ -276,14 +273,10 @@ typedef struct apu {
     unsigned        irq_flag        : 1;    // Set if an IRQ should occur.
     unsigned                        : 2;    
 
-    //pulse_out_t     pulse1_out[MIXER_BUFFER];
-    //pulse_out_t     pulse2_out[MIXER_BUFFER];
-
-    float           mixer_out[MIXER_BUFFER];
-    uint32_t        mixer_ptr;
-
     float           pulse_table[31];        // Pulse output lookup table.
     float           tnd_table[16][16][128]; // Triangle-noise-DMC output lookup table.
+
+    mixer_buffer_t  out;                    // APU mixer output.
 
 } apu_t;
 

@@ -11,12 +11,11 @@
 #define SDL_MAIN_HANDLED
 #include <sdl.h>
 
-#define SCREEN_SCALE    3
-#define FRAME_RATE      60
-#define TIME_STEP       (1000.0 / FRAME_RATE)
+#define max(a,b) (((a) > (b)) ? (a) : (b))
+#define min(a,b) (((a) < (b)) ? (a) : (b))
 
-#define WINDOW_WIDTH    (SCREEN_WIDTH * SCREEN_SCALE)
-#define WINDOW_HEIGHT   (SCREEN_HEIGHT * SCREEN_SCALE)
+#define WINDOW_WIDTH    (SCREEN_WIDTH * 3)
+#define WINDOW_HEIGHT   (SCREEN_HEIGHT * 3)
 
 #define HIST_LEN        50
 

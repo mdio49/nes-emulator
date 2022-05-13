@@ -7,6 +7,9 @@
 #include <prog.h>
 #include <stdbool.h>
 
+#define F_CPU_NTSC  1789773
+#define F_CPU_PAL   1662607
+
 typedef enum tv_sys {
     TV_SYS_NTSC,
     TV_SYS_PAL

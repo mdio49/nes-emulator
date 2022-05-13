@@ -1,16 +1,15 @@
 #include <emu.h>
 
+static void poll_events(void);
+
 static SDL_Surface *mainSurface = NULL;
 static SDL_Renderer *mainRenderer = NULL;
 static SDL_Texture *screen = NULL;
 
-static uint64_t last_update = 0;
 static uint64_t frame_counter = 0;
 static uint64_t last_fps = 0;
 
 static bool fullscreen = false;
-
-static void poll_events(void);
 
 bool init_display(void) {
     // Get the main window surface.
@@ -73,7 +72,7 @@ void update_screen(const char *data) {
     // Determine the scaling factor.
     const double sx = (double)Sw / SCREEN_WIDTH;
     const double sy = (double)Sh / SCREEN_HEIGHT;
-    const double scale = sx < sy ? sx : sy;
+    const double scale = min(sx, sy);
 
     // Determine the viewport offset.
     const int Vx = (Sw / scale - SCREEN_WIDTH) / 2;
@@ -89,18 +88,10 @@ void update_screen(const char *data) {
     SDL_RenderSetScale(mainRenderer, scale, scale);
     SDL_RenderPresent(mainRenderer);
 
-    // Add a delay for the next frame.
-    uint64_t delta = 0;
-    while (delta < TIME_STEP) {
-        uint64_t ticks = SDL_GetTicks64();
-        delta += ticks - last_update;
-        last_update = ticks;
-    }
-
     // Keep track of the FPS.
     frame_counter++;
     uint64_t ticks = SDL_GetTicks64();
-    delta = ticks - last_fps;
+    uint64_t delta = ticks - last_fps;
     if (delta >= 1000) {
         char title[50];
         sprintf(title, "NES Emulator (FPS: %lld)", frame_counter);

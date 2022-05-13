@@ -13,7 +13,7 @@ Once you have a copy of the emulator, you can run it through the terminal by pro
 
 There are other flags that may be included:
 - `-l`: Logs all CPU instructions to a file named `emu.log`. Will significantly slow down the emulator. Useful only for debugging purposes.
-- `-t`: Runs the emulator in test mode, printing output to the terminal based on memory at $6004 in accordance with the standard tests. The emulator will automatically halt once the test is complete (i.e. it has a status at $6000 that isn't 80 or 81).
+- `-t`: Runs the emulator in test mode, printing output to the terminal based on memory at $6004 in accordance with the standard tests. The emulator will automatically halt once the test is complete (i.e. it has a status at $6000 that isn't $80 or $81).
 - `-x`: Runs the specific sequence of bytes given after the argument rather than executing a binary file. Does not produce a GUI and will instead print each instruction exeucted and halt once the `BRK` instruction is called. Only interacts with the 6502 CPU implementation and is only useful for very primitive testing.
 
 Keyboard interrupts are also possible in order to pause the emulation. During this state, the following commands can be typed into the terminal:
@@ -35,6 +35,7 @@ The window may also be resized to any scale and put into fullscreen mode by pres
 
 ## Possible Future Plans
 - Add more mappers.
+- Add P2 joypad support.
 - Improve cycle accuracy.
 - Implement PAL and Dendy support.
 - Implement support for the NES 2.0 file format.

@@ -14,7 +14,7 @@ Once you have a copy of the emulator, you can run it through the terminal by pro
 There are other flags that may be included:
 - `-l`: Logs all CPU instructions to a file `emu.log`. Will significantly slow down the emulator. Useful only for debugging purposes.
 - `-t`: Runs the emulator in test mode, printing output to the terminal based on memory at $6004 in accordance with the standard tests. The emulator will automatically halt once the test is complete (i.e. it has a status at $6000 that isn't 80 or 81).
-- `-x`: Runs the specific sequence of bytes given after the argument rather than executing a binary file. Does not produce a GUI and will instead print each instruction exeucted and halt once the `BRK` instruction is called. Only useful for very primitive testing.
+- `-x`: Runs the specific sequence of bytes given after the argument rather than executing a binary file. Does not produce a GUI and will instead print each instruction exeucted and halt once the `BRK` instruction is called. Only interacts with the 6502 CPU implementation and is only useful for very primitive testing.
 
 Keyboard interrupts are also possible in order to pause the emulation. During this state, the following commands can be typed into the terminal:
 - `reset`: Resets the emulator (i.e. invokes the RESET vector on the CPU). Note that this can also be done by pressing the `R` key.

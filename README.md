@@ -1,7 +1,7 @@
 # NES Emulator
 An NES emulator written in C, developed for educational purposes. Code is written for clarity and understanding rather than performance and cycle-perfect accuracy.
 
-## Compilation Instrucitons
+## Compilation Instructions
 The emulator must be compiled from source, which requires `gcc` and `make` to be available on your platform. Has only been tested on a Windows 10 PC but it should work on other platforms.
 1. Download the repository into a new folder.
 2. Download the latest version of [SDL2](https://www.libsdl.org/) and place the SDL2.dll in the root of the working directory.

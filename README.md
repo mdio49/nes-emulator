@@ -9,7 +9,7 @@ The emulator must be compiled from source, which requires `gcc` and `make` to be
 4. If the build succeeded, then the output should be `emu`, potentially with a file extension that depends on your operating system.
 
 ## Usage Instructions
-Once you have a copy of the emulator, you can run it through the terminal by providing a ROM as the first command line argument, (i.e. `./emu <ROM>`). The emulator provides support up to as many mappers as it has implemented. If a particular mapper is not supported, then a message will be printed in the terminal and the emulator will not attempt to execute the ROM. Moreover, as the PPU and APU were written using NTSC timings, NTSC ROMs will generally work better than PAL ROMs, however PAL ROMs are still playable.
+Once you have a copy of the emulator, you can run it through the terminal by providing a ROM as the first command line argument, (i.e. `./emu <ROM>`). The emulator provides support up to as many mappers as it has implemented. If a particular mapper is not supported, then a message will be printed in the terminal and the emulator will not attempt to execute the ROM. Moreover, as the PPU and APU have only been written using NTSC timings, NTSC ROMs will generally work better than PAL ROMs, however PAL ROMs are still playable.
 
 There are other flags that may be included:
 - `-l`: Logs all CPU instructions to a file named `emu.log`. Will significantly slow down the emulator. Useful only for debugging purposes.

@@ -18,7 +18,11 @@ typedef struct prog {
     const char      *inst_rom;          // play-choice INST-ROM data (may not be present; 0 or 8192 bytes)
     const char      *prom;              // play-choice PROM data (may not be present; 0 or 16 bytes)
 
-    uint8_t         prg_ram[0x2000];    // PRG-RAM (may not be used)
+    uint32_t        prg_rom_sz;         // Size of PRG-ROM (should be divisible by 16K).
+    uint32_t        prg_ram_sz;         // Size of PRG-RAM (should be divisible by 8K).
+    uint32_t        chr_sz;             // Size of CHR-ROM or CHR-RAM (whichever is used; divisible by 8K).
+
+    uint8_t         prg_ram[0x2000 * 4];    // PRG-RAM (may not be used)
     uint8_t         chr_ram[0x2000];    // CHR-RAM (may not be used)
 
 } prog_t;

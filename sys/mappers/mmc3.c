@@ -99,7 +99,7 @@ static void insert(mapper_t *mapper, prog_t *prog) {
     as_add_segment(mapper->cpuas, PRG_BANK2, PRG_BANK_SIZE, (uint8_t*)prog->prg_rom, AS_READ);
 
     // Fourth bank is fixed to the last bank.
-    const int nbanks = prog->header.prg_rom_size * INES_PRG_ROM_UNIT / PRG_BANK_SIZE;
+    const int nbanks = prog->prg_rom_sz / PRG_BANK_SIZE;
     as_add_segment(mapper->cpuas, PRG_BANK3, PRG_BANK_SIZE, (uint8_t*)prog->prg_rom + (nbanks - 1) * PRG_BANK_SIZE, AS_READ);
 
     // Have 8 separate 1KB CHR segments for both possible arrangements of CHR banks.
@@ -200,7 +200,7 @@ static uint8_t *map_prg(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *t
     if ((mapper->banks[SELECT_INDEX] & 0x40) > 0) {
         // Bank 0 fixed to second last bank.
         if (vaddr < PRG_BANK1) {        // Bank 0
-            const int nbanks = prog->header.prg_rom_size * INES_PRG_ROM_UNIT / PRG_BANK_SIZE;
+            const int nbanks = prog->prg_rom_sz / PRG_BANK_SIZE;
             target += (nbanks - 2) * PRG_BANK_SIZE;
         }
         else if (vaddr < PRG_BANK2) {   // Bank 1
@@ -219,7 +219,7 @@ static uint8_t *map_prg(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *t
             target += mapper->banks[R7] * PRG_BANK_SIZE;
         }
         else {                          // Bank 2
-            const int nbanks = prog->header.prg_rom_size * INES_PRG_ROM_UNIT / PRG_BANK_SIZE;
+            const int nbanks = prog->prg_rom_sz / PRG_BANK_SIZE;
             target += (nbanks - 2) * PRG_BANK_SIZE;
         }
     }

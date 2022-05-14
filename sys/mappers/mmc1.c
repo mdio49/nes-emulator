@@ -2,6 +2,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <ppu.h>
+#include <sys.h>
+
+/**
+ * bank registers:
+ * 0 - control
+ * 1 - CHR bank 0
+ * 2 - CHR bank 1
+ * 3 - PRG bank
+ */
 
 #define N_BANKS         4
 #define MMC1_SR_RESET   0x10
@@ -17,11 +26,19 @@
 #define PRG_BANK1       0xC000
 #define PRG_BANK_SIZE   0x4000
 
+struct mmc1_data {
+
+    uint8_t     chr_mask;
+    uint8_t     prg_ram_bank;
+
+};
+
 static mapper_t *init(void);
 
 static void insert(mapper_t *mapper, prog_t *prog);
 static void monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vaddr, uint8_t value, bool write);
 
+static uint8_t *map_ram(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset);
 static uint8_t *map_prg(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset);
 static uint8_t *map_chr(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset);
 static uint8_t *map_nts(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset);
@@ -39,6 +56,7 @@ static mapper_t *init(void) {
     mapper->monitor = monitor;
 
     /* set mapper rules */
+    mapper->map_ram = map_ram;
     mapper->map_prg = map_prg;
     mapper->map_chr = map_chr;
     mapper->map_nts = map_nts;
@@ -46,6 +64,17 @@ static mapper_t *init(void) {
     /* setup registers */
     mapper->banks = calloc(N_BANKS, sizeof(uint8_t));
     mapper->sr[0] = MMC1_SR_RESET;
+
+    /* additional data */
+    mapper->data = malloc(sizeof(struct mmc1_data));
+    ((struct mmc1_data*)mapper->data)->prg_ram_bank = 0;
+
+    // Some programs expect first bank at $8000 and last bank at $C000 for PRG-ROM, and all 8KB of CHR
+    // memory mapped to $0000, so the mapper will predefine this to support this behaviour.
+    mapper->banks[0] = 0x0C;
+    mapper->banks[1] = 0x00;
+    mapper->banks[2] = 0x00;
+    mapper->banks[3] = 0x00;
     
     return mapper;
 }
@@ -73,6 +102,24 @@ static void insert(mapper_t *mapper, prog_t *prog) {
     as_add_segment(mapper->ppuas, NAMETABLE1, NT_SIZE, mapper->vram, AS_READ | AS_WRITE);
     as_add_segment(mapper->ppuas, NAMETABLE2, NT_SIZE, mapper->vram, AS_READ | AS_WRITE); 
     as_add_segment(mapper->ppuas, NAMETABLE3, NT_SIZE, mapper->vram, AS_READ | AS_WRITE);
+
+    // Determine mask used to determine CHR bank number (cached for efficiency).
+    uint8_t mask;
+    if (prog->chr_sz < 16 * 1024)
+        mask = 0x01;
+    else if (prog->chr_sz < 32 * 1024)
+        mask = 0x03;
+    else if (prog->chr_sz < 64 * 1024)
+        mask = 0x07;
+    else if (prog->chr_sz < 128 * 1024)
+        mask = 0x0F;
+    else
+        mask = 0x1F;
+    ((struct mmc1_data*)mapper->data)->chr_mask = mask;
+
+    //printf("PRG-ROM size: %dK\n", prog->prg_rom_sz / 1024);
+    //printf("PRG-RAM size: %dK\n", prog->prg_ram_sz / 1024);
+    //printf("CHR size: %dK\n", prog->chr_sz / 1024);
 }
 
 static void monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vaddr, uint8_t value, bool write) {
@@ -83,7 +130,7 @@ static void monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vadd
     if (vaddr < PRG_ROM_START)
         return;
     
-    if ((value & 0x70) > 0) {
+    if ((value & 0x80) > 0) {
         // Reset shift register.
         mapper->sr[0] = MMC1_SR_RESET;
     }
@@ -100,13 +147,35 @@ static void monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vadd
             uint8_t bank = (vaddr >> 13) & 0x03;
             mapper->banks[bank] = mapper->sr[0];
             mapper->sr[0] = MMC1_SR_RESET;
-        }
-    }
+
+            //printf("%lld: register %d = $%.2x\n", cpu->cycles, bank, mapper->banks[bank]);
+
+            // Update PRG-RAM bank if necessary.
+            if (bank == 1 || bank == 2) {
+                struct mmc1_data *data = (struct mmc1_data*)mapper->data;
+                const uint8_t chr_mode = (mapper->banks[0] >> 2) & 0x03;
+                if (bank == 1 || chr_mode == 1) {
+                    data->prg_ram_bank = (mapper->banks[bank] >> 2) & 0x03;
+                    //printf("%d\n", data->prg_ram_bank);
+
+                    // Also update bit 4 of PRG-ROM bank (if PRG-ROM is big enough).
+                    if (prog->prg_rom_sz == 512 * 1024) {
+                        mapper->banks[3] = (mapper->banks[bank] & 0x10) | (mapper->banks[3] & 0x0F);
+                    }
+                }
+            }
+        }    }
+}
+
+static uint8_t *map_ram(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset) {
+    struct mmc1_data *data = (struct mmc1_data*)mapper->data;
+    const uint8_t bank = data->prg_ram_bank;
+    return target + bank * PRG_RAM_SIZE;
 }
 
 static uint8_t *map_prg(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset) {
-    uint8_t mode = (mapper->banks[0] >> 2) & 0x03;
-    uint8_t bank = mapper->banks[3] & 0x0F;
+    const uint8_t mode = (mapper->banks[0] >> 2) & 0x03;
+    const uint8_t bank = mapper->banks[3] & 0x0F;
 
     if (mode == 2) {
         // Fix first bank, switch second bank.
@@ -120,7 +189,7 @@ static uint8_t *map_prg(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *t
             target += bank * PRG_BANK_SIZE;
         }
         else {
-            const int nbanks = prog->header.prg_rom_size * INES_PRG_ROM_UNIT / PRG_BANK_SIZE;
+            const int nbanks = prog->prg_rom_sz / PRG_BANK_SIZE;
             target += (nbanks - 1) * PRG_BANK_SIZE;
         }
     }
@@ -135,25 +204,30 @@ static uint8_t *map_prg(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *t
 }
 
 static uint8_t *map_chr(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset) {
+    struct mmc1_data *data = (struct mmc1_data*)mapper->data;
+    const uint8_t mask = data->chr_mask;
+
+    // Switch bank depending on mode.
     uint8_t mode = (mapper->banks[0] >> 4) & 0x01;
     if (mode == 1) {
         // Two separate 4KB banks.
-        uint8_t bank = vaddr >= CHR_BANK1 ? mapper->banks[2] : mapper->banks[1];
+        uint8_t bank = (vaddr >= CHR_BANK1 ? mapper->banks[2] : mapper->banks[1]) & mask;
         target += bank * CHR_BANK_SIZE;
     }
     else {
         // One combined 8KB bank.
         uint8_t *start = target - offset;
         offset = vaddr - CHR_BANK0; // Both banks are needed for offset.
-        target = start + (mapper->banks[1] & 0x1E) * CHR_BANK_SIZE + offset;
+        target = start + (mapper->banks[1] & ~0x01) * CHR_BANK_SIZE + offset;
     }
+
     return target;
 }
 
 static uint8_t *map_nts(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset) {
-    bool mirror = (mapper->banks[0] & 0x02) > 0;
-    bool hz = (mapper->banks[0] & 0x01) > 0;
-    uint8_t nt = NT(vaddr);
+    const bool mirror = (mapper->banks[0] & 0x02) > 0;
+    const bool hz = (mapper->banks[0] & 0x01) > 0;
+    const uint8_t nt = NT(vaddr);
 
     if (!mirror) {
         // One-screen (upper bank if bit 0 is set).

@@ -6,6 +6,8 @@ static void audio_callback(void *udata, uint8_t *stream, int len);
 /* SDL audio specifications */
 static SDL_AudioSpec audio;
 
+static bool muted = false;
+
 bool init_audio(void) {
     /* Set the audio format */
     audio.freq = 192000;
@@ -29,6 +31,14 @@ void free_audio(void) {
     SDL_CloseAudio();
 }
 
+void toggle_audio(void) {
+    muted = !muted;
+}
+
+bool is_muted(void) {
+    return muted;
+}
+
 static void audio_callback(void *udata, uint8_t *stream, int len) {
     float *output = (float*)stream;
 
@@ -45,7 +55,7 @@ static void audio_callback(void *udata, uint8_t *stream, int len) {
     // Fill the output buffer based on the samples produced by the APU.
     for (int i = 0; i < nsamples; i++) {
         int offset = i * data_to_fetch / nsamples;
-        output[i] = offset < max_data ? apu->out.buffer[(apu->out.cons + offset) % MIXER_BUFFER] : 0;
+        output[i] = offset < max_data && !muted ? apu->out.buffer[(apu->out.cons + offset) % MIXER_BUFFER] : 0;
     }
 
     // Increment consumer pointer based on the amount of data collected.

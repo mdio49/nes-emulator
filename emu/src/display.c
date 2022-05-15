@@ -48,6 +48,19 @@ void poll_events(void) {
                 if (e.key.keysym.scancode == SDL_SCANCODE_R) {
                     sys_reset();
                 }
+                if (e.key.keysym.scancode == SDL_SCANCODE_L) {
+                    if (is_logging()) {
+                        end_log();
+                        printf("Logging stopped.\n");
+                    }
+                    else {
+                        start_log();
+                        printf("Logging started.\n");
+                    }
+                }
+                if (e.key.keysym.scancode == SDL_SCANCODE_M) {
+                    toggle_audio();
+                }
                 if (e.key.keysym.scancode == SDL_SCANCODE_F4) {
                     SDL_SetWindowFullscreen(mainWindow, !fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
                     fullscreen = !fullscreen;

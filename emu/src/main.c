@@ -19,7 +19,6 @@ int status = 0x00;
 int msg_ptr = 0x6004;
 
 bool test = false;
-FILE *log_fp = NULL;
 
 int main(int argc, char *argv[]) {
     // Setup signal handlers.
@@ -41,7 +40,7 @@ int main(int argc, char *argv[]) {
             test = true;
         }
         else if (strcmp(arg, "-l") == 0) {
-            log_fp = fopen("emu.log", "w");
+            start_log();
         }
         else if (!strprefix(arg, "-") && path == NULL) {
             path = arg;
@@ -94,11 +93,6 @@ bool init(void) {
 }
 
 void exit_handler() {
-    // Close log file pointer (if it exists).
-    if (log_fp != NULL) {
-        fclose(log_fp);
-    }
-
     // Save PRG-RAM data.
     if (sav_path != NULL) {
         FILE *fp = fopen(sav_path, "wb");
@@ -106,6 +100,9 @@ void exit_handler() {
         fclose(fp);
         free(sav_path);
     }
+
+    // Close log.
+    end_log();
 
     // Turn off the system.
     sys_poweroff();
@@ -245,24 +242,8 @@ void before_execute(operation_t ins) {
     history[HIST_LEN - 1].pc = cpu->frame.pc;
     history[HIST_LEN - 1].op = ins;
 
-    // Write to the log.
-    if (log_fp != NULL) {
-        fprintf(log_fp, "$%.4x:", cpu->frame.pc);
-        fprintf(log_fp, " %.2X", ins.opc);
-        if (ins.addr_mode->argc > 0)
-            fprintf(log_fp, " %.2X", ins.args[0]);
-        else
-            fprintf(log_fp, "   ");
-        if (ins.addr_mode->argc > 1)
-            fprintf(log_fp, " %.2X", ins.args[1]);
-        else
-            fprintf(log_fp, "   ");
-        fprintf(log_fp, " \t|\t");
-        print_ins(log_fp, ins);
-        fprintf(log_fp, "\t|\t");
-        print_state(log_fp, cpu);
-        fprintf(log_fp, "\t|\tPPU: %3d, %3d CPU: %lld\n", ppu->draw_x, ppu->draw_y, cpu->cycles);
-    }
+    // Log the instruction.
+    log_ins(ins);
 }
 
 void after_execute(operation_t ins) {

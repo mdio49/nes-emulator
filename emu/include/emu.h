@@ -52,6 +52,18 @@ void update_screen(const char *data);
 uint8_t poll_input_p1(void);
 uint8_t poll_input_p2(void);
 
+/* log functions */
+
+void start_log(void);
+void end_log(void);
+void log_ins(operation_t ins);
+bool is_logging(void);
+
+/* audio functions */
+
+void toggle_audio(void);
+bool is_muted(void);
+
 /* util functions */
 
 const char *load_rom(const char *path);

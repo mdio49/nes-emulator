@@ -69,6 +69,13 @@ static mapper_t *init(void) {
     /* additional data */
     mapper->data = malloc(sizeof(struct mmc1_data));
     ((struct mmc1_data*)mapper->data)->prg_ram_bank = 0;
+
+    // Some programs expect first bank at $8000 and last bank at $C000 for PRG-ROM, and all 8KB of CHR
+    // memory mapped to $0000, so the mapper will predefine this to support this behaviour.
+    mapper->banks[0] = 0x0C;
+    mapper->banks[1] = 0x00;
+    mapper->banks[2] = 0x00;
+    mapper->banks[3] = 0x00;
     
     return mapper;
 }
@@ -111,13 +118,6 @@ static void insert(mapper_t *mapper, prog_t *prog) {
     else
         mask = 0x1F;
     ((struct mmc1_data*)mapper->data)->chr_mask = mask;
-
-    // Some programs expect first bank at $8000 and last bank at $C000 for PRG-ROM, and all 8KB of CHR
-    // memory mapped to $0000, so the mapper will predefine this to support this behaviour.
-    mapper->banks[0] = 0x0C;
-    mapper->banks[1] = 0x00;
-    mapper->banks[2] = 0x00;
-    mapper->banks[3] = 0x00;
 }
 
 static void monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vaddr, uint8_t value, bool write) {
@@ -142,7 +142,6 @@ static void monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vadd
         // If the shift register is full, then move the contents of the register into the
         // bank register and reset the shift register.
         if (full) {
-            
             uint8_t bank = (vaddr >> 13) & 0x03;
             if (bank == 3) {
                 mapper->banks[bank] = (mapper->banks[bank] & 0x10) | (mapper->r8[0] & 0x0F);
@@ -157,7 +156,10 @@ static void monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vadd
                 struct mmc1_data *data = (struct mmc1_data*)mapper->data;
                 const uint8_t chr_mode = (mapper->banks[0] >> 2) & 0x03;
                 if (bank == 1 || chr_mode == 1) {
-                    data->prg_ram_bank = (mapper->banks[bank] >> 2) & 0x03;
+                    // Only swap PRG-RAM if the lines are not being used for CHR memory.
+                    if (prog->header.chr_rom_size < 2) {
+                        data->prg_ram_bank = (mapper->banks[bank] >> 2) & 0x03;
+                    }
 
                     // Also update bit 4 of PRG-ROM bank (if PRG-ROM is big enough).
                     if (prog->header.prg_rom_size == 32) {

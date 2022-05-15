@@ -93,6 +93,9 @@ bool init(void) {
 }
 
 void exit_handler() {
+    // Close log (if it's open).
+    end_log();
+
     // Save PRG-RAM data.
     if (sav_path != NULL) {
         FILE *fp = fopen(sav_path, "wb");
@@ -100,9 +103,6 @@ void exit_handler() {
         fclose(fp);
         free(sav_path);
     }
-
-    // Close log.
-    end_log();
 
     // Turn off the system.
     sys_poweroff();

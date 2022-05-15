@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <ppu.h>
 
-#define N_BANKS 1
+#define N_REGISTERS     1
 
 #define CHR_BANK0       0x0000
 #define CHR_BANK_SIZE   0x2000
@@ -35,7 +35,7 @@ static mapper_t *init(void) {
     mapper->map_chr = map_chr;
     
     /* setup registers */
-    mapper->banks = calloc(N_BANKS, sizeof(uint8_t));
+    mapper->banks = calloc(N_REGISTERS, sizeof(uint8_t));
     
     return mapper;
 }

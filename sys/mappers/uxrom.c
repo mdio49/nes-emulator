@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <ppu.h>
 
-#define N_BANKS 1
+#define N_REGISTERS     1
 
 #define CHR_BANK0       0x0000
 #define CHR_BANK_SIZE   0x2000
@@ -35,7 +35,7 @@ static mapper_t *init(void) {
     mapper->map_prg = map_prg;
     
     /* setup registers */
-    mapper->banks = calloc(N_BANKS, sizeof(uint8_t));
+    mapper->banks = calloc(N_REGISTERS, sizeof(uint8_t));
     
     return mapper;
 }
@@ -45,8 +45,7 @@ static void insert(mapper_t *mapper, prog_t *prog) {
     as_add_segment(mapper->cpuas, PRG_BANK0, PRG_BANK_SIZE, (uint8_t*)prog->prg_rom, AS_READ);
 
     // Second PRG bank is fixed to the last bank.
-    const int nbanks = prog->header.prg_rom_size * INES_PRG_ROM_UNIT / PRG_BANK_SIZE;
-    as_add_segment(mapper->cpuas, PRG_BANK1, PRG_BANK_SIZE, (uint8_t*)prog->prg_rom + (nbanks - 1) * PRG_BANK_SIZE, AS_READ);
+    as_add_segment(mapper->cpuas, PRG_BANK1, PRG_BANK_SIZE, (uint8_t*)prog->prg_rom + (N_PRG_BANKS(prog, PRG_BANK_SIZE) - 1) * PRG_BANK_SIZE, AS_READ);
 
     // CHR-ROM/RAM is fixed.
     if (prog->chr_rom != NULL) {

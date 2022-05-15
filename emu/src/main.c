@@ -164,6 +164,14 @@ void run_bin(const char *path, bool test) {
         exit(1);
     }
 
+    // Set to PAL if there is an '(E)' in the filename.
+    if (strstr(path, "(E)")) {
+        tv_sys = TV_SYS_PAL;
+    }
+
+    // Attach the program to the system.
+    sys_insert(prog);
+
     // Load save data.
     if (prog->header.prg_ram) {
         // Determine size of save data.
@@ -180,14 +188,6 @@ void run_bin(const char *path, bool test) {
             free((void*)sav); // Free the save data buffer.
         }
     }
-
-    // Set to PAL if there is an '(E)' in the filename.
-    if (strstr(path, "(E)")) {
-        tv_sys = TV_SYS_PAL;
-    }
-
-    // Attach the program to the system.
-    sys_insert(prog);
 
     // Setup the handlers.
     handlers.before_execute = before_execute;
@@ -298,21 +298,21 @@ uint8_t poll_input_p1(void) {
     const uint8_t *keystate = SDL_GetKeyboardState(NULL);
     uint8_t result = 0;
     if (keystate[SDL_SCANCODE_SPACE])
-        result |= 0x01;
+        result |= JOYPAD_A;
     if (keystate[SDL_SCANCODE_LCTRL])
-        result |= 0x02;
+        result |= JOYPAD_B;
     if (keystate[SDL_SCANCODE_RSHIFT])
-        result |= 0x04;
+        result |= JOYPAD_SELECT;
     if (keystate[SDL_SCANCODE_RETURN])
-        result |= 0x08;
+        result |= JOYPAD_START;
     if (keystate[SDL_SCANCODE_UP])
-        result |= 0x10;
-    if (keystate[SDL_SCANCODE_DOWN])
-        result |= 0x20;
+        result |= JOYPAD_UP;
+    else if (keystate[SDL_SCANCODE_DOWN])
+        result |= JOYPAD_DOWN;
     if (keystate[SDL_SCANCODE_LEFT])
-        result |= 0x40;
-    if (keystate[SDL_SCANCODE_RIGHT])
-        result |= 0x80;
+        result |= JOYPAD_LEFT;
+    else if (keystate[SDL_SCANCODE_RIGHT])
+        result |= JOYPAD_RIGHT;
     return result;
 }
 

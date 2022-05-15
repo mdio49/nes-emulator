@@ -35,7 +35,8 @@ static mapper_t *init(void) {
 static void insert(mapper_t *mapper, prog_t *prog) {
     /* Setup CPU address space. */
 
-    // PRG-RAM.
+    // PRG-RAM (may not be used).
+    prog->prg_ram = malloc(PRG_RAM_SIZE * sizeof(uint8_t));
     as_add_segment(mapper->cpuas, PRG_RAM, PRG_RAM_SIZE, prog->prg_ram, AS_READ | AS_WRITE);
 
     // PRG-ROM (mirrored if there is only one 16KB bank).

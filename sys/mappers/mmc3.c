@@ -13,7 +13,7 @@
  * 11   - irq latch
  */
 
-#define N_BANKS         16
+#define N_REGISTERS     16
 #define SELECT_INDEX    0    
 #define BANKS_INDEX     1   
 #define MIRROR_INDEX    9
@@ -81,7 +81,7 @@ static mapper_t *init(void) {
     mapper->map_nts = map_nts;
     
     /* setup registers */
-    mapper->banks = calloc(N_BANKS, sizeof(uint8_t));
+    mapper->banks = calloc(N_REGISTERS, sizeof(uint8_t));
 
     /* additional data */
     mapper->data = malloc(sizeof(struct mmc3_data));
@@ -91,6 +91,7 @@ static mapper_t *init(void) {
 
 static void insert(mapper_t *mapper, prog_t *prog) {
     // Fixed 8KB of PRG-RAM (may not be used).
+    prog->prg_ram = malloc(PRG_RAM_SIZE * sizeof(uint8_t));
     as_add_segment(mapper->cpuas, PRG_RAM, PRG_RAM_SIZE, prog->prg_ram, AS_READ | AS_WRITE);
     
     // Three switchable PRG-ROM banks (one is fixed to the second last bank).
@@ -99,8 +100,7 @@ static void insert(mapper_t *mapper, prog_t *prog) {
     as_add_segment(mapper->cpuas, PRG_BANK2, PRG_BANK_SIZE, (uint8_t*)prog->prg_rom, AS_READ);
 
     // Fourth bank is fixed to the last bank.
-    const int nbanks = prog->prg_rom_sz / PRG_BANK_SIZE;
-    as_add_segment(mapper->cpuas, PRG_BANK3, PRG_BANK_SIZE, (uint8_t*)prog->prg_rom + (nbanks - 1) * PRG_BANK_SIZE, AS_READ);
+    as_add_segment(mapper->cpuas, PRG_BANK3, PRG_BANK_SIZE, (uint8_t*)prog->prg_rom + (N_PRG_BANKS(prog, PRG_BANK_SIZE) - 1) * PRG_BANK_SIZE, AS_READ);
 
     // Have 8 separate 1KB CHR segments for both possible arrangements of CHR banks.
     for (int i = 0; i < 8; i++) {
@@ -200,8 +200,7 @@ static uint8_t *map_prg(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *t
     if ((mapper->banks[SELECT_INDEX] & 0x40) > 0) {
         // Bank 0 fixed to second last bank.
         if (vaddr < PRG_BANK1) {        // Bank 0
-            const int nbanks = prog->prg_rom_sz / PRG_BANK_SIZE;
-            target += (nbanks - 2) * PRG_BANK_SIZE;
+            target += (N_PRG_BANKS(prog, PRG_BANK_SIZE) - 2) * PRG_BANK_SIZE;
         }
         else if (vaddr < PRG_BANK2) {   // Bank 1
             target += mapper->banks[R7] * PRG_BANK_SIZE;
@@ -219,8 +218,7 @@ static uint8_t *map_prg(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *t
             target += mapper->banks[R7] * PRG_BANK_SIZE;
         }
         else {                          // Bank 2
-            const int nbanks = prog->prg_rom_sz / PRG_BANK_SIZE;
-            target += (nbanks - 2) * PRG_BANK_SIZE;
+            target += (N_PRG_BANKS(prog, PRG_BANK_SIZE) - 2) * PRG_BANK_SIZE;
         }
     }
 

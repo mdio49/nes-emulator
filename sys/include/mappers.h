@@ -4,6 +4,9 @@
 #include <mapper.h>
 #include <prog.h>
 
+#define N_PRG_BANKS(prog, sz) (prog->header.prg_rom_size * INES_PRG_ROM_UNIT / sz)
+#define N_CHR_BANKS(prog, sz) (prog->header.chr_rom_size * INES_CHR_ROM_UNIT / sz)
+
 #define PRG_RAM_START   0x6000
 #define PRG_ROM_START   0x8000
 
@@ -51,7 +54,8 @@ struct mapper {
 
     /* mapper registers */
 
-    uint8_t         sr[16];     // Shift registers (16 available).
+    uint8_t         r8[16];     // 8-bit registers (16 available).
+    uint16_t        r16[8];     // 16-bit registers (8 available).
     uint8_t         *banks;     // Bank registers (mapper can allocate as many as needed).
 
     /* other variables */

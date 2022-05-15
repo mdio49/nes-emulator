@@ -44,6 +44,8 @@ static void load_ines(prog_t *prog, const char *src) {
 
     // Prepare copying of data.
     const char *fp = src + INES_HEADER_SIZE;
+    const size_t prg_rom_bytes = prog->header.prg_rom_size * INES_PRG_ROM_UNIT;
+    const size_t chr_rom_bytes = prog->header.chr_rom_size * INES_CHR_ROM_UNIT;
     
     // Copy trainer.
     if (prog->header.trainer) {
@@ -56,21 +58,18 @@ static void load_ines(prog_t *prog, const char *src) {
     }
 
     // Copy PRG-ROM.
-    prog->prg_rom_sz = prog->header.prg_rom_size * INES_PRG_ROM_UNIT;
-    prog->prg_rom = malloc(prog->prg_rom_sz);
-    memcpy((void *)prog->prg_rom, fp, prog->prg_rom_sz);
-    fp += prog->prg_rom_sz;
+    prog->prg_rom = malloc(prg_rom_bytes);
+    memcpy((void *)prog->prg_rom, fp, prg_rom_bytes);
+    fp += prg_rom_bytes;
 
     // Copy CHR-ROM.
     if (prog->header.chr_rom_size > 0) {
-        prog->chr_sz = prog->header.chr_rom_size * INES_CHR_ROM_UNIT;
-        prog->chr_rom = malloc(prog->chr_sz);
-        memcpy((void *)prog->chr_rom, fp, prog->chr_sz);
-        fp += prog->chr_sz;
+        prog->chr_rom = malloc(chr_rom_bytes);
+        memcpy((void *)prog->chr_rom, fp, chr_rom_bytes);
+        fp += chr_rom_bytes;
     }
     else {
         // Use CHR-RAM instead.
-        prog->chr_sz = sizeof(prog->chr_ram);
         prog->chr_rom = NULL;
     }
 
@@ -84,8 +83,8 @@ static void load_ines(prog_t *prog, const char *src) {
         prog->inst_rom = NULL;
     }
 
-    // Declare PRG-RAM size.
-    prog->prg_ram_sz = sizeof(prog->prg_ram);
+    // Mapper allocates PRG-RAM.
+    prog->prg_ram = NULL;
 
     // Don't worry about PROM for now.
     prog->prom = NULL;

@@ -32,6 +32,15 @@
 #define RES_VECTOR      0xFFFC
 #define IRQ_VECTOR      0xFFFE
 
+#define JOYPAD_A        0x01
+#define JOYPAD_B        0x02
+#define JOYPAD_SELECT   0x04
+#define JOYPAD_START    0x08
+#define JOYPAD_UP       0x10
+#define JOYPAD_DOWN     0x20
+#define JOYPAD_LEFT     0x40
+#define JOYPAD_RIGHT    0x80
+
 /**
  * @brief The flags for each bit in the status register.
  */

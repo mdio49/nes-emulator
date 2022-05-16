@@ -36,8 +36,6 @@ The following hotkeys may also be used to control the emulator:
 - `L`: Start/stop logger.
 - `Esc`: Exit emulator.
 
-The window may also be resized to any scale and put into fullscreen mode by pressing the `F4` key.
-
 ## Possible Future Plans
 - Add more mappers.
 - Add P2 controller support.

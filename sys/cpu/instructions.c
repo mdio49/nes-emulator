@@ -473,7 +473,7 @@ static int jmp_apply(tframe_t *frame, const addrspace_t *as, const addrmode_t *a
     return am == &AM_INDIRECT ? 5 : 3;
 }
 
-static int jrs_apply(tframe_t *frame, const addrspace_t *as, const addrmode_t *am, mem_loc_t loc) {
+static int jsr_apply(tframe_t *frame, const addrspace_t *as, const addrmode_t *am, mem_loc_t loc) {
     push_word(frame, as, frame->pc + 2);
     frame->pc = loc.vaddr;
     return 6;
@@ -485,7 +485,7 @@ static int rts_apply(tframe_t *frame, const addrspace_t *as, const addrmode_t *a
 }
 
 const instruction_t INS_JMP = { "JMP", jmp_apply, true };
-const instruction_t INS_JSR = { "JSR", jrs_apply, true };
+const instruction_t INS_JSR = { "JSR", jsr_apply, true };
 const instruction_t INS_RTS = { "RTS", rts_apply, true };
 
 /**

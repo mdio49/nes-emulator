@@ -74,7 +74,7 @@ cpu_t *cpu_create(void) {
     cpu->frame.sp = 0;
 
     // Initialise status register.
-    cpu->frame.sr = bits_to_sr(SR_BREAK | SR_IGNORED);
+    cpu->frame.sr = bits_to_sr(SR_IGNORED);
 
     // Setup memory.
     cpu->wmem = malloc(sizeof(uint8_t) * WMEM_SIZE);

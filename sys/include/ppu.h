@@ -228,7 +228,7 @@ typedef struct ppu {
 #endif
 
 /**
- * @brief Creates a new instance of an emulated PPU in a power-up state.
+ * @brief Creates a new instance of an emulated PPU.
  * 
  * @return The new instance of the PPU.
  */

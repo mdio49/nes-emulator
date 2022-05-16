@@ -238,7 +238,7 @@ uint8_t sr_to_bits(const sr_flags_t sr);
 sr_flags_t bits_to_sr(uint8_t bits);
 
 /**
- * @brief Creates a new instance of an emulated CPU in a power-up state.
+ * @brief Creates a new instance of an emulated CPU.
  * 
  * @return The CPU instance.
  */

@@ -54,10 +54,10 @@ typedef struct pulse {
     };
     union {
         struct {
-            unsigned    shift   : 4;
+            unsigned    shift   : 3;
             unsigned    negate  : 1;
             unsigned    period  : 3;
-            unsigned    enabled : 2;
+            unsigned    enabled : 1;
         } sweep;
         uint8_t reg1;
     };

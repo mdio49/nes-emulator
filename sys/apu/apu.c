@@ -134,6 +134,10 @@ void apu_reset(apu_t *apu) {
     // Clear $4015.
     apu->status.value = 0;
 
+    // Reset frame counter.
+    apu->frame_counter = 0;
+    apu->step = 0;
+
     // Reset triangle sequencer.
     apu->triangle.sequencer = 15;
     apu->triangle.desc = true;

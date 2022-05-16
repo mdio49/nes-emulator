@@ -22,19 +22,25 @@ Keyboard interrupts are also possible in order to pause the emulation. During th
 - `continue`: Continues emulation from where it was paused.
 - `quit`: Stops emulation and exits the emulator.
 
-During emulation, the emulator accepts the following input:
-- Digital Pad: Arrow Keys.
-- Start: Enter.
-- Select: Right-Shift.
-- A: Spacebar.
-- B: Left-Control.
-- Reset: R.
+During emulation, the emulator accepts the following keys as controller input for P1:
+- `D-Pad`: Arrow Keys.
+- `Start`: Enter.
+- `Select`: Right-Shift.
+- `A`: Spacebar.
+- `B`: Left-Control.
+
+The following hotkeys may also be used to control the emulator:
+- `R`: Reset.
+- `F4`: Toggle fullscreen.
+- `M`: Toggle audio.
+- `L`: Start/stop logger.
+- `Esc`: Exit emulator.
 
 The window may also be resized to any scale and put into fullscreen mode by pressing the `F4` key.
 
 ## Possible Future Plans
 - Add more mappers.
-- Add P2 joypad support.
+- Add P2 controller support.
 - Improve cycle accuracy.
 - Implement PAL and Dendy support.
 - Implement support for the NES 2.0 file format.

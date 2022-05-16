@@ -233,7 +233,6 @@ void apu_update(apu_t *apu, addrspace_t *cpuas, int hcycles) {
             apu->irq_flag = true;
         }
         apu->irq_occurred = true;
-        //printf("IRQ: %lld ~ %lld (%d >= %d)\n", cpu->cycles, cpu->cycles + hcycles, apu->frame_counter, frame_step);
     }
     if (apu->frame_counter > frame_step) {
         // Check if the current step is a half-frame.
@@ -298,8 +297,6 @@ void apu_update(apu_t *apu, addrspace_t *cpuas, int hcycles) {
                 len_counter_clock(&apu->noise.len_counter, apu->noise.loop);
             }
         }
-
-        //printf("step %d: %lld ~ %lld (%d > %d) ", apu->step + 1, cpu->cycles, cpu->cycles + hcycles, apu->frame_counter, frame_step);
         
         // Decrement the frame counter and increment the step.
         apu->frame_counter -= frame_step;
@@ -313,8 +310,6 @@ void apu_update(apu_t *apu, addrspace_t *cpuas, int hcycles) {
         else {
             apu->step++;
         }
-
-        //printf("frame counter now %d\n", apu->frame_counter);
     }
 
     // Get the number of APU cycles to process.

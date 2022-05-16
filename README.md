@@ -18,7 +18,6 @@ There are other flags that may be included:
 
 Keyboard interrupts are also possible in order to pause the emulation. During this state, the following commands can be typed into the terminal:
 - `reset`: Resets the emulator (i.e. invokes the RESET vector on the CPU, similar to pressing the reset button on the console). Note that this can also be done by pressing the `R` key.
-- `history`: Displays the last 50 instructions executed.
 - `state`: Dumps the current state of the processor.
 - `continue`: Continues emulation from where it was paused.
 - `quit`: Stops emulation and exits the emulator.

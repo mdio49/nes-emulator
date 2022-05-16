@@ -63,7 +63,7 @@ uint16_t pull_word(tframe_t *frame, const addrspace_t *as) {
 }
 
 cpu_t *cpu_create(void) {
-    // Create CPU struct.
+    // Create the CPU.
     cpu_t *cpu = malloc(sizeof(struct cpu));
 
     // Clear registers.
@@ -71,16 +71,14 @@ cpu_t *cpu_create(void) {
     cpu->frame.pc = 0;
     cpu->frame.x = 0;
     cpu->frame.y = 0;
+    cpu->frame.sp = 0;
 
-    // Clear status register.
-    cpu->frame.sr = bits_to_sr(SR_IGNORED);
+    // Initialise status register.
+    cpu->frame.sr = bits_to_sr(SR_BREAK | SR_IGNORED);
 
     // Setup memory.
     cpu->wmem = malloc(sizeof(uint8_t) * WMEM_SIZE);
-
-    // Setup stack.
-    cpu->frame.sp = 0xFD;
-
+    
     // Create address space.
     cpu->as = as_create();
 
@@ -109,7 +107,8 @@ void cpu_reset(cpu_t *cpu) {
     const uint8_t low = as_read(cpu->as, RES_VECTOR);
     const uint8_t high = as_read(cpu->as, RES_VECTOR + 1);
     cpu->frame.pc = bytes_to_word(low, high);
-    cpu->cycles = 0;
+    cpu->frame.sr.irq = 1;
+    cpu->frame.sp -= 3;
 }
 
 void cpu_nmi(cpu_t *cpu) {
@@ -121,8 +120,6 @@ void cpu_nmi(cpu_t *cpu) {
     const uint8_t low = as_read(cpu->as, NMI_VECTOR);
     const uint8_t high = as_read(cpu->as, NMI_VECTOR + 1);
     cpu->frame.pc = bytes_to_word(low, high);
-
-    //printf("NMI detected.\n");
 }
 
 void cpu_irq(cpu_t *cpu) {
@@ -141,8 +138,6 @@ void cpu_irq(cpu_t *cpu) {
     const uint8_t low = as_read(cpu->as, IRQ_VECTOR);
     const uint8_t high = as_read(cpu->as, IRQ_VECTOR + 1);
     cpu->frame.pc = bytes_to_word(low, high);
-
-    //printf("IRQ detected.\n");
 }
 
 uint8_t cpu_fetch(const cpu_t *cpu) {

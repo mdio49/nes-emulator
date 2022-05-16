@@ -119,13 +119,30 @@ static inline void inc_vram_addr(ppu_t *ppu, vram_reg_t *addr) {
 }
 
 ppu_t *ppu_create(void) {
+    // Create the PPU.
     ppu_t *ppu = malloc(sizeof(struct ppu));
     ppu->vram = malloc(sizeof(uint8_t) * VRAM_SIZE);
     ppu->as = as_create();
-    ppu->bkg_color = 0x0F;
 
+    // Clear registers.
+    ppu->controller.value = 0;
+    ppu->mask.value = 0;
+    ppu->status.value = 0;
+    ppu->oam_addr = 0;
+    ppu->scroll = 0;
+    ppu->ppu_addr = 0;
+    ppu->ppu_data = 0;
+    ppu->w = 0;
+
+    // Set the draw position to (0, 0).
     ppu->draw_x = 0;
     ppu->draw_y = 0;
+
+    // Clear the odd frame flag.
+    ppu->odd_frame = false;
+
+    // Make the background black at the start.
+    ppu->bkg_color = 0x0F;
 
     return ppu;
 }
@@ -134,6 +151,18 @@ void ppu_destroy(ppu_t *ppu) {
     as_destroy(ppu->as);
     free(ppu->vram);
     free(ppu);
+}
+
+void ppu_reset(ppu_t *ppu) {
+    // These registers are cleared on reset.
+    ppu->controller.value = 0;
+    ppu->mask.value = 0;
+    ppu->scroll = 0;
+    ppu->ppu_data = 0;
+    ppu->w = 0;
+
+    // Odd frame flag is reset.
+    ppu->odd_frame = false;
 }
 
 void ppu_render(ppu_t *ppu, int cycles) {

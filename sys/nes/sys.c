@@ -122,6 +122,9 @@ void sys_reset(void) {
 
     // Reset APU.
     apu_reset(apu);
+
+    // Reset PPU.
+    ppu_reset(ppu);
 }
 
 void sys_insert(prog_t *prog) {
@@ -138,10 +141,6 @@ void sys_insert(prog_t *prog) {
 void sys_run(handlers_t *handlers) {
     // Reset the system (so the program counter is set correctly).
     sys_reset();
-
-    // Simulate 7 power-on cycles (TODO: figure out what this actually is).
-    //handlers->cpu_cycle_counter += 7;
-    //ppu_render(ppu, 21);
 
     // Run the program.
     handlers->running = true;

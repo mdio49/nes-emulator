@@ -227,8 +227,31 @@ typedef struct ppu {
 
 #endif
 
+/**
+ * @brief Creates a new instance of an emulated PPU in a power-up state.
+ * 
+ * @return The new instance of the PPU.
+ */
 ppu_t *ppu_create(void);
 
+/**
+ * @brief Frees the memory associated with the given PPU, including the underlying address space.
+ * 
+ * @param cpu The PPU to destroy.
+ */
 void ppu_destroy(ppu_t *ppu);
 
+/**
+ * @brief Resets the given PPU.
+ * 
+ * @param ppu The PPU to reset.
+ */
+void ppu_reset(ppu_t *ppu);
+
+/**
+ * @brief Performs rendering on a PPU for the given number of cycles.
+ * 
+ * @param ppu The PPU.
+ * @param cycles The number of PPU cycles to execute.
+ */
 void ppu_render(ppu_t *ppu, int cycles);

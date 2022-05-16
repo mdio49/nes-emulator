@@ -60,7 +60,34 @@ static const uint16_t DMC_RATES[16] = {
 };
 
 apu_t *apu_create(void) {
+    // Create the APU.
     apu_t *apu = malloc(sizeof(struct apu));
+
+    // Clear registers.
+    apu->pulse[0].reg0 = 0;
+    apu->pulse[0].reg1 = 0;
+    apu->pulse[0].reg2 = 0;
+    apu->pulse[0].reg3 = 0;
+
+    apu->pulse[1].reg0 = 0;
+    apu->pulse[1].reg1 = 0;
+    apu->pulse[1].reg2 = 0;
+    apu->pulse[1].reg3 = 0;
+
+    apu->triangle.reg0 = 0;
+    apu->triangle.reg1 = 0;
+    apu->triangle.reg2 = 0;
+    apu->triangle.reg3 = 0;
+
+    apu->noise.reg0 = 0;
+    apu->noise.reg1 = 0;
+    apu->noise.reg2 = 0;
+    apu->noise.reg3 = 0;
+
+    apu->dmc.reg0 = 0;
+    apu->dmc.reg1 = 0;
+    apu->dmc.reg2 = 0;
+    apu->dmc.reg3 = 0;
     
     // Initialize frame counter.
     apu->frame_counter = 0;
@@ -74,7 +101,7 @@ apu_t *apu_create(void) {
     apu->noise.shift_register = 1;
 
     // Initialize DMC.
-    apu->dmc.output = 0 ;
+    apu->dmc.output = 0;
     apu->dmc.bits_remaining = 1;
 
     // Generate lookup tables.
@@ -104,9 +131,12 @@ void apu_reset(apu_t *apu) {
     // Clear $4015.
     apu->status.value = 0;
 
-    // Reset output buffer.
-    //apu->out.cons = 0;
-    //apu->out.prod = 0;
+    // Reset triangle sequencer.
+    apu->triangle.sequencer = 15;
+    apu->triangle.desc = true;
+
+    // DMC output is ANDed with 1 on reset.
+    apu->dmc.output &= 0x01;
 }
 
 void apu_update(apu_t *apu, addrspace_t *cpuas, int hcycles) {

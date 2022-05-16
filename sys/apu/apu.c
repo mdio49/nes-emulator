@@ -88,6 +88,9 @@ apu_t *apu_create(void) {
     apu->dmc.reg1 = 0;
     apu->dmc.reg2 = 0;
     apu->dmc.reg3 = 0;
+
+    apu->status.value = 0;
+    apu->frame.value = 0;
     
     // Initialize frame counter.
     apu->frame_counter = 0;

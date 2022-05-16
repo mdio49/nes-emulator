@@ -139,8 +139,8 @@ void sys_insert(prog_t *prog) {
 }
 
 void sys_run(handlers_t *handlers) {
-    // Reset the system (so the program counter is set correctly).
-    sys_reset();
+    // Reset the CPU (so the program counter is set correctly).
+    cpu_reset(cpu);
 
     // Run the program.
     handlers->running = true;

@@ -44,19 +44,16 @@
 /**
  * @brief The flags for each bit in the status register.
  */
-typedef union sr_flags {
-    struct {
-        unsigned carry : 1;     // Carry flag.
-        unsigned zero  : 1;     // Zero flag.
-        unsigned irq   : 1;     // Interrupt flag (IRQ disable).
-        unsigned dec   : 1;     // Decimal flag.
-        unsigned brk   : 1;     // Break flag.
-        unsigned ign   : 1;     // Ignored flag (unused).
-        unsigned vflow : 1;     // Overflow flag.
-        unsigned neg   : 1;     // Negative/sign flag.
-    };
-    uint8_t bits;
-} srflags_t;
+typedef struct sr_flags {
+    unsigned carry : 1;     // Carry flag.
+    unsigned zero  : 1;     // Zero flag.
+    unsigned irq   : 1;     // Interrupt flag (IRQ disable).
+    unsigned dec   : 1;     // Decimal flag.
+    unsigned brk   : 1;     // Break flag.
+    unsigned ign   : 1;     // Ignored flag (unused).
+    unsigned vflow : 1;     // Overflow flag.
+    unsigned neg   : 1;     // Negative/sign flag.
+} sr_flags_t;
 
 /**
  * @brief A trap frame that stores the state of the CPU's registers.
@@ -66,7 +63,7 @@ typedef struct tframe {
     uint8_t     ac;     // accumulator
     uint8_t     x;      // X register
     uint8_t     y;      // Y register
-    srflags_t   sr;     // status register
+    sr_flags_t  sr;     // status register
     uint8_t     sp;     // stack pointer
 } tframe_t;
 
@@ -223,6 +220,22 @@ const instruction_t *get_instruction(opcode_t opc);
  * @return The resultant 16-bit word.
  */
 uint16_t bytes_to_word(uint8_t low, uint8_t high);
+
+/**
+ * @brief Gets the bits in the status register given the state of the flags.
+ * 
+ * @param sr The status register.
+ * @return The integral value of the status register.
+ */
+uint8_t sr_to_bits(const sr_flags_t sr);
+
+/**
+ * @brief Sets the bits in a status register from the given bits.
+ * 
+ * @param sr The status register.
+ * @param bits The integral value.
+ */
+sr_flags_t bits_to_sr(uint8_t bits);
 
 /**
  * @brief Creates a new instance of an emulated CPU.

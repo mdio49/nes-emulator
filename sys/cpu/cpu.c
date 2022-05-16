@@ -6,6 +6,40 @@ uint16_t bytes_to_word(uint8_t low, uint8_t high) {
     return (high << 8) + low;
 }
 
+uint8_t sr_to_bits(const sr_flags_t sr) {
+    uint8_t bits = 0;
+    if (sr.brk)
+        bits |= SR_BREAK;
+    if (sr.carry)
+        bits |= SR_CARRY;
+    if (sr.dec)
+        bits |= SR_DECIMAL;
+    if (sr.ign)
+        bits |= SR_IGNORED;
+    if (sr.irq)
+        bits |= SR_INTERRUPT;
+    if (sr.neg)
+        bits |= SR_NEGATIVE;
+    if (sr.vflow)
+        bits |= SR_OVERFLOW;
+    if (sr.zero)
+        bits |= SR_ZERO;
+    return bits;
+}
+
+sr_flags_t bits_to_sr(uint8_t bits) {
+    sr_flags_t sr;
+    sr.brk = (bits & SR_BREAK) > 0;
+    sr.carry = (bits & SR_CARRY) > 0;
+    sr.dec = (bits & SR_DECIMAL) > 0;
+    sr.ign = (bits & SR_IGNORED) > 0;
+    sr.irq = (bits & SR_INTERRUPT) > 0;
+    sr.neg = (bits & SR_NEGATIVE) > 0;
+    sr.vflow = (bits & SR_OVERFLOW) > 0;
+    sr.zero = (bits & SR_ZERO) > 0;
+    return sr;
+}
+
 void push(tframe_t *frame, const addrspace_t *as, uint8_t value) {
     as_write(as, STACK_START + frame->sp, value);
     frame->sp--;
@@ -35,9 +69,11 @@ cpu_t *cpu_create(void) {
     // Clear registers.
     cpu->frame.ac = 0;
     cpu->frame.pc = 0;
-    cpu->frame.sr.bits = SR_IGNORED;
     cpu->frame.x = 0;
     cpu->frame.y = 0;
+
+    // Clear status register.
+    cpu->frame.sr = bits_to_sr(SR_IGNORED);
 
     // Setup memory.
     cpu->wmem = malloc(sizeof(uint8_t) * WMEM_SIZE);
@@ -79,7 +115,7 @@ void cpu_reset(cpu_t *cpu) {
 void cpu_nmi(cpu_t *cpu) {
     // Push PC and status register.
     push_word(&cpu->frame, cpu->as, cpu->frame.pc);
-    push(&cpu->frame, cpu->as, cpu->frame.sr.bits);
+    push(&cpu->frame, cpu->as, sr_to_bits(cpu->frame.sr));
     
     // Jump to interrupt handler.
     const uint8_t low = as_read(cpu->as, NMI_VECTOR);
@@ -96,7 +132,7 @@ void cpu_irq(cpu_t *cpu) {
     
     // Push PC and status register.
     push_word(&cpu->frame, cpu->as, cpu->frame.pc);
-    push(&cpu->frame, cpu->as, cpu->frame.sr.bits);
+    push(&cpu->frame, cpu->as, sr_to_bits(cpu->frame.sr));
 
     // Disable further interrupts.
     cpu->frame.sr.irq = 1;

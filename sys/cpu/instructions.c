@@ -27,7 +27,7 @@ static inline int def_cycles(const addrmode_t *am, mem_loc_t loc) {
 
 static inline void update_sign_flags(tframe_t *frame, uint8_t result) {
     frame->sr.zero = (result == 0x00);
-    frame->sr.neg = ((result & 0x80) == 0x80);
+    frame->sr.neg = (result & 0x80) > 0;
 }
 
 static uint8_t load(const addrspace_t *as, mem_loc_t loc) {
@@ -149,7 +149,8 @@ static int pha_apply(tframe_t *frame, const addrspace_t *as, const addrmode_t *a
 }
 
 static int php_apply(tframe_t *frame, const addrspace_t *as, const addrmode_t *am, mem_loc_t loc) {
-    push(frame, as, frame->sr.bits | SR_BREAK | SR_IGNORED);
+    uint8_t bits = sr_to_bits(frame->sr) | SR_BREAK | SR_IGNORED;
+    push(frame, as, bits);
     return 3;
 }
 
@@ -161,8 +162,10 @@ static int pla_apply(tframe_t *frame, const addrspace_t *as, const addrmode_t *a
 
 static int plp_apply(tframe_t *frame, const addrspace_t *as, const addrmode_t *am, mem_loc_t loc) {
     uint8_t bits = pull(frame, as);
-    uint8_t mask = SR_BREAK | SR_IGNORED;
-    frame->sr.bits = (bits & ~mask) | (frame->sr.bits & mask);
+    sr_flags_t sr = bits_to_sr(bits);
+    sr.brk = frame->sr.brk;
+    sr.ign = frame->sr.ign;
+    frame->sr = sr;
     return 4;
 }
 
@@ -492,7 +495,7 @@ const instruction_t INS_RTS = { "RTS", rts_apply, true };
 static int brk_apply(tframe_t *frame, const addrspace_t *as, const addrmode_t *am, mem_loc_t loc) {
     // Push PC and status register.
     push_word(frame, as, frame->pc + 2);
-    push(frame, as, frame->sr.bits | SR_BREAK);
+    push(frame, as, sr_to_bits(frame->sr) | SR_BREAK);
 
     // Disable interrupts.
     frame->sr.irq = 1;
@@ -507,10 +510,16 @@ static int brk_apply(tframe_t *frame, const addrspace_t *as, const addrmode_t *a
 }
 
 static int rti_apply(tframe_t *frame, const addrspace_t *as, const addrmode_t *am, mem_loc_t loc) {
+    // Pull status register.
     uint8_t bits = pull(frame, as);
-    uint8_t mask = SR_BREAK | SR_IGNORED;
-    frame->sr.bits = (bits & ~mask) | (frame->sr.bits & mask);
+    sr_flags_t sr = bits_to_sr(bits);
+    sr.brk = frame->sr.brk;
+    sr.ign = frame->sr.ign;
+    frame->sr = sr;
+
+    // Pull program counter.
     frame->pc = pull_word(frame, as);
+
     return 6;
 }
 

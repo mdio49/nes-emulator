@@ -9,13 +9,13 @@ void print_state(FILE *fp, cpu_t *cpu) {
     fprintf(fp, "pc: $%.4x, a: $%.2x, x: $%.2x, y: $%.2x, sp: $%.2x, sr: ", cpu->frame.pc, cpu->frame.ac, cpu->frame.x, cpu->frame.y, cpu->frame.sp);
     fprintf(fp, cpu->frame.sr.neg ? "n" : "-");
     fprintf(fp, cpu->frame.sr.vflow ? "v" : "-");
-    fprintf(fp, cpu->frame.sr.ign ? "-" : "-");
+    fprintf(fp, cpu->frame.sr.ign ? "x" : "-");
     fprintf(fp, cpu->frame.sr.brk ? "b" : "-");
     fprintf(fp, cpu->frame.sr.dec ? "d" : "-");
     fprintf(fp, cpu->frame.sr.irq ? "i" : "-");
     fprintf(fp, cpu->frame.sr.zero ? "z" : "-");
     fprintf(fp, cpu->frame.sr.carry ? "c" : "-");
-    fprintf(fp, " ($%.2x)", cpu->frame.sr.bits);
+    fprintf(fp, " ($%.2x)", sr_to_bits(cpu->frame.sr));
 }
 
 void print_ins(FILE *fp, operation_t ins) {

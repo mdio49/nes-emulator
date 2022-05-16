@@ -260,16 +260,44 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
         switch (vaddr & 0x2007) {
             case PPU_CTRL:
                 if (write) {
+                    // Resolve the bitmask.
+                    union ppu_ctrl ctrl;
+                    ctrl.nt_addr = value & 0x03;
+                    ctrl.vram_inc = (value >> 2) & 0x01;
+                    ctrl.spt_addr = (value >> 3) & 0x01;
+                    ctrl.bpt_addr = (value >> 4) & 0x01;
+                    ctrl.spr_size = (value >> 5) & 0x01;
+                    ctrl.m_slave = (value >> 6) & 0x01;
+                    ctrl.nmi = (value >> 7) & 0x01;
+                    value = ctrl.value;
+
+                    // Set the write flag to true.
                     ppu->ppucontrol_flags.write = 1;
+                }
+                break;
+            case PPU_MASK:
+                if (write) {
+                    // Resolve the bitmask.
+                    union ppu_mask mask;
+                    mask.grayscale = value & 0x01;
+                    mask.bkg_left = (value >> 1) & 0x01;
+                    mask.spr_left = (value >> 2) & 0x01;
+                    mask.background = (value >> 3) & 0x01;
+                    mask.sprites = (value >> 4) & 0x01;
+                    mask.em_red = (value >> 5) & 0x01;
+                    mask.em_green = (value >> 6) & 0x01;
+                    mask.em_blue = (value >> 7) & 0x01;
+                    value = mask.value;
                 }
                 break;
             case PPU_STATUS:
                 if (read) {
+                    // Resolve the bitmask.
+                    union ppu_status status = { .value = value };
+                    value = (status.vblank << 7) | (status.hit << 6) | (status.overflow << 5);
+
+                    // Set the read flag to true.
                     ppu->ppustatus_flags.read = 1;
-                }
-                if (write) {
-                    // Writing to PPUSTATUS shouldn't affect VBL flag.
-                    value = (ppu->status.value & 0x80) | (value & ~0x80);
                 }
                 break;
             case PPU_SCROLL:

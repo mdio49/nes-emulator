@@ -5,21 +5,6 @@ void dump_state(cpu_t *cpu) {
     printf("\n");
 }
 
-void print_hist(history_t *hist, int nhist) {
-    bool printed = false;
-    for (int i = 0; i < HIST_LEN; i++) {
-        if (history[i].op.instruction != NULL) {
-            printf("$%.4x: ", history[i].pc);
-            print_ins(stdout, history[i].op);
-            printf("\n");
-            printed = true;
-        }
-    }
-    if (!printed) {
-        printf("No instructions to display.\n");
-    }
-}
-
 void print_state(FILE *fp, cpu_t *cpu) {
     fprintf(fp, "pc: $%.4x, a: $%.2x, x: $%.2x, y: $%.2x, sp: $%.2x, sr: ", cpu->frame.pc, cpu->frame.ac, cpu->frame.x, cpu->frame.y, cpu->frame.sp);
     fprintf(fp, cpu->frame.sr.neg ? "n" : "-");

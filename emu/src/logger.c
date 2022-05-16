@@ -35,7 +35,7 @@ void log_ins(operation_t ins) {
     print_ins(log_fp, ins);
     fprintf(log_fp, "\t|\t");
     print_state(log_fp, cpu);
-    fprintf(log_fp, "\t|\tPPU: %3d, %3d CPU: %lld\n", ppu->draw_x, ppu->draw_y, cpu->cycles);
+    fprintf(log_fp, "\t|\tPPU: %3d, %3d CPU: %llu\n", ppu->draw_x, ppu->draw_y, cpu->cycles);
 }
 
 bool is_logging(void) {

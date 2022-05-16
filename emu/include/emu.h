@@ -17,15 +17,6 @@
 #define WINDOW_WIDTH    (SCREEN_WIDTH * 3)
 #define WINDOW_HEIGHT   (SCREEN_HEIGHT * 3)
 
-#define HIST_LEN        50
-
-typedef struct history {
-
-    operation_t     op;
-    uint16_t        pc;
-
-} history_t;
-
 /* init functions */
 
 bool init(void);
@@ -64,20 +55,19 @@ bool is_logging(void);
 void toggle_audio(void);
 bool is_muted(void);
 
+/* display functions */
+
+void toggle_fullscreen(void);
+bool is_fullscreen(void);
+
 /* util functions */
 
 const char *load_rom(const char *path);
 const char *load_save(const char *path);
 
-void dump_state();
+void dump_state(cpu_t *cpu);
 
-void print_hist();
 void print_ins(FILE *fp, operation_t ins);
 void print_state(FILE *fp, cpu_t *cpu);
 
 bool strprefix(const char *str, const char *pre);
-
-/* variables */
-
-extern SDL_Window *mainWindow;
-extern history_t history[HIST_LEN];

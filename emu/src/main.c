@@ -5,9 +5,6 @@ void keyboard_interupt_handler(int signum);
 
 static char *get_sav_path(const char *rom_path);
 
-SDL_Window *mainWindow = NULL;
-
-history_t history[HIST_LEN] = { 0 };
 handlers_t handlers = {
     .interrupted = false
 };
@@ -67,25 +64,15 @@ int main(int argc, char *argv[]) {
 bool init(void) {
     // Initialize SDL.
 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
-        printf("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
+        printf("SDL could not initialize: %s\n", SDL_GetError());
 		return false;
 	}
-
-    // Create the main window.
-	mainWindow = SDL_CreateWindow("NES Emulator (FPS: 0)", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
-	if (mainWindow == NULL) {
-		printf("Window could not be created! SDL_Error: %s\n", SDL_GetError());
-		return false;
-	}
-
-    // Ensure that the window can't be made smaller than the raw output of the PPU.
-    SDL_SetWindowMinimumSize(mainWindow, SCREEN_WIDTH, SCREEN_HEIGHT);
 
     // Initialize subsystems.
-    if (!init_audio()) {
+    if (!init_display()) {
         return false;
     }
-    if (!init_display()) {
+    if (!init_audio()) {
         return false;
     }
 
@@ -113,10 +100,6 @@ void exit_handler() {
     // Free the display.
     free_display();
 
-    // Destroy the window.
-    if (mainWindow != NULL)
-	    SDL_DestroyWindow(mainWindow);
-
     // Quit SDL subsystems.
     SDL_Quit();
 }
@@ -134,9 +117,6 @@ void keyboard_interupt_handler(int signum) {
         else if (strcmp(buffer, "quit") == 0) {
             handlers.running = false;
             handlers.interrupted = false;
-        }
-        else if (strcmp(buffer, "history") == 0) {
-            print_hist(history, HIST_LEN);
         }
         else if (strcmp(buffer, "state") == 0) {
             dump_state(cpu);
@@ -235,13 +215,6 @@ void run_hex(int argc, char *bytes[]) {
 }
 
 void before_execute(operation_t ins) {
-    // Update history.
-    for (int i = 0; i < HIST_LEN - 1; i++) {
-        history[i] = history[i + 1];
-    }
-    history[HIST_LEN - 1].pc = cpu->frame.pc;
-    history[HIST_LEN - 1].op = ins;
-
     // Log the instruction.
     log_ins(ins);
 }

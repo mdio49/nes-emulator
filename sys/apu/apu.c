@@ -396,6 +396,11 @@ void apu_update(apu_t *apu, addrspace_t *cpuas, int hcycles) {
             triangle = 0;
         }
 
+        // Ignore ultrasonic frequencies (i.e. period less than 2).
+        /*if (apu->triangle.timer_low < 2 && apu->triangle.timer_high == 0) {
+            triangle = 0;
+        }*/
+
         // Update noise timer.
         if (apu->noise.timer == 0) {
             // Calculate feedback.
@@ -445,6 +450,9 @@ void apu_update(apu_t *apu, addrspace_t *cpuas, int hcycles) {
             // If there are no bits remaining in the shift register, then load the next sample.
             if (apu->dmc.bits_remaining == 0) {
                 if (apu->dmc.bytes_remaining > 0) {
+                    // Clear the silence flag.
+                    apu->dmc.silence = false;
+
                     // Load next sample byte.
                     apu->dmc.shift_register = as_read(cpuas, apu->dmc.addr_counter);
                     apu->dmc.bytes_remaining--;
@@ -470,10 +478,6 @@ void apu_update(apu_t *apu, addrspace_t *cpuas, int hcycles) {
                             apu->irq_flag = true;
                         }
                     }
-                    else {
-                        // Clear the silence flag.
-                        apu->dmc.silence = false;
-                    }
                 }
                 else {
                     // Silence the channel if the sample buffer is empty (or if $4015 was cleared).
@@ -487,7 +491,7 @@ void apu_update(apu_t *apu, addrspace_t *cpuas, int hcycles) {
         }
 
         // Get output of DMC.
-        dmc = apu->dmc.output;
+        dmc = !apu->dmc.silence ? apu->dmc.output : 0;
 
         // Get mixer output.
         float pulse_out = apu->pulse_table[pulse1 + pulse2];

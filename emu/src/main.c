@@ -1,7 +1,6 @@
 #include <emu.h>
 
 void exit_handler(void);
-void keyboard_interupt_handler(int signum);
 
 static char *get_sav_path(const char *rom_path);
 
@@ -18,8 +17,7 @@ int msg_ptr = 0x6004;
 bool test = false;
 
 int main(int argc, char *argv[]) {
-    // Setup signal handlers.
-    signal(SIGINT, keyboard_interupt_handler);
+    // Setup exit handler.
     atexit(exit_handler);
 
     // Turn on the system.
@@ -102,34 +100,6 @@ void exit_handler() {
 
     // Quit SDL subsystems.
     SDL_Quit();
-}
-
-void keyboard_interupt_handler(int signum) {
-    char buffer[50];
-    handlers.interrupted = true;
-    while (handlers.interrupted) {
-        printf("> ");
-        scanf("%49s", buffer);
-        if (strcmp(buffer, "reset") == 0) {
-            sys_reset();
-            handlers.interrupted = false;
-        }
-        else if (strcmp(buffer, "quit") == 0) {
-            handlers.running = false;
-            handlers.interrupted = false;
-        }
-        else if (strcmp(buffer, "state") == 0) {
-            dump_state(cpu);
-        }
-        else if (strcmp(buffer, "continue") == 0) {
-            handlers.interrupted = false;
-        }
-        else {
-            printf("Invalid command.\n");
-        }
-    }
-
-    signal(SIGINT, keyboard_interupt_handler);
 }
 
 void run_bin(const char *path, bool test) {

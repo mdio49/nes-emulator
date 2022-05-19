@@ -11,14 +11,14 @@
 #define F_CPU_PAL   1662607
 
 typedef enum tv_sys {
-    TV_SYS_NTSC,
-    TV_SYS_PAL
+    TV_SYS_NTSC = 0x01,
+    TV_SYS_PAL = 0x02
 } tv_sys_t;
 
 typedef struct handlers {
 
     /* system flags */
-    bool        interrupted;                            // Set if emulation is currently paused.
+    bool        paused;                                 // Set if emulation is currently paused.
     bool        running;                                // Set if the system is currently running.
 
     /* cpu handlers */
@@ -58,8 +58,8 @@ void sys_insert(prog_t *prog);
 void sys_reset(void);
 
 /**
- * @brief Runs the NES. This method will loop forever unless sys_poweroff() is
- * called via a handler or interrupt in the emulator (or curprog is set to NULL).
+ * @brief Runs the NES. This method will loop forever unless the `running` field
+ * in the provided handlers struct is set to `false` by the emulator.
  * 
  * @param handlers A struct that contains emulator specific events that take place
  * and variables that may be altered during an interrupt in the emulator.

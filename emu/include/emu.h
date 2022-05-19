@@ -28,10 +28,16 @@ bool init_display(void);
 void free_audio(void);
 void free_display(void);
 
-/* run functions */
+/* emulator functions */
+
+void exit_handler(void);
 
 void run_bin(const char *path, bool test);
 void run_hex(int argc, char *argv[]);
+
+void pause(void);
+void resume(void);
+bool is_paused(void);
 
 /* callback functions */
 

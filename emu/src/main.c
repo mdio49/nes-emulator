@@ -1,11 +1,9 @@
 #include <emu.h>
 
-void exit_handler(void);
-
 static char *get_sav_path(const char *rom_path);
 
 handlers_t handlers = {
-    .interrupted = false
+    .paused = false
 };
 
 char *sav_path = NULL;
@@ -77,15 +75,17 @@ bool init(void) {
     return true;
 }
 
-void exit_handler() {
+void exit_handler(void) {
     // Close log (if it's open).
     end_log();
 
     // Save PRG-RAM data.
     if (sav_path != NULL) {
         FILE *fp = fopen(sav_path, "wb");
-        fwrite(curprog->prg_ram, sizeof(char), sav_data_size, fp);
-        fclose(fp);
+        if (fp != NULL) {
+            fwrite(curprog->prg_ram, sizeof(char), sav_data_size, fp);
+            fclose(fp);
+        }
         free(sav_path);
     }
 
@@ -182,6 +182,18 @@ void run_hex(int argc, char *bytes[]) {
 
     // Dump state.
     dump_state(cpu);
+}
+
+void pause(void) {
+    handlers.paused = true;
+}
+
+void resume(void) {
+    handlers.paused = false;
+}
+
+bool is_paused(void) {
+    return handlers.paused;
 }
 
 void before_execute(operation_t ins) {

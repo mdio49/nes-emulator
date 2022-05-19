@@ -145,6 +145,12 @@ void sys_run(handlers_t *handlers) {
     // Run the program.
     handlers->running = true;
     while (handlers->running) {
+        // If emulation is paused, then update the screen so that the program responds and spin until emulation is resumed.
+        if (handlers->paused) {
+            handlers->update_screen(NULL);
+            continue;
+        }
+
         // Record the old state of the NMI enable flag as enabling it while VBL flag is set should delay NMI for one instruction.
         bool nmi_delay = !ppu->status.vblank || !ppu->controller.nmi;
 
@@ -215,9 +221,6 @@ void sys_run(handlers_t *handlers) {
         // Store the state of next key to be checked in the joypad I/O registers.
         cpu->joypad1 = cpu->joypad1_t & 0x01;
         cpu->joypad2 = cpu->joypad2_t & 0x01;
-
-        // Spin while an interrupt is taking place.
-        while (handlers->interrupted);
     }
 }
 

@@ -2,7 +2,7 @@
 
 static void poll_events(void);
 
-const char *title = "NES Emulator";
+static const char *title = "NES Emulator";
 
 static SDL_Window *window = NULL;
 static SDL_Surface *surface = NULL;
@@ -81,7 +81,9 @@ void update_screen(const char *data) {
 
     // Update and copy the texture to the surface.
     SDL_Rect rect = { Vx, Vy, SCREEN_WIDTH, SCREEN_HEIGHT };
-    SDL_UpdateTexture(screen, NULL, data, PIXEL_STRIDE * SCREEN_WIDTH);
+    if (data != NULL) {
+        SDL_UpdateTexture(screen, NULL, data, PIXEL_STRIDE * SCREEN_WIDTH);
+    }
     SDL_RenderCopy(renderer, screen, NULL, &rect);
 
     // Present the rendering surface.
@@ -89,17 +91,24 @@ void update_screen(const char *data) {
     SDL_RenderSetScale(renderer, scale, scale);
     SDL_RenderPresent(renderer);
 
-    // Keep track of the FPS.
-    frame_counter++;
-    uint64_t ticks = SDL_GetTicks64();
-    uint64_t delta = ticks - last_fps;
-    if (delta >= 1000) {
-        char window_title[50];
-        sprintf(window_title, "%s (FPS: %llu)", title, frame_counter);
-        SDL_SetWindowTitle(window, window_title);
+    // Keep track of the FPS (if the emulator isn't paused).
+    if (data != NULL) {
+        frame_counter++;
+        uint64_t ticks = SDL_GetTicks64();
+        uint64_t delta = ticks - last_fps;
+        if (delta >= 1000) {
+            char window_title[50];
+            sprintf(window_title, "%s (FPS: %llu)", title, frame_counter);
+            SDL_SetWindowTitle(window, window_title);
 
-        last_fps += 1000;
-        frame_counter = 0;
+            last_fps += 1000;
+            frame_counter = 0;
+        }
+    }
+    else {
+        char window_title[50];
+        sprintf(window_title, "%s (Paused)", title);
+        SDL_SetWindowTitle(window, window_title);
     }
 }
 
@@ -116,6 +125,14 @@ static void poll_events(void) {
                 }
                 if (e.key.keysym.scancode == SDL_SCANCODE_R) {
                     sys_reset();
+                }
+                if (e.key.keysym.scancode == SDL_SCANCODE_P) {
+                    if (is_paused()) {
+                        resume();
+                    }
+                    else {
+                        pause();
+                    }
                 }
                 if (e.key.keysym.scancode == SDL_SCANCODE_L) {
                     if (is_logging()) {

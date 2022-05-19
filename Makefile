@@ -98,5 +98,5 @@ $(PPU): $(OBJ_PATH)/%.o: $(PPU_DIR)/%.c $(PPU_H) $(MEMORY)
 $(MAPPERS): $(OBJ_PATH)/%.o: $(MAPPERS_DIR)/%.c $(MAPPERS_H) $(MEMORY)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(MEMORY): $(OBJ_PATH)/%.o: $(MEMORY_DIR)/%.c $(VM_H)
+$(MEMORY): $(OBJ_PATH)/%.o: $(MEMORY_DIR)/%.c $(MEMORY_H)
 	$(CC) $(CFLAGS) -c $< -o $@

@@ -51,16 +51,26 @@ ALL = $(APU) $(CPU) $(MAPPERS) $(MEMORY) $(PPU) $(PROG) $(SYS)
 EMU = $(patsubst $(EMU_DIR)/%.c,$(OBJ_PATH)/%.o, $(wildcard $(EMU_DIR)/*.c))
 TEST = $(patsubst $(TEST_DIR)/%.c,$(OBJ_PATH)/%.o, $(wildcard $(TEST_DIR)/*.c))
 
+# Other variables.
+ifeq ($(OS),Windows_NT)
+	INIT_CMD = if not exist $(OBJ_PATH) mkdir $(OBJ_PATH)
+else
+	INIT_CMD = mkdir -p $(OBJ_PATH)
+endif
+
 # Main targets.
 
-main: $(EMU)
+main: init $(EMU)
 	$(CC) $(CFLAGS) $(EMU) $(ALL) -o $(TARGET) $(LIB_FLAGS) $(LINKER_FLAGS)
 
-test: $(TEST)
+test: init $(TEST)
 	$(CC) $(CFLAGS) $(TEST) $(CPU) $(MEMORY) -o $(TARGET)_test
 
 clean:
-	rm $(OBJ_PATH)/*.o *.exe -rf
+	@rm $(OBJ_PATH)/*.o *.exe -rf
+
+init:
+	@$(INIT_CMD)
 
 # Dependency targets.
 

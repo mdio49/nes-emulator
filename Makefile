@@ -5,7 +5,7 @@ TARGET = emu
 # Paths.
 INC_PATHS = emu/include SDL2/include sys/include
 LIB_PATHS = SDL2/lib
-SRC_PATH = .
+OBJ_PATH = bin
 
 # Flags
 LIB_FLAGS = $(foreach d, $(LIB_PATHS),-L $d)
@@ -16,42 +16,77 @@ CFLAGS = -g -Wall $(INC_FLAGS)
 LINKER_INPUT = SDL2 SDL2main
 LINKER_FLAGS = $(foreach d, $(LINKER_INPUT),-l $d)
 
-# Object files (excluding main).
-MAIN = main.o test.o
-OBJECTS = $(filter-out $(MAIN), $(wildcard *.o))
+# Header files.
+APU_H = sys/include/apu.h
+CPU_H = sys/include/addrmodes.h sys/include/cpu.h sys/include/instructions.h
+EMU_H = emu/include/*.h
+MAPPERS_H = sys/include/mapper.h sys/include/mappers.h
+MEMORY_H = sys/include/vm.h
+PPU_H = sys/include/color.h sys/include/ppu.h
+PROG_H = sys/include/ines.h sys/include/prog.h
+SYS_H = sys/include/sys.h
 
-main: main.o
-	$(CC) $(CFLAGS) $(OBJECTS) main.o -o $(TARGET) $(LIB_FLAGS) $(LINKER_FLAGS)
+# Source directories.
+APU_DIR = sys/apu
+CPU_DIR = sys/cpu
+MAPPERS_DIR = sys/mappers
+MEMORY_DIR = sys/memory
+PPU_DIR = sys/ppu
+PROG_DIR = sys/prog
+SYS_DIR = sys/nes
 
-test: test.o
-	$(CC) $(CFLAGS) $(OBJECTS) test.o -o $(TARGET)_test 
+EMU_DIR = emu/src
+TEST_DIR = emu/test
 
-test.o: emu/test/*.c cpu.o
-	$(CC) $(CFLAGS) -c emu/test/*.c
+# Object files.
+APU = $(patsubst $(APU_DIR)/%.c,$(OBJ_PATH)/%.o, $(wildcard $(APU_DIR)/*.c))
+CPU = $(patsubst $(CPU_DIR)/%.c,$(OBJ_PATH)/%.o, $(wildcard $(CPU_DIR)/*.c))
+MAPPERS = $(patsubst $(MAPPERS_DIR)/%.c,$(OBJ_PATH)/%.o, $(wildcard $(MAPPERS_DIR)/*.c))
+MEMORY = $(patsubst $(MEMORY_DIR)/%.c,$(OBJ_PATH)/%.o, $(wildcard $(MEMORY_DIR)/*.c))
+PPU = $(patsubst $(PPU_DIR)/%.c,$(OBJ_PATH)/%.o, $(wildcard $(PPU_DIR)/*.c))
+PROG = $(patsubst $(PROG_DIR)/%.c,$(OBJ_PATH)/%.o, $(wildcard $(PROG_DIR)/*.c))
+SYS = $(patsubst $(SYS_DIR)/%.c,$(OBJ_PATH)/%.o, $(wildcard $(SYS_DIR)/*.c))
 
-main.o: emu/src/*.c sys.o
-	$(CC) $(CFLAGS) -c emu/src/*.c
+ALL = $(APU) $(CPU) $(MAPPERS) $(MEMORY) $(PPU) $(PROG) $(SYS)
+EMU = $(patsubst $(EMU_DIR)/%.c,$(OBJ_PATH)/%.o, $(wildcard $(EMU_DIR)/*.c))
+TEST = $(patsubst $(TEST_DIR)/%.c,$(OBJ_PATH)/%.o, $(wildcard $(TEST_DIR)/*.c))
 
-sys.o: apu.o cpu.o ppu.o prog.o
-	$(CC) $(CFLAGS) -c sys/nes/*.c
+# Main targets.
 
-prog.o: sys/prog/*.c mappers.o
-	$(CC) $(CFLAGS) -c sys/prog/*.c
+main: $(EMU)
+	$(CC) $(CFLAGS) $(EMU) $(ALL) -o $(TARGET) $(LIB_FLAGS) $(LINKER_FLAGS)
 
-apu.o: sys/apu/*.c cpu.o
-	$(CC) $(CFLAGS) -c sys/apu/*.c
-
-cpu.o: sys/cpu/*.c memory.o
-	$(CC) $(CFLAGS) -c sys/cpu/*.c
-
-ppu.o: sys/ppu/*.c memory.o
-	$(CC) $(CFLAGS) -c sys/ppu/*.c
-
-mappers.o: sys/mappers/*.c memory.o
-	$(CC) $(CFLAGS) -c sys/mappers/*.c
-
-memory.o: sys/memory/*.c
-	$(CC) $(CFLAGS) -c sys/memory/*.c
+test: $(TEST)
+	$(CC) $(CFLAGS) $(TEST) $(CPU) $(MEMORY) -o $(TARGET)_test
 
 clean:
-	rm *.o *.exe -rf
+	rm $(OBJ_PATH)/*.o *.exe -rf
+
+# Dependency targets.
+
+$(EMU): $(OBJ_PATH)/%.o: $(EMU_DIR)/%.c $(EMU_H) $(SYS)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(TEST): $(OBJ_PATH)/%.o: $(TEST_DIR)/%.c $(CPU)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(SYS): $(OBJ_PATH)/%.o: $(SYS_DIR)/%.c $(SYS_H) $(APU) $(CPU) $(PPU) $(PROG)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(PROG): $(OBJ_PATH)/%.o: $(PROG_DIR)/%.c $(PROG_H) $(MAPPERS)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(APU): $(OBJ_PATH)/%.o: $(APU_DIR)/%.c $(API_H) $(CPU)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(CPU): $(OBJ_PATH)/%.o: $(CPU_DIR)/%.c $(CPU_H) $(MEMORY) 
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(PPU): $(OBJ_PATH)/%.o: $(PPU_DIR)/%.c $(PPU_H) $(MEMORY) 
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(MAPPERS): $(OBJ_PATH)/%.o: $(MAPPERS_DIR)/%.c $(MAPPERS_H) $(MEMORY)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(MEMORY): $(OBJ_PATH)/%.o: $(MEMORY_DIR)/%.c $(VM_H)
+	$(CC) $(CFLAGS) -c $< -o $@

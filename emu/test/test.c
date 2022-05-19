@@ -318,10 +318,9 @@ void test_instructions(tframe_t *frame) {
     assert(frame->ac == 10);
     assert(frame->sp = sp_start);
 
-    srflags_t sr = frame->sr;
-    exec_ins(&INS_PHP, frame, as, 0, NULL);;
-    frame->sr.bits = ~sr.bits;
-    exec_ins(&INS_PLP, frame, as, 0, NULL);;
+    sr_flags_t sr = frame->sr;
+    exec_ins(&INS_PHP, frame, as, 0, NULL);
+    exec_ins(&INS_PLP, frame, as, 0, NULL);
     assert(frame->sr.carry == sr.carry);
     assert(frame->sr.dec == sr.dec);
     assert(frame->sr.irq == sr.irq);
@@ -803,7 +802,14 @@ void test_instructions(tframe_t *frame) {
     assert(prev.ac == frame->ac);
     assert(prev.pc == frame->pc);
     assert(prev.sp == frame->sp);
-    assert(prev.sr.bits == frame->sr.bits);
+    assert(prev.sr.brk == frame->sr.brk);
+    assert(prev.sr.carry == frame->sr.carry);
+    assert(prev.sr.dec == frame->sr.dec);
+    assert(prev.sr.ign == frame->sr.ign);
+    assert(prev.sr.irq == frame->sr.irq);
+    assert(prev.sr.neg == frame->sr.neg);
+    assert(prev.sr.vflow == frame->sr.vflow);
+    assert(prev.sr.zero == frame->sr.zero);
     assert(prev.sp == frame->sp);
     assert(prev.x == frame->x);
     assert(prev.y == frame->y);
@@ -986,18 +992,18 @@ void test_branch(tframe_t *frame, const addrspace_t *as, const instruction_t *br
     addr_t target = start + 5;
     frame->pc = start;
 
-    frame->sr.bits = !true_val ? mask : 0x00;
+    frame->sr = bits_to_sr(!true_val ? mask : 0x00);
     exec_ins(branch, frame, as, target, NULL);
     assert(frame->pc == start);
 
-    frame->sr.bits = true_val ? mask : 0x00;
+    frame->sr = bits_to_sr(true_val ? mask : 0x00);
     exec_ins(branch, frame, as, target, NULL);
     assert(frame->pc == target);
 
     frame->pc = start;
     target = start - 5;
 
-    frame->sr.bits = true_val ? mask : 0x00;
+    frame->sr = bits_to_sr(true_val ? mask : 0x00);
     exec_ins(branch, frame, as, target, NULL);
     assert(frame->pc == target);
 }

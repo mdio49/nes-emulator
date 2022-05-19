@@ -25,6 +25,7 @@ During emulation, the emulator accepts the following keys as controller input fo
 
 The following hotkeys may also be used to control the emulator:
 - `R`: Reset.
+- `P`: Pause/resume.
 - `F4`: Toggle fullscreen.
 - `M`: Toggle audio.
 - `L`: Start/stop logger.

@@ -86,7 +86,7 @@ $(SYS): $(OBJ_PATH)/%.o: $(SYS_DIR)/%.c $(SYS_H) $(APU) $(CPU) $(PPU) $(PROG)
 $(PROG): $(OBJ_PATH)/%.o: $(PROG_DIR)/%.c $(PROG_H) $(MAPPERS)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(APU): $(OBJ_PATH)/%.o: $(APU_DIR)/%.c $(API_H) $(CPU)
+$(APU): $(OBJ_PATH)/%.o: $(APU_DIR)/%.c $(APU_H) $(CPU)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(CPU): $(OBJ_PATH)/%.o: $(CPU_DIR)/%.c $(CPU_H) $(MEMORY) 

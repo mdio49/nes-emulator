@@ -106,9 +106,13 @@ void update_screen(const char *data) {
         }
     }
     else {
+        // Update title.
         char window_title[50];
         sprintf(window_title, "%s (Paused)", title);
         SDL_SetWindowTitle(window, window_title);
+
+        // Add a delay to prevent the program from hogging OS resources.
+        SDL_Delay(100);
     }
 }
 

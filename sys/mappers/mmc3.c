@@ -14,8 +14,8 @@
  */
 
 #define N_REGISTERS     16
-#define SELECT_INDEX    0    
-#define BANKS_INDEX     1   
+#define SELECT_INDEX    0
+#define BANKS_INDEX     1
 #define MIRROR_INDEX    9
 #define PROTECT_INDEX   10
 

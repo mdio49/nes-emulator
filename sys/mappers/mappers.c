@@ -14,6 +14,8 @@ static inline void init_mappers(void) {
     mappers[3] = ines003;
     mappers[4] = mmc3;
     // ...
+    mappers[9] = mmc2; // Mike Tyson's Punch Out!!
+    // ...
 }
 
 static uint8_t *default_map(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset) {

@@ -98,6 +98,6 @@ void mapper_insert(mapper_t *mapper, prog_t *prog);
 void mapper_monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vaddr, uint8_t value, bool write);
 
 /* mapper singletons */
-extern const mapper_t nrom, mmc1, uxrom, ines003, mmc3;
+extern const mapper_t nrom, mmc1, uxrom, ines003, mmc3, mmc2;
 
 #endif

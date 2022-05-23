@@ -14,7 +14,6 @@
  */
 
 #define N_REGISTERS     6
-#define MIRROR_INDEX    9
 
 #define CHR_BANK0       0x0000
 #define CHR_BANK1       0x1000

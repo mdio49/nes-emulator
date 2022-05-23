@@ -11,40 +11,28 @@
 #define INES_INST_ROM_SIZE  8192
 #define INES_PROM_SIZE      16
 
-typedef union ines_flag6 {
-    struct {
-        unsigned    mirroring   : 1;
-        unsigned    prg_ram     : 1;
-        unsigned    trainer     : 1;
-        unsigned    four_screen : 1;
-        unsigned    mapper_low  : 4;
-    } flags;
-    uint8_t bits;
+typedef struct ines_flag6 {
+    unsigned    mirroring   : 1;
+    unsigned    prg_ram     : 1;
+    unsigned    trainer     : 1;
+    unsigned    four_screen : 1;
+    unsigned    mapper_low  : 4;
 } ines_flag6_t;
 
-typedef union ines_flag7 {
-    struct {
-        unsigned    vs_unisys       : 1;
-        unsigned    playchoice_10   : 1;
-        unsigned    format          : 2;
-        unsigned    mapper_high     : 4;
-    } flags;
-    uint8_t bits;
+typedef struct ines_flag7 {
+    unsigned    vs_unisys       : 1;
+    unsigned    playchoice_10   : 1;
+    unsigned    format          : 2;
+    unsigned    mapper_high     : 4;
 } ines_flag7_t;
 
-typedef union ines_flag8 {
-    struct {
-        unsigned    prg_ram_size    : 8;
-    } flags;
-    uint8_t bits;
+typedef struct ines_flag8 {
+    unsigned    prg_ram_size    : 8;
 } ines_flag8_t;
 
-typedef union ines_flag9 {
-    struct {
-        unsigned    tv_sys  : 1;
-        unsigned            : 7;
-    } flags;
-    uint8_t bits;
+typedef struct ines_flag9 {
+    unsigned    tv_sys  : 1;
+    unsigned            : 7;
 } ines_flag9_t;
 
 typedef struct ines_header {

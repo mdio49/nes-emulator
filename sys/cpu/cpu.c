@@ -88,6 +88,8 @@ cpu_t *cpu_create(void) {
     cpu->joypad1_t = 0;
     cpu->joypad2_t = 0;
     cpu->jp_strobe = 0;
+    cpu->oam_upload = 0;
+    cpu->cycles = 0;
 
     return cpu;
 }
@@ -145,14 +147,17 @@ uint8_t cpu_fetch(const cpu_t *cpu) {
 }
 
 operation_t cpu_decode(const cpu_t *cpu, const uint8_t opc) {
-    // Convert the raw data into an opcode_t.
-    opcode_converter_t decoder;
-    decoder.raw = opc;
+    // Convert the raw opcode into an opcode_t.
+    opcode_t opcode = {
+        .group = opc & 0x03,
+        .addrmode = (opc >> 2) & 0x07,
+        .num = (opc >> 5) & 0x07,
+    };
 
     // Decode the opcode to determine the instruction and address mode.
     operation_t result = { .opc = opc };
-    result.instruction = get_instruction(decoder.opcode);
-    result.addr_mode = get_address_mode(decoder.opcode);
+    result.instruction = get_instruction(opcode);
+    result.addr_mode = get_address_mode(opcode);
 
     // Get the arguments.
     result.args[0] = as_read(cpu->as, cpu->frame.pc + 1);
@@ -160,7 +165,7 @@ operation_t cpu_decode(const cpu_t *cpu, const uint8_t opc) {
 
     // If the instruction is invalid, then print an error and terminate.
     if (result.instruction == NULL) {
-        printf("Invalid instruction: $%.2x. Program terminated.\n", decoder.raw);
+        printf("Invalid instruction: $%.2x. Program terminated.\n", opc);
         exit(1);
     }
 
@@ -176,7 +181,7 @@ int cpu_execute(cpu_t *cpu, operation_t op) {
 
     // Determine the memory location of the instruction's argument using the correct address mode.
     const mem_loc_t loc = op.addr_mode->resolve(&cpu->frame, cpu->as, op.args);
-
+    
     // Execute the instruction.
     int cycles = op.instruction->apply(&cpu->frame, cpu->as, op.addr_mode, loc);
 

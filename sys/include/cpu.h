@@ -176,14 +176,6 @@ typedef struct opcode {
 } opcode_t;
 
 /**
- * @brief A union to convert raw byte values into opcodes and vice versa.
- */
-typedef union opcode_converter {
-    opcode_t    opcode;
-    uint8_t     raw;
-} opcode_converter_t;
-
-/**
  * @brief A single CPU operation that contains an instruction along with the
  * address mode that will be used to process the argument(s) to this instruction.
  */

@@ -14,9 +14,9 @@
 #define NAMETABLE2  0x2800
 #define NAMETABLE3  0x2C00
 
-#define NT(V)       ((V >> 10) & 0x03);
-#define NT_X(V)     ((V >> 10) & 0x01);
-#define NT_Y(V)     ((V >> 11) & 0x01);
+#define NT(V)       ((V >> 10) & 0x03)
+#define NT_X(V)     ((V >> 10) & 0x01)
+#define NT_Y(V)     ((V >> 11) & 0x01)
 
 #define PPU_CTRL    0x2000
 #define PPU_MASK    0x2001

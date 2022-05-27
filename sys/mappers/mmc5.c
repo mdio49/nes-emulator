@@ -12,6 +12,8 @@
 #define FILL_MODE_TILE  0x5006
 #define FILL_MODE_COLOR 0x5007
 
+#define PRG_SELECT      0x5013
+
 #define CHR_BANK0       0x0000
 #define CHR_BANK_SIZE   0x0400
 
@@ -26,17 +28,19 @@
 
 struct mmc5_data {
 
-    uint8_t     prg_mode;
-    uint8_t     chr_mode;
+    uint8_t     prg_mode;           // PRG mode
+    uint8_t     chr_mode;           // CHR mode
 
-    uint8_t     prg_ram_protect_1;
-    uint8_t     prg_ram_protect_2;
+    uint8_t     prg_ram_protect_1;  // PRG-RAM protect 1
+    uint8_t     prg_ram_protect_2;  // PRG-RAM protect 2
 
     uint8_t     ex_ram_mode;
     uint8_t     nt_mapping;
 
     uint8_t     fill_mode_tile;
     uint8_t     fill_mode_color;
+
+    uint8_t     prg_banks[5];       // PRG bank select
 
 };
 
@@ -89,6 +93,8 @@ static void insert(mapper_t *mapper, prog_t *prog) {
     as_add_segment(mapper->cpuas, NT_MAPPING, 1, &data->nt_mapping, AS_WRITE);
     as_add_segment(mapper->cpuas, FILL_MODE_TILE, 1, &data->fill_mode_tile, AS_WRITE);
     as_add_segment(mapper->cpuas, FILL_MODE_COLOR, 1, &data->fill_mode_color, AS_WRITE);
+
+    as_add_segment(mapper->cpuas, PRG_SELECT, sizeof(data->prg_banks), data->prg_banks, AS_WRITE);
     
     // Switchable 8KB of PRG-RAM (128KB allocated).
     prog->prg_ram = malloc(PRG_RAM_SIZE * sizeof(uint8_t));
@@ -124,12 +130,79 @@ static void monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vadd
 }
 
 static uint8_t *map_ram(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset) {
-    // TODO
-    return target;
+    struct mmc5_data *data = (struct mmc5_data*)mapper->data;
+    return target + (data->prg_banks[0] & 0x7F) * PRG_BANK_SIZE;
 }
 
 static uint8_t *map_prg(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset) {
-    // TODO
+    struct mmc5_data *data = (struct mmc5_data*)mapper->data;
+    uint8_t bank = (vaddr - PRG_BANK0) / PRG_BANK_SIZE;
+    uint8_t mode = data->prg_mode;
+
+    // Determine the bank selection and ROM/RAM select depending on the mode.
+    uint8_t select;
+    bool prg_ram_select = false;
+    if (mode == 0) {
+        // 32KB switchable ROM bank.
+        select = (data->prg_banks[4] & 0x7C) | (bank & 0x03);
+    }
+    else if (mode == 1) {
+        if (vaddr < PRG_BANK2) {
+            // 16KB switchable ROM/RAM bank.
+            prg_ram_select = ((data->prg_banks[2] & 0x80) == 0);
+            select = (data->prg_banks[2] & 0x7E) | (bank & 0x01);
+        }
+        else {
+            // 16KB switchable ROM bank.
+            select = (data->prg_banks[4] & 0x7E) | (bank & 0x01);
+        }
+    }
+    else if (mode == 2) {   
+        if (vaddr < PRG_BANK2) {
+            // 16KB switchable ROM/RAM bank.
+            prg_ram_select = ((data->prg_banks[2] & 0x80) == 0);
+            select = (data->prg_banks[2] & 0x7E) | (bank & 0x01);
+        }
+        else if (vaddr < PRG_BANK3) {
+            // 8KB switchable ROM/RAM bank.
+            prg_ram_select = ((data->prg_banks[3] & 0x80) == 0);
+            select = data->prg_banks[3] & 0x7F;
+        }
+        else {
+            // 8KB switchable ROM bank.
+            select = data->prg_banks[4] & 0x7F;
+        }
+    }
+    else {
+        if (vaddr < PRG_BANK1) {
+            // 8KB switchable ROM/RAM bank.
+            prg_ram_select = ((data->prg_banks[1] & 0x80) == 0);
+            select = data->prg_banks[1] & 0x7F;
+        }
+        else if (vaddr < PRG_BANK2) {
+            // 8KB switchable ROM/RAM bank.
+            prg_ram_select = ((data->prg_banks[2] & 0x80) == 0);
+            select = data->prg_banks[2] & 0x7F;
+        }
+        else if (vaddr < PRG_BANK3) {
+            // 8KB switchable ROM/RAM bank.
+            prg_ram_select = ((data->prg_banks[3] & 0x80) == 0);
+            select = data->prg_banks[3] & 0x7F;
+        }
+        else {
+            // 8KB switchable ROM bank.
+            select = data->prg_banks[4] & 0x7F;
+        }
+    }
+
+    // Switch to PRG-RAM if RAM is selected.
+    if (prg_ram_select) {
+        target = prog->prg_ram + offset;
+    }
+
+    // Adjust the offset based on the selected bank.
+    target += select * PRG_BANK_SIZE;
+
     return target;
 }
 

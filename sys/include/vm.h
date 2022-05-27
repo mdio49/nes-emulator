@@ -81,6 +81,20 @@ void as_add_segment(addrspace_t *as, addr_t start, size_t size, uint8_t *target,
 void as_add_mirror(addrspace_t *as, addr_t start, addr_t end, size_t repeat, addr_t target);
 
 /**
+ * @brief Modifies segments within the given address range in order to point to the provided
+ * target with the given permissions. Segments must be fully contained within the range in order
+ * to be affected. `NULL` can be passed in the target in order to make the segment(s) retain
+ * their current target. Likewise, 0 can be passed into the mode in order to not change it.
+ * 
+ * @param as The address space to modify.
+ * @param start The minimum address.
+ * @param end The maximum address (inclusive).
+ * @param target The new target (or `NULL` to not change the target).
+ * @param mode The new mode (or 0 to retain the current mode).
+ */
+void as_modify_segments(addrspace_t *as, addr_t start, addr_t end, uint8_t *target, uint8_t mode);
+
+/**
  * @brief Sets the resolve rule that is called whenever a virtual address in the given address
  * space is resolved into a "physical" address in the emulator's virtual address space.
  * 
@@ -100,8 +114,8 @@ void as_set_update_rule(addrspace_t *as, update_rule_t rule);
 
 /**
  * @brief Reads the value at the memory location corresponding to the given virtual address. If
- * the address space does not have a segment that contains the given virtual address, then this
- * method will produce a segmentation error.
+ * the address space does not have a segment that contains the given virtual address, or the
+ * segment does not have read permissions, then the result is "open bus behaviour".
  * 
  * @param as The address space.
  * @param vaddr The virtual address.
@@ -111,8 +125,8 @@ uint8_t as_read(const addrspace_t *as, addr_t vaddr);
 
 /**
  * @brief Writes a value to the memory location corresponding to the given virtual address. If
- * the address space does not have a segment that contains the given virtual address, then this
- * method will produce a segmentation error.
+ * the address space does not have a segment that contains the given virtual address, or the
+ * segment does not have write permissions, then the result is "open bus behaviour".
  * 
  * @param as The address space.
  * @param vaddr The virtual address.

@@ -228,6 +228,28 @@ void as_add_mirror(addrspace_t *as, addr_t start, addr_t end, size_t repeat, add
     as->mirrors_tail = mirror;
 }
 
+void as_modify_segments(addrspace_t *as, addr_t start, addr_t end, uint8_t *target, uint8_t mode) {
+    for (int i = start / SEG_SIZE; i <= end / SEG_SIZE; i++) {
+        for (mem_seg_t *seg = as->segs[i]; seg != NULL; seg = seg->next) {
+            // Ensure that the segment is fully contained within the range.
+            if (seg->start < start)
+                continue;
+            if (seg->end - 1 > end)
+                break;
+
+            // Update target.
+            if (target != NULL) {
+                seg->target = target;
+            }
+
+            // Update mode.
+            if (mode > 0) {
+                seg->mode = mode;
+            }
+        }
+    }
+}
+
 void as_set_resolve_rule(addrspace_t *as, resolve_rule_t rule) {
     as->resolve_rule = rule;
 }

@@ -13,7 +13,7 @@ static inline void init_mappers(void) {
     mappers[2] = uxrom;
     mappers[3] = ines003;
     mappers[4] = mmc3;
-    //mappers[5] = mmc5;
+    mappers[5] = mmc5;
     // ...
     mappers[9] = mmc2; // Mike Tyson's Punch Out!!
     // ...

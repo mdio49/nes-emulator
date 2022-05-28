@@ -3,17 +3,17 @@
 #include <stdlib.h>
 #include <ppu.h>
 
-#define PRG_MODE        0x5000
-#define CHR_MODE        0x5001
-#define PRG_RAM_PRTC1   0x5002
-#define PRG_RAM_PRTC2   0x5003
-#define EX_RAM_MODE     0x5004
-#define NT_MAPPING      0x5005
-#define FILL_MODE_TILE  0x5006
-#define FILL_MODE_COLOR 0x5007
+#define PRG_MODE        0x5100
+#define CHR_MODE        0x5101
+#define PRG_RAM_PRTC1   0x5102
+#define PRG_RAM_PRTC2   0x5103
+#define EX_RAM_MODE     0x5104
+#define NT_MAPPING      0x5105
+#define FILL_MODE_TILE  0x5106
+#define FILL_MODE_COLOR 0x5107
 
-#define PRG_SELECT      0x5013
-#define CHR_SELECT      0x5020
+#define PRG_SELECT      0x5113
+#define CHR_SELECT      0x5120
 
 #define CHR_BANK0       0x0000
 #define CHR_BANK_SIZE   0x0400
@@ -45,6 +45,7 @@ struct mmc5_data {
     uint8_t     chr_banks[12];      // CHR bank select
     uint8_t     ex_ram[1024];       // 1KB of on-chip memory
 
+    uint8_t     prg_mask;           // PRG-ROM mask.
     uint8_t     read_buffer;        // Read buffer used for fill mode and NT mode 2 with no EX-RAM.
 
 };
@@ -104,9 +105,9 @@ static void insert(mapper_t *mapper, prog_t *prog) {
     
     // Switchable 8KB of PRG-RAM (128KB allocated).
     prog->prg_ram = malloc(PRG_RAM_SIZE * sizeof(uint8_t));
-    as_add_segment(mapper->cpuas, PRG_RAM, PRG_RAM_SIZE, prog->prg_ram, AS_READ | AS_WRITE);
+    as_add_segment(mapper->cpuas, PRG_RAM, PRG_BANK_SIZE, prog->prg_ram, AS_READ | AS_WRITE);
     
-    // Up to 4 switchable PRG-ROM (and RAM) banks (map it to start of PRG-ROM).
+    // Up to 4 switchable 8KB PRG-ROM (and RAM) banks (map it to start of PRG-ROM).
     as_add_segment(mapper->cpuas, PRG_BANK0, PRG_BANK_SIZE, (uint8_t*)prog->prg_rom, AS_READ | AS_WRITE);
     as_add_segment(mapper->cpuas, PRG_BANK1, PRG_BANK_SIZE, (uint8_t*)prog->prg_rom, AS_READ | AS_WRITE);
     as_add_segment(mapper->cpuas, PRG_BANK2, PRG_BANK_SIZE, (uint8_t*)prog->prg_rom, AS_READ | AS_WRITE);
@@ -129,12 +130,33 @@ static void insert(mapper_t *mapper, prog_t *prog) {
     as_add_segment(mapper->ppuas, NAMETABLE1, NT_SIZE, mapper->vram, AS_READ | AS_WRITE);
     as_add_segment(mapper->ppuas, NAMETABLE2, NT_SIZE, mapper->vram, AS_READ | AS_WRITE); 
     as_add_segment(mapper->ppuas, NAMETABLE3, NT_SIZE, mapper->vram, AS_READ | AS_WRITE);
+
+    // Games expect $5017 = $FF at power on.
+    data->prg_banks[4] = 0xFF;
+
+    // Determine mask used to determine PRG bank number (cached for efficiency).
+    uint8_t mask;
+    if (prog->header.prg_rom_size < 2)
+        mask = 0x01;
+    else if (prog->header.prg_rom_size < 4)
+        mask = 0x03;
+    else if (prog->header.prg_rom_size < 8)
+        mask = 0x07;
+    else if (prog->header.prg_rom_size < 16)
+        mask = 0x0F;
+    else if (prog->header.prg_rom_size < 32)
+        mask = 0x1F;
+    else if (prog->header.prg_rom_size < 64)
+        mask = 0x3F;
+    else
+        mask = 0x7F;
+    data->prg_mask = mask;
 }
 
 static void monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vaddr, uint8_t value, bool write) {
     if (as == mapper->cpuas) {
         // CPU
-        
+
     }
     else {
         // PPU
@@ -150,7 +172,7 @@ static uint8_t *map_ram(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *t
 static uint8_t *map_prg(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset) {
     struct mmc5_data *data = (struct mmc5_data*)mapper->data;
     const uint8_t bank = (vaddr - PRG_BANK0) / PRG_BANK_SIZE;
-    const uint8_t mode = data->prg_mode;
+    const uint8_t mode = data->prg_mode & 0x03;
 
     // Determine the bank selection and ROM/RAM select depending on the mode.
     uint8_t select;
@@ -170,7 +192,7 @@ static uint8_t *map_prg(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *t
             select = (data->prg_banks[4] & 0x7E) | (bank & 0x01);
         }
     }
-    else if (mode == 2) {   
+    else if (mode == 2) {
         if (vaddr < PRG_BANK2) {
             // 16KB switchable ROM/RAM bank.
             prg_ram_select = ((data->prg_banks[2] & 0x80) == 0);
@@ -214,14 +236,45 @@ static uint8_t *map_prg(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *t
     }
 
     // Adjust the offset based on the selected bank.
-    target += select * PRG_BANK_SIZE;
-
-    return target;
+    uint8_t mask = prg_ram_select ? 0x0F : data->prg_mask;
+    return target + (select & mask) * PRG_BANK_SIZE;
 }
 
 static uint8_t *map_chr(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset) {
-    // TODO
-    return target;
+    struct mmc5_data *data = (struct mmc5_data*)mapper->data;
+    const uint8_t bank = (vaddr - CHR_BANK0) / CHR_BANK_SIZE;
+    const uint8_t mode = data->chr_mode & 0x03;
+
+    uint8_t mask, size;
+    if (mode == 0) {
+        // 8KB pages.
+        size = 8;
+        mask = 0x07;
+    }
+    else if (mode == 1) {
+        // 4KB pages.
+        size = 4;
+        mask = 0x03;
+    }
+    else if (mode == 2) {
+        // 2KB pages.
+        size = 2;
+        mask = 0x01;
+    }
+    else {
+        // 1KB pages.
+        size = 1;
+        mask = 0x00;
+    }
+    
+    // Offset based on the page that is selected for the current bank.
+    uint8_t index = ((bank & ~mask) | mask) & 0x07;
+    target += data->chr_banks[index] * CHR_BANK_SIZE * size;
+
+    // Adjust the address to the correct bank (as each 1KB segment points to the top of memory).
+    target += (bank & mask) * CHR_BANK_SIZE;
+
+    return target; 
 }
 
 static uint8_t *map_nts(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *target, size_t offset) {

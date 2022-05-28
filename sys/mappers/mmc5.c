@@ -15,6 +15,9 @@
 #define PRG_SELECT      0x5113
 #define CHR_SELECT      0x5120
 
+#define MULT_LOW        0x5205
+#define MULT_HIGH       0x5206
+
 #define CHR_BANK0       0x0000
 #define CHR_BANK_SIZE   0x0400
 
@@ -29,24 +32,35 @@
 
 struct mmc5_data {
 
-    uint8_t     prg_mode;           // PRG mode
-    uint8_t     chr_mode;           // CHR mode
+    uint8_t     prg_mode;           // PRG mode.
+    uint8_t     chr_mode;           // CHR mode.
 
-    uint8_t     prg_ram_protect_1;  // PRG-RAM protect 1
-    uint8_t     prg_ram_protect_2;  // PRG-RAM protect 2
+    uint8_t     prg_ram_protect_1;  // PRG-RAM protect 1.
+    uint8_t     prg_ram_protect_2;  // PRG-RAM protect 2.
 
-    uint8_t     ex_ram_mode;        // EX-RAM mode
-    uint8_t     nt_mapping;         // Nametable mapping
+    uint8_t     ex_ram_mode;        // EX-RAM mode.
+    uint8_t     nt_mapping;         // Nametable mapping.
 
-    uint8_t     fill_mode_tile;     // Tile used for fill mode
-    uint8_t     fill_mode_color;    // Attribute used for fill mode
+    uint8_t     fill_mode_tile;     // Tile used for fill mode.
+    uint8_t     fill_mode_color;    // Attribute used for fill mode.
 
-    uint8_t     prg_banks[5];       // PRG bank select
-    uint8_t     chr_banks[12];      // CHR bank select
-    uint8_t     ex_ram[1024];       // 1KB of on-chip memory
+    struct multiplier {             // Multiplier circuit (for unsigned 8-bit multiplication).
+        uint8_t     in1, in2;       // Two unsigned 8-bit inputs.
+        uint8_t     out_low;        // Low byte of unsigned 16-bit result.
+        uint8_t     out_high;       // High byte of unsigned 16-bit result.
+    } multiplier;
+
+    uint8_t     prg_banks[5];       // PRG bank select.
+    uint8_t     chr_banks[12];      // CHR bank select.
+    uint8_t     ex_ram[1024];       // 1KB of on-chip memory.
 
     uint8_t     prg_mask;           // PRG-ROM mask.
+    uint8_t     chr_mask;           // CHR-ROM mask.
     uint8_t     read_buffer;        // Read buffer used for fill mode and NT mode 2 with no EX-RAM.
+
+    unsigned    sprite_sz   : 1;    // Internal account of PPU sprite size (0: 8x8; 1: 16x16).
+    unsigned    rendering   : 2;    // Internal account of whether the PPU is rendering (0: disabled; 1,2,3: enabled).
+    unsigned                : 5;
 
 };
 
@@ -89,7 +103,7 @@ static mapper_t *init(void) {
 
 static void insert(mapper_t *mapper, prog_t *prog) {
     struct mmc5_data *data = (struct mmc5_data*)mapper->data;
-
+    
     // Map registers.
     as_add_segment(mapper->cpuas, PRG_MODE, 1, &data->prg_mode, AS_WRITE);
     as_add_segment(mapper->cpuas, CHR_MODE, 1, &data->chr_mode, AS_WRITE);
@@ -102,6 +116,9 @@ static void insert(mapper_t *mapper, prog_t *prog) {
 
     as_add_segment(mapper->cpuas, PRG_SELECT, sizeof(data->prg_banks), data->prg_banks, AS_WRITE);
     as_add_segment(mapper->cpuas, CHR_SELECT, sizeof(data->chr_banks), data->chr_banks, AS_WRITE);
+
+    as_add_segment(mapper->cpuas, MULT_LOW, 1, &data->multiplier.out_low, AS_READ);
+    as_add_segment(mapper->cpuas, MULT_HIGH, 1, &data->multiplier.out_high, AS_READ);
     
     // Switchable 8KB of PRG-RAM (128KB allocated).
     prog->prg_ram = malloc(PRG_RAM_SIZE * sizeof(uint8_t));
@@ -134,7 +151,13 @@ static void insert(mapper_t *mapper, prog_t *prog) {
     // Games expect $5017 = $FF at power on.
     data->prg_banks[4] = 0xFF;
 
-    // Determine mask used to determine PRG bank number (cached for efficiency).
+    // Multiplication registers power-on values.
+    data->multiplier.in1 = 0xFF;
+    data->multiplier.in2 = 0xFF;
+    data->multiplier.out_low = 0x01;
+    data->multiplier.out_high = 0xFE;
+
+    // Determine mask used to determine PRG and CHR bank numbers.
     uint8_t mask;
     if (prog->header.prg_rom_size < 2)
         mask = 0x01;
@@ -151,12 +174,54 @@ static void insert(mapper_t *mapper, prog_t *prog) {
     else
         mask = 0x7F;
     data->prg_mask = mask;
+
+    if (prog->header.chr_rom_size < 4)
+        mask = 0x01;
+    else if (prog->header.chr_rom_size < 8)
+        mask = 0x03;
+    else if (prog->header.chr_rom_size < 16)
+        mask = 0x07;
+    else if (prog->header.chr_rom_size < 32)
+        mask = 0x0F;
+    else if (prog->header.chr_rom_size < 64)
+        mask = 0x1F;
+    else if (prog->header.chr_rom_size < 128)
+        mask = 0x3F;
+    else
+        mask = 0x7F;
+    data->chr_mask = mask;
 }
 
 static void monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vaddr, uint8_t value, bool write) {
+    struct mmc5_data *data = (struct mmc5_data*)mapper->data;
     if (as == mapper->cpuas) {
         // CPU
+        if (write) {
+            if (vaddr == PPU_CTRL) {
+                // Update sprite size flag.
+                data->sprite_sz = (value >> 5) & 0x01;
+            }
+            else if (vaddr == PPU_MASK) {
+                // Determine whether rendering is enabled.
+                data->rendering = (value >> 3) & 0x03;
+            }
+            else if (vaddr == MULT_LOW || vaddr == MULT_HIGH) {
+                // Determine which register is being written to.
+                if (vaddr == MULT_LOW) {
+                    data->multiplier.in1 = value;
+                }
+                else {
+                    data->multiplier.in2 = value;
+                }
 
+                // Computer the unsigned 16-bit product.
+                uint16_t result = data->multiplier.in1 * data->multiplier.in2;
+
+                // Store the result in the registers so that it may be read.
+                data->multiplier.out_low = result & 0xFF;
+                data->multiplier.out_high = result >> 8;
+            }
+        }
     }
     else {
         // PPU
@@ -269,7 +334,7 @@ static uint8_t *map_chr(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *t
     
     // Offset based on the page that is selected for the current bank.
     uint8_t index = ((bank & ~mask) | mask) & 0x07;
-    target += data->chr_banks[index] * CHR_BANK_SIZE * size;
+    target += data->chr_banks[index] * size * CHR_BANK_SIZE;
 
     // Adjust the address to the correct bank (as each 1KB segment points to the top of memory).
     target += (bank & mask) * CHR_BANK_SIZE;

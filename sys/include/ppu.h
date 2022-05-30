@@ -69,23 +69,21 @@ typedef union pt_entry {
     };
 } pt_entry_t;
 
-typedef struct nt_entry {
-    unsigned    cell_x  : 5;    // The x-coordinate of the cell along the nametable.
-    unsigned    cell_y  : 5;    // The y-coordinate of the cell along the nametable.
-    unsigned    nt_x    : 1;    // Nametable along x-direction (0: left; 1: right).
-    unsigned    nt_y    : 1;    // Nametable along y-direction (0: top; 1: bottom).
-    unsigned            : 4;
-} nt_entry_t;
-
+/**
+ * @brief A VRAM address register.
+ */
 typedef struct vram_reg {
-    unsigned    coarse_x    : 5;
-    unsigned    coarse_y    : 5;
-    unsigned    nt_x        : 1;
-    unsigned    nt_y        : 1;
-    unsigned    fine_y      : 3;
+    unsigned    coarse_x    : 5;    // Coarse-x scroll (i.e. x-coordinate of the cell along nametable).
+    unsigned    coarse_y    : 5;    // Coarse-y scroll (i.e. y-coordinate of the cell along nametable).
+    unsigned    nt_x        : 1;    // Nametable along x-direction (0: left; 1: right).
+    unsigned    nt_y        : 1;    // Nametable along y-direction (0: top; 1: bottom).
+    unsigned    fine_y      : 3;    // Fine-y scroll (i.e. y-coordinate of pixel within tile).
     unsigned                : 1;
 } vram_reg_t;
 
+/**
+ * @brief A sprite attribute.
+ */
 typedef struct spr_attr {
 
     unsigned    palette     : 2;    // Palette number (4 to 7).
@@ -109,9 +107,6 @@ typedef struct ppu {
     unsigned        x : 3;              // Fine X scroll.
     unsigned        w : 1;              // First or second write toggle bit.
     unsigned          : 4;
-    
-    uint16_t        sr16[2];            // 16-bit shift registers.
-    uint8_t         sr8[2];             // 8-bit shift registers.
 
     addrspace_t     *as;                // The PPU's address space.
     uint8_t         *vram;              // 2KB of memory.
@@ -122,6 +117,15 @@ typedef struct ppu {
 
     uint8_t         oam[256];           // Object attribute memory.
     uint8_t         oam2[32];           // Secondary OAM.
+
+    /* background latches and shift registers */
+
+    pt_entry_t      nt_latch;           // NT byte latch.
+    uint8_t         attr_latch;         // Attribute byte latch.
+    uint8_t         tile_latch[2];      // Tile latch (for both bit planes).
+            
+    uint16_t        sr_tile[2];         // Shift registers for both tile planes (index 0: low byte; index 1: high byte).
+    uint16_t        sr_attr[2];         // Shift registers for tile attribute.
 
     /* oam shift registers */
 
@@ -219,13 +223,7 @@ typedef struct ppu {
     unsigned    odd_frame       : 1;    // Set if currently on an odd frame.
     unsigned                    : 3;
 
-    /* temporary until shift registers work properly */
-    unsigned    t_x     : 3;
-    unsigned            : 5;
-
 } ppu_t;
-
-#endif
 
 /**
  * @brief Creates a new instance of an emulated PPU.
@@ -255,3 +253,5 @@ void ppu_reset(ppu_t *ppu);
  * @param cycles The number of PPU cycles to execute.
  */
 void ppu_render(ppu_t *ppu, int cycles);
+
+#endif

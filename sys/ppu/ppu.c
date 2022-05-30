@@ -4,14 +4,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+static inline void render_cycle(ppu_t *ppu, bool rendering, bool vbl_suppress);
+static inline void sprite_evaluation(ppu_t *ppu);
+
 /**
  * @brief Gets the address of the corresponding nametable entry.
  * 
- * @param entry The nametable entry.
+ * @param addr The VRAM address.
  * @return The resultant address.
  */
-static inline addr_t get_nt_addr(nt_entry_t entry) {
-    return (0x02 << 12) | (entry.nt_y << 11) | (entry.nt_x << 10) | (entry.cell_y << 5) | entry.cell_x;
+static inline addr_t get_nt_addr(vram_reg_t addr) {
+    return 0x2000 | (addr.nt_y << 11) | (addr.nt_x << 10) | (addr.coarse_y << 5) | addr.coarse_x;
 }
 
 /**
@@ -27,57 +30,23 @@ static inline addr_t get_pt_addr(pt_entry_t entry) {
 /**
  * @brief Gets the attribute table address of the corresponding nametable entry.
  * 
- * @param entry The nametable entry.
+ * @param addr The VRAM address.
  * @return The resultant attribute table address.
  */
-static inline addr_t get_at_addr(nt_entry_t entry) {
-    return (0x02 << 12) | (entry.nt_y << 11) | (entry.nt_x << 10) | (0x0F << 6) | ((entry.cell_y >> 2) << 3) | (entry.cell_x >> 2);
+static inline addr_t get_at_addr(vram_reg_t addr) {
+    return 0x2000 | (addr.nt_y << 11) | (addr.nt_x << 10) | (0x0F << 6) | ((addr.coarse_y >> 2) << 3) | (addr.coarse_x >> 2);
 }
 
-static inline pt_entry_t fetch_tile(ppu_t *ppu, nt_entry_t nt) {
-    pt_entry_t result = { 0 };
-    addr_t nt_addr = get_nt_addr(nt);
+static inline pt_entry_t fetch_tile(ppu_t *ppu) {
+    pt_entry_t result = {
+        .table = ppu->controller.bpt_addr,
+        .fine_y = ppu->v.fine_y
+    };
+    addr_t nt_addr = get_nt_addr(ppu->v);
     uint8_t tile = as_read(ppu->as, nt_addr);
     result.tile_x = tile & 0x0F;
     result.tile_y = (tile & 0xF0) >> 4;
     return result;
-}
-
-static inline void fetch_tile_planes(ppu_t *ppu, pt_entry_t pt, uint8_t *p1, uint8_t *p2) {
-    addr_t pt_addr = get_pt_addr(pt);
-    *p1 = as_read(ppu->as, pt_addr);
-    *p2 = as_read(ppu->as, pt_addr + 0x08);
-}
-
-static inline void fetch_tile_into_sr(ppu_t *ppu) {
-    const nt_entry_t nt = {
-        .cell_x = ppu->v.coarse_x,
-        .cell_y = ppu->v.coarse_y,
-        .nt_x = ppu->v.nt_x,
-        .nt_y = ppu->v.nt_y
-    };
-    
-    // Fetch NT byte.
-    pt_entry_t pt = fetch_tile(ppu, nt);
-    pt.table = ppu->controller.bpt_addr;
-    pt.fine_x = ppu->x;
-    pt.fine_y = ppu->v.fine_y;
-
-    // Fetch AT byte.
-    addr_t attr_addr = get_at_addr(nt);
-    ppu->sr8[0] = as_read(ppu->as, attr_addr);
-
-    // Fetch low and high BG tile byte.
-    uint8_t p1, p2;
-    fetch_tile_planes(ppu, pt, &p1, &p2);
-    ppu->sr16[0] = p1 | (p2 << 8);
-}
-
-static inline uint8_t get_tile_value(uint8_t p1, uint8_t p2, uint8_t fine_x) {
-    uint8_t mask = 0x80 >> fine_x;
-    uint8_t b0 = (p1 & mask) > 0;
-    uint8_t b1 = (p2 & mask) > 0;
-    return (b1 << 1) | b0;
 }
 
 static inline void put_pixel(ppu_t *ppu, int screen_x, int screen_y, color_t color) {
@@ -114,6 +83,35 @@ static inline void inc_vram_addr(ppu_t *ppu, vram_reg_t *addr) {
                     }
                 }
             }
+        }
+    }
+}
+
+static inline void inc_vram_x(vram_reg_t *addr) {
+    if (addr->coarse_x < 31) {
+        addr->coarse_x++;
+    }
+    else {
+        addr->coarse_x = 0;
+        addr->nt_x = !addr->nt_x;
+    }
+}
+
+static inline void inc_vram_y(vram_reg_t *addr) {
+    if (addr->fine_y < 7) {
+        addr->fine_y++;
+    }
+    else {
+        addr->fine_y = 0;
+        if (addr->coarse_y == 29) {
+            addr->coarse_y = 0;
+            addr->nt_y = !addr->nt_y;
+        }
+        else if (addr->coarse_y == 31) {
+            addr->coarse_y = 0;
+        }
+        else {
+            addr->coarse_y++;
         }
     }
 }
@@ -203,8 +201,7 @@ void ppu_render(ppu_t *ppu, int cycles) {
         }
         else {
             // first write
-            //ppu->x = ppu->scroll & 0x07;
-            ppu->t_x = ppu->scroll & 0x07;
+            ppu->x = ppu->scroll & 0x07;
             ppu->t.coarse_x = ppu->scroll >> 3;
         }
         ppu->ppuscroll_flags.write = 0;
@@ -257,7 +254,32 @@ void ppu_render(ppu_t *ppu, int cycles) {
     // Rendering.
     bool rendering = ppu->mask.background || ppu->mask.sprites;
     while (cycles > 0) {
-        // Render background.
+        // Render background and sprites.
+        render_cycle(ppu, rendering, vbl_suppress);
+        
+        // Sprite evaluation.
+        sprite_evaluation(ppu);
+
+        // Increment scanline pointer.
+        ppu->draw_x++;
+        if (ppu->draw_x == 341) {
+            ppu->draw_x = 0;
+            ppu->draw_y++;
+        }
+        if (ppu->draw_y == 261) {
+            ppu->draw_y = -1;
+        }
+
+        vbl_suppress = false;
+        if (ppu->nmi_suppress > 0) {
+            ppu->nmi_suppress--;
+        }
+        cycles--;
+    }
+}
+
+static inline void render_cycle(ppu_t *ppu, bool rendering, bool vbl_suppress) {
+    if (ppu->draw_y < 240) {
         if (ppu->draw_y == -1) {
             // Pre-render scanline.
             if (ppu->draw_x == 1) {
@@ -281,290 +303,284 @@ void ppu_render(ppu_t *ppu, int cycles) {
                     }
                 }
                 ppu->odd_frame = !ppu->odd_frame;
-
-                // Fetch tile for next frame.
-                fetch_tile_into_sr(ppu);
             }
         }
-        else if (ppu->draw_y == 240) {
-            // Post-render scanline.
-        }
-        else if (ppu->draw_y == 241) {
-            // Vblank.
-            if (ppu->draw_x == 1) {
-                // Set VBL flag if not suppressed.
-                ppu->status.vblank = !vbl_suppress;
+        else if (ppu->draw_x > 0 && ppu->draw_x <= 256) {
+            // Get the x-coordinate of the pixel on the screen.
+            const uint8_t screen_x = ppu->draw_x - 1;
 
-                // Suppress NMI for 3 PPU cycles (1 CPU cycle) after reading.
-                ppu->nmi_suppress = 3;
+            // Get the mask used for the shift registers.
+            const uint16_t sr_mask = 0x8000 >> ppu->x;
 
-                ppu->vbl_occurred = true;
-                ppu->nmi_occurred = false;
+            // Determine the value of the bit at this pixel of the tile.
+            uint8_t bkg;
+            if (!ppu->mask.background) {
+                bkg = 0;
             }
-        }
-        else if (ppu->draw_y < 240) {
-            // Normal rendering.
-            if (ppu->draw_x == 0) {
-                // Idle.
-                ppu->x = ppu->t_x;
+            else if (ppu->draw_x <= 8 && !ppu->mask.bkg_left) {
+                bkg = 0;
             }
-            else if (ppu->draw_x <= 256) {
-                // Get the x-coordinate of the pixel on the screen.
-                const uint8_t screen_x = ppu->draw_x - 1;
+            else {
+                uint8_t b0 = (ppu->sr_tile[0] & sr_mask) > 0;
+                uint8_t b1 = (ppu->sr_tile[1] & sr_mask) > 0;
+                bkg = (b1 << 1) | b0;
+            }
+            
+            // Determine the color of the pixel.
+            uint8_t b0 = (ppu->sr_attr[0] & sr_mask) > 0;
+            uint8_t b1 = (ppu->sr_attr[1] & sr_mask) > 0;
+            uint8_t index = (b1 << 1) | b0;
+            uint8_t col_index = bkg > 0 ? ppu->bkg_palette[index * 4 + bkg - 1] : ppu->bkg_color;
 
-                // Determine the value of the bit at this pixel of the tile.
-                uint8_t bkg;
-                if (!ppu->mask.background) {
-                    bkg = 0;
-                }
-                else if (ppu->draw_x <= 8 && !ppu->mask.bkg_left) {
-                    bkg = 0;
-                }
-                else {
-                    bkg = get_tile_value(ppu->sr16[0] & 0xFF, ppu->sr16[0] >> 8, ppu->x);
-                }
-                
-                // Determine the color of the pixel.
-                uint8_t index = ppu->sr8[0];
-                if ((ppu->v.coarse_x & 0x02) > 0)
-                    index >>= 2;
-                if ((ppu->v.coarse_y & 0x02) > 0)
-                    index >>= 4;
-                uint8_t col_index = bkg > 0 ? ppu->bkg_palette[(index & 0x03) * 4 + bkg - 1] : ppu->bkg_color;
+            // Check if the pixel should be overriden with one from a sprite.
+            if (ppu->mask.sprites) {
+                // Get active sprites.
+                for (int i = 0; i < 8; i++) {
+                    if (ppu->oam_x[i] == 0xFF)
+                        continue;
+                    if (ppu->oam_x[i] > screen_x)
+                        continue;
+                    if (screen_x > ppu->oam_x[i] + 8)
+                        continue;
+                    if (ppu->draw_x <= 8 && !ppu->mask.spr_left)
+                        continue;
+                    
+                    // Get fine-x and flip horizontally if necessary.
+                    uint8_t fine_x = screen_x - ppu->oam_x[i];
+                    if (ppu->oam_attr[i].flip_h) {
+                        fine_x = 7 - fine_x;
+                    }
 
-                // Check if the pixel should be overriden with one from a sprite.
-                if (ppu->mask.sprites) {
-                    // Get active sprites.
-                    for (int i = 0; i < 8; i++) {
-                        if (ppu->oam_x[i] == 0xFF)
-                            continue;
-                        if (ppu->oam_x[i] > screen_x)
-                            continue;
-                        if (screen_x > ppu->oam_x[i] + 8)
-                            continue;
-                        if (ppu->draw_x <= 8 && !ppu->mask.spr_left)
-                            continue;
-                        
-                        // Get fine-x and flip horizontally if necessary.
-                        uint8_t fine_x = screen_x - ppu->oam_x[i];
-                        if (ppu->oam_attr[i].flip_h) {
-                            fine_x = 7 - fine_x;
-                        }
+                    // Get value of sprite at current pixel and decide whether it should override the background.
+                    uint8_t mask = 0x80 >> fine_x;
+                    uint8_t low = (ppu->oam_p[i][0] & mask) > 0;
+                    uint8_t high = (ppu->oam_p[i][1] & mask) > 0;
+                    uint8_t spr = (high << 1) | low;
+                    if (spr == 0)
+                        continue;
+                    
+                    // Check if the sprite 0 hit flag should be updated.
+                    if (i == 0 && bkg > 0 && ppu->szc && ppu->draw_x != 256) {
+                        ppu->status.hit = 1;
+                    }
 
-                        // Get value of sprite at current pixel and decide whether it should override the background.
-                        uint8_t spr = get_tile_value(ppu->oam_p[i][0], ppu->oam_p[i][1], fine_x);
-                        if (spr == 0)
-                            continue;
-                        
-                        // Check if the sprite 0 hit flag should be updated.
-                        if (i == 0 && bkg > 0 && ppu->szc && ppu->draw_x != 256) {
-                            ppu->status.hit = 1;
-                        }
-
-                        // At this stage, if there is an opaque background pixel and the sprite's priority bit is set,
-                        // then the background pixel should be drawn regardless of the priority of any remaining sprites.
-                        if (bkg > 0 && ppu->oam_attr[i].priority)
-                            break;
-                        
-                        // Update the color and break as any subsequent sprites would be displayed behind this sprite.
-                        col_index = ppu->spr_palette[ppu->oam_attr[i].palette * 3 + spr - 1];
+                    // At this stage, if there is an opaque background pixel and the sprite's priority bit is set,
+                    // then the background pixel should be drawn regardless of the priority of any remaining sprites.
+                    if (bkg > 0 && ppu->oam_attr[i].priority)
                         break;
-                    }
+                    
+                    // Update the color and break as any subsequent sprites would be displayed behind this sprite.
+                    col_index = ppu->spr_palette[ppu->oam_attr[i].palette * 3 + spr - 1];
+                    break;
                 }
+            }
 
-                // Output the pixel.
-                color_t col = color_resolve(col_index);
-                put_pixel(ppu, screen_x, ppu->draw_y, col);
+            // Output the pixel.
+            color_t col = color_resolve(col_index);
+            put_pixel(ppu, screen_x, ppu->draw_y, col);
+        }
 
-                // Increment x.
-                if (ppu->x < 7) {
-                    ppu->x++;
-                }
-                else {
-                    ppu->x = 0;
-                    if (rendering) {
-                        if (ppu->v.coarse_x < 31) {
-                            ppu->v.coarse_x++;
-                        }
-                        else {
-                            ppu->v.coarse_x = 0;
-                            ppu->v.nt_x = !ppu->v.nt_x;
-                        }
-                    }
-
-                    // Fetch the next tile.
-                    fetch_tile_into_sr(ppu);
-                }
-
-                if (ppu->draw_x == 256 && rendering) {
-                    // Increment y.
-                    if (ppu->v.fine_y < 7) {
-                        ppu->v.fine_y++;
+        // Tile fetches.
+        if ((ppu->draw_x > 0 && ppu->draw_x <= 256) || (ppu->draw_x > 320 && ppu->draw_x <= 336)) {
+            // Clock shift registers.
+            ppu->sr_attr[0] <<= 1;
+            ppu->sr_attr[1] <<= 1;
+            ppu->sr_tile[0] <<= 1;
+            ppu->sr_tile[1] <<= 1;
+        
+            // Do tile fetches if necessary.
+            if (ppu->draw_x % 8 == 0) {
+                // Fetch high BG tile byte.
+                ppu->nt_latch.plane = 1;
+                addr_t pt_addr = get_pt_addr(ppu->nt_latch);
+                ppu->tile_latch[1] = as_read(ppu->as, pt_addr);
+                
+                if (rendering) {
+                    if (ppu->draw_x == 256) {
+                        // Increment y.
+                        inc_vram_y(&ppu->v);
                     }
                     else {
-                        ppu->v.fine_y = 0;
-                        if (ppu->v.coarse_y == 29) {
-                            ppu->v.coarse_y = 0;
-                            ppu->v.nt_y = !ppu->v.nt_y;
-                        }
-                        else if (ppu->v.coarse_y == 31) {
-                            ppu->v.coarse_y = 0;
-                        }
-                        else {
-                            ppu->v.coarse_y++;
-                        }
+                        // Increment x.
+                        inc_vram_x(&ppu->v);
                     }
                 }
-            }
-            else if (ppu->draw_x == 257) {
-                // Reset x.
-                ppu->x = ppu->t_x;
-                if (rendering) {
-                    ppu->v.coarse_x = ppu->t.coarse_x;
-                    ppu->v.nt_x = ppu->t.nt_x;
-                }
-            }
-            else if (ppu->draw_x == 340) {
-                fetch_tile_into_sr(ppu);
-            }
 
+                // Reload shift registers (for next cycle).
+                bool attr_low = (ppu->attr_latch & 0x01) > 0;
+                bool attr_high = (ppu->attr_latch & 0x02) > 0;
+                
+                ppu->sr_attr[0] = (ppu->sr_attr[0] & 0xFF00) | (attr_low ? 0xFF : 0x00);
+                ppu->sr_attr[1] = (ppu->sr_attr[1] & 0xFF00) | (attr_high ? 0xFF : 0x00);
+
+                ppu->sr_tile[0] = (ppu->sr_tile[0] & 0xFF00) | ppu->tile_latch[0];
+                ppu->sr_tile[1] = (ppu->sr_tile[1] & 0xFF00) | ppu->tile_latch[1];
+            }
+            else if (ppu->draw_x % 8 == 2) {
+                // Fetch NT byte.
+                addr_t nt_addr = get_nt_addr(ppu->v);
+                uint8_t tile = as_read(ppu->as, nt_addr);
+                ppu->nt_latch.tile_x = tile & 0x0F;
+                ppu->nt_latch.tile_y = (tile & 0xF0) >> 4;
+                ppu->nt_latch.table = ppu->controller.bpt_addr;
+                ppu->nt_latch.fine_y = ppu->v.fine_y;
+            }
+            else if (ppu->draw_x % 8 == 4) {
+                // Fetch AT byte.
+                addr_t attr_addr = get_at_addr(ppu->v);
+                uint8_t attr = as_read(ppu->as, attr_addr);
+                if ((ppu->v.coarse_x & 0x02) > 0)
+                    attr >>= 2;
+                if ((ppu->v.coarse_y & 0x02) > 0)
+                    attr >>= 4;
+                ppu->attr_latch = attr & 0x03;
+            }
+            else if (ppu->draw_x % 8 == 6) {
+                // Fetch low BG tile byte.
+                ppu->nt_latch.plane = 0;
+                addr_t pt_addr = get_pt_addr(ppu->nt_latch);
+                ppu->tile_latch[0] = as_read(ppu->as, pt_addr);
+            }
+        }
+        else if (ppu->draw_x == 257 && rendering) {
+            // Reset x.
+            ppu->v.coarse_x = ppu->t.coarse_x;
+            ppu->v.nt_x = ppu->t.nt_x;
+        }
+        else if (ppu->draw_x == 338 || ppu->draw_x == 340) {
+            // Unused NT fetches.
+            addr_t attr_addr = get_at_addr(ppu->v);
+            as_read(ppu->as, attr_addr);
+        }
+        
+        if (ppu->draw_x >= 257 && ppu->draw_x <= 320) {
             // Reset OAMADDR.
-            if (ppu->draw_x >= 257 && ppu->draw_x <= 320) {
-                ppu->oam_addr = 0;
-            }
+            ppu->oam_addr = 0;
         }
+    }
+    else if (ppu->draw_y == 241) {
+        // Vblank.
+        if (ppu->draw_x == 1) {
+            // Set VBL flag if not suppressed.
+            ppu->status.vblank = !vbl_suppress;
 
-        // Sprite evaluation.
-        if (ppu->draw_y == 0) {
-            if (ppu->draw_x >= 257 && ppu->draw_x <= 320) {
-                // Reset OAMADDR.
-                ppu->oam_addr = 0;
-            }
+            // Suppress NMI for 3 PPU cycles (1 CPU cycle) after reading.
+            ppu->nmi_suppress = 3;
+
+            ppu->vbl_occurred = true;
+            ppu->nmi_occurred = false;
         }
-        if (ppu->draw_y < 240) {
-            if (ppu->draw_x == 0) {
-                // Idle (reset iterators).
-                ppu->n = 0;
-                ppu->m = 0;
-                ppu->szn = false;
-                ppu->oam2_ptr = 0;
+    }
+}
+
+static inline void sprite_evaluation(ppu_t *ppu) {
+    if (ppu->draw_y < 240) {
+        if (ppu->draw_x == 0) {
+            // Idle (reset iterators).
+            ppu->n = 0;
+            ppu->m = 0;
+            ppu->szn = false;
+            ppu->oam2_ptr = 0;
+        }
+        else if (ppu->draw_x <= 64) {
+            // Secondary OAM clear.
+            ppu->oam2[((ppu->draw_x - 1) >> 1) & 0x1F] = 0xFF;
+        }
+        else if (ppu->draw_x <= 256) {
+            if (ppu->draw_x % 2 == 1) {
+                // Read OAM data on odd cycles into a buffer.
+                uint8_t oam_index = (4 * ppu->n + ppu->m + ppu->oam_addr) & 0xFF;
+                ppu->oam_buffer = ppu->oam[oam_index];
             }
-            else if (ppu->draw_x <= 64) {
-                // Secondary OAM clear.
-                ppu->oam2[((ppu->draw_x - 1) >> 1) & 0x1F] = 0xFF;
-            }
-            else if (ppu->draw_x <= 256) {
-                if (ppu->draw_x % 2 == 1) {
-                    // Read OAM data on odd cycles into a buffer.
-                    uint8_t oam_index = (4 * ppu->n + ppu->m + ppu->oam_addr) & 0xFF;
-                    ppu->oam_buffer = ppu->oam[oam_index];
+            else if (ppu->oam2_ptr % 4 != 0) {
+                // Copy remaining sprite data into secondary OAM.
+                if (ppu->oam2_ptr < sizeof(ppu->oam2)) {
+                    ppu->oam2[ppu->oam2_ptr] = ppu->oam_buffer;
                 }
-                else if (ppu->oam2_ptr % 4 != 0) {
-                    // Copy remaining sprite data into secondary OAM.
-                    if (ppu->oam2_ptr < sizeof(ppu->oam2)) {
-                        ppu->oam2[ppu->oam2_ptr] = ppu->oam_buffer;
-                    }
-                    ppu->oam2_ptr++;
-                    if (ppu->m == 3) {
-                        ppu->n++;
-                    }
-                    ppu->m++;
-                }
-                else if (ppu->n >= N_SPRITES) {
-                    // All 64 sprites have already been evaluated.
-                    if (ppu->oam2_ptr < sizeof(ppu->oam2)) {
-                        ppu->oam2[ppu->oam2_ptr] = ppu->oam_buffer;
-                    }
+                ppu->oam2_ptr++;
+                if (ppu->m == 3) {
                     ppu->n++;
                 }
-                else if (ppu->oam2_ptr >= sizeof(ppu->oam2)) {
-                    // Sprite overflow.
-                    if (sprite_in_range(ppu, ppu->oam_buffer)) {
-                        if (ppu->mask.background || ppu->mask.sprites) {
-                            ppu->status.overflow = true; // Shouldn't be set if all rendering is off.
-                        }
-                        ppu->oam2_ptr++;
-                        ppu->m++;
+                ppu->m++;
+            }
+            else if (ppu->n >= N_SPRITES) {
+                // All 64 sprites have already been evaluated.
+                if (ppu->oam2_ptr < sizeof(ppu->oam2)) {
+                    ppu->oam2[ppu->oam2_ptr] = ppu->oam_buffer;
+                }
+                ppu->n++;
+            }
+            else if (ppu->oam2_ptr >= sizeof(ppu->oam2)) {
+                // Sprite overflow.
+                if (sprite_in_range(ppu, ppu->oam_buffer)) {
+                    if (ppu->mask.background || ppu->mask.sprites) {
+                        ppu->status.overflow = true; // Shouldn't be set if all rendering is off.
                     }
-                    else {
-                        ppu->n++;
-                        ppu->m++; // Sprite overflow bug.
-                    }
+                    ppu->oam2_ptr++;
+                    ppu->m++;
                 }
                 else {
-                    // Fetch next sprite and check if y-coordinate is within range.
-                    ppu->oam2[ppu->oam2_ptr] = ppu->oam_buffer;
-                    if (sprite_in_range(ppu, ppu->oam_buffer)) {
-                        if (ppu->n == 0) {
-                            ppu->szn = true;
-                        }
-                        ppu->oam2_ptr++;
-                        ppu->m++;
-                    }
-                    else {
-                        ppu->n++;
-                    }
+                    ppu->n++;
+                    ppu->m++; // Sprite overflow bug.
                 }
             }
-            else if (ppu->draw_x <= 320) {
-                // Reset OAMADDR.
-                ppu->oam_addr = 0;
+            else {
+                // Fetch next sprite and check if y-coordinate is within range.
+                ppu->oam2[ppu->oam2_ptr] = ppu->oam_buffer;
+                if (sprite_in_range(ppu, ppu->oam_buffer)) {
+                    if (ppu->n == 0) {
+                        ppu->szn = true;
+                    }
+                    ppu->oam2_ptr++;
+                    ppu->m++;
+                }
+                else {
+                    ppu->n++;
+                }
             }
-            else if (ppu->draw_x == 321) {
-                // Fill shift registers.
-                for (int i = 0; i < 8; i++) {
-                    uint8_t sprite_y = ppu->oam2[4 * i];
-                    uint8_t fine_y = ppu->draw_y - sprite_y;
-                    uint8_t tile = ppu->oam2[4 * i + 1];
+        }
+        else if (ppu->draw_x <= 320) {
+            // Reset OAMADDR.
+            ppu->oam_addr = 0;
+        }
+        else if (ppu->draw_x == 321) {
+            // Fill shift registers.
+            for (int i = 0; i < 8; i++) {
+                uint8_t sprite_y = ppu->oam2[4 * i];
+                uint8_t fine_y = ppu->draw_y - sprite_y;
+                uint8_t tile = ppu->oam2[4 * i + 1];
 
-                    // Fetch attribute data.
-                    uint8_t attr = ppu->oam2[4 * i + 2];
-                    ppu->oam_attr[i].palette = attr & 0x03;
-                    ppu->oam_attr[i].priority = (attr >> 5) & 0x01;
-                    ppu->oam_attr[i].flip_h = (attr >> 6) & 0x01;
-                    ppu->oam_attr[i].flip_v = (attr >> 7) & 0x01;
+                // Fetch attribute data.
+                uint8_t attr = ppu->oam2[4 * i + 2];
+                ppu->oam_attr[i].palette = attr & 0x03;
+                ppu->oam_attr[i].priority = (attr >> 5) & 0x01;
+                ppu->oam_attr[i].flip_h = (attr >> 6) & 0x01;
+                ppu->oam_attr[i].flip_v = (attr >> 7) & 0x01;
 
-                    // Flip vertically if necessary.
-                    if (ppu->oam_attr[i].flip_v) {
-                        fine_y = (ppu->controller.spr_size ? 15 : 7) - fine_y;
-                    }
-
-                    // Get pattern table address.
-                    addr_t pt_addr;
-                    if (ppu->controller.spr_size) {
-                        pt_addr = ((tile & 0x01) << 12) | ((tile & ~0x01) << 4) | ((fine_y & 0x08) << 1) | (fine_y & 0x07); // 8x16 sprite mode.
-                    }
-                    else {
-                        pt_addr = (ppu->controller.spt_addr << 12) | (tile << 4) | (fine_y & 0x07); // 8x8 sprite mode.
-                    }
-
-                    // Fetch tile planes.
-                    ppu->oam_p[i][0] = as_read(ppu->as, pt_addr);
-                    ppu->oam_p[i][1] = as_read(ppu->as, pt_addr + 0x08);
-
-                    // Fetch x-position.
-                    ppu->oam_x[i] = ppu->oam2[4 * i + 3];
+                // Flip vertically if necessary.
+                if (ppu->oam_attr[i].flip_v) {
+                    fine_y = (ppu->controller.spr_size ? 15 : 7) - fine_y;
                 }
 
-                // Check if sprite 0 is included at indices 0-3 of the secondary OAM.
-                ppu->szc = ppu->szn;
+                // Get pattern table address.
+                addr_t pt_addr;
+                if (ppu->controller.spr_size) {
+                    pt_addr = ((tile & 0x01) << 12) | ((tile & ~0x01) << 4) | ((fine_y & 0x08) << 1) | (fine_y & 0x07); // 8x16 sprite mode.
+                }
+                else {
+                    pt_addr = (ppu->controller.spt_addr << 12) | (tile << 4) | (fine_y & 0x07); // 8x8 sprite mode.
+                }
+
+                // Fetch tile planes.
+                ppu->oam_p[i][0] = as_read(ppu->as, pt_addr);
+                ppu->oam_p[i][1] = as_read(ppu->as, pt_addr + 0x08);
+
+                // Fetch x-position.
+                ppu->oam_x[i] = ppu->oam2[4 * i + 3];
             }
-        }
 
-        // Increment scanline pointer.
-        ppu->draw_x++;
-        if (ppu->draw_x == 341) {
-            ppu->draw_x = 0;
-            ppu->draw_y++;
+            // Check if sprite 0 is included at indices 0-3 of the secondary OAM.
+            ppu->szc = ppu->szn;
         }
-        if (ppu->draw_y == 261) {
-            ppu->draw_y = -1;
-        }
-
-        vbl_suppress = false;
-        if (ppu->nmi_suppress > 0) {
-            ppu->nmi_suppress--;
-        }
-        cycles--;
     }
 }

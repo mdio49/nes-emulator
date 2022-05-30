@@ -452,11 +452,6 @@ static inline void render_cycle(ppu_t *ppu, bool rendering, bool vbl_suppress) {
             addr_t attr_addr = get_at_addr(ppu->v);
             as_read(ppu->as, attr_addr);
         }
-        
-        if (ppu->draw_x >= 257 && ppu->draw_x <= 320) {
-            // Reset OAMADDR.
-            ppu->oam_addr = 0;
-        }
     }
     else if (ppu->draw_y == 241) {
         // Vblank.

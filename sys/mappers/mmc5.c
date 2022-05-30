@@ -1,6 +1,7 @@
 #include <mappers.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <cpu.h>
 #include <ppu.h>
 
 #define PRG_MODE        0x5100
@@ -14,6 +15,13 @@
 
 #define PRG_SELECT      0x5113
 #define CHR_SELECT      0x5120
+
+#define V_SPLIT_MODE    0x5201
+#define V_SPLIT_SCROLL  0x5201
+#define V_SPLIT_BANK    0x5202
+
+#define IRQ_COMPARE     0x5203
+#define IRQ_STATUS      0x5204
 
 #define MULT_LOW        0x5205
 #define MULT_HIGH       0x5206
@@ -29,6 +37,9 @@
 #define PRG_BANK2       0xC000
 #define PRG_BANK3       0xE000
 #define PRG_BANK_SIZE   0x2000
+
+#define IN_FRAME_MASK   0x40
+#define IRQ_ACK_MASK    0x80
 
 struct mmc5_data {
 
@@ -54,13 +65,27 @@ struct mmc5_data {
     uint8_t     chr_banks[12];      // CHR bank select.
     uint8_t     ex_ram[1024];       // 1KB of on-chip memory.
 
+    uint8_t     v_split_mode;       // Vertical split mode.
+    uint8_t     v_split_scroll;     // Vertical split scroll.
+    uint8_t     v_split_bank;       // Vertical split bank.
+
+    uint8_t     irq_scanline;       // IRQ scanline compare value.
+    uint8_t     irq_status;         // IRQ scanline compare value.
+
     uint8_t     prg_mask;           // PRG-ROM mask.
     uint8_t     chr_mask;           // CHR-ROM mask.
     uint8_t     read_buffer;        // Read buffer used for fill mode and NT mode 2 with no EX-RAM.
 
     unsigned    sprite_sz   : 1;    // Internal account of PPU sprite size (0: 8x8; 1: 16x16).
     unsigned    rendering   : 2;    // Internal account of whether the PPU is rendering (0: disabled; 1,2,3: enabled).
-    unsigned                : 5;
+    unsigned    reading_bkg : 1;    // Set if the PPU is currently rendering the background.
+    unsigned    irq_enable  : 1;    // Set if scanline IRQ is enabled.
+    unsigned                : 3;
+
+    addr_t      last_ppu_addr;      // Last PPU address read from.
+    uint8_t     match_count;
+    uint8_t     nt_bytes_read;
+    uint8_t     scanline;           // Current scanline.
 
 };
 
@@ -117,6 +142,13 @@ static void insert(mapper_t *mapper, prog_t *prog) {
     as_add_segment(mapper->cpuas, PRG_SELECT, sizeof(data->prg_banks), data->prg_banks, AS_WRITE);
     as_add_segment(mapper->cpuas, CHR_SELECT, sizeof(data->chr_banks), data->chr_banks, AS_WRITE);
 
+    as_add_segment(mapper->cpuas, V_SPLIT_MODE, 1, &data->v_split_mode, AS_WRITE);
+    as_add_segment(mapper->cpuas, V_SPLIT_SCROLL, 1, &data->v_split_scroll, AS_WRITE);
+    as_add_segment(mapper->cpuas, V_SPLIT_BANK, 1, &data->v_split_bank, AS_WRITE);
+
+    as_add_segment(mapper->cpuas, IRQ_COMPARE, 1, &data->irq_scanline, AS_WRITE);
+    as_add_segment(mapper->cpuas, IRQ_STATUS, 1, &data->irq_status, AS_READ);
+
     as_add_segment(mapper->cpuas, MULT_LOW, 1, &data->multiplier.out_low, AS_READ);
     as_add_segment(mapper->cpuas, MULT_HIGH, 1, &data->multiplier.out_high, AS_READ);
     
@@ -150,6 +182,10 @@ static void insert(mapper_t *mapper, prog_t *prog) {
 
     // Games expect $5017 = $FF at power on.
     data->prg_banks[4] = 0xFF;
+
+    // IRQ registers power-on values.
+    data->scanline = 0;
+    data->irq_status = 0x00;
 
     // Multiplication registers power-on values.
     data->multiplier.in1 = 0xFF;
@@ -204,6 +240,13 @@ static void monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vadd
             else if (vaddr == PPU_MASK) {
                 // Determine whether rendering is enabled.
                 data->rendering = (value >> 3) & 0x03;
+                if (!data->rendering) {
+                    data->irq_status = data->irq_status & ~IN_FRAME_MASK;
+                }
+            }
+            else if (vaddr == IRQ_STATUS) {
+                // Set scanline IRQ enable flag.
+                data->irq_enable = (value & 0x70) > 0;
             }
             else if (vaddr == MULT_LOW || vaddr == MULT_HIGH) {
                 // Determine which register is being written to.
@@ -222,10 +265,55 @@ static void monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vadd
                 data->multiplier.out_high = result >> 8;
             }
         }
+        else if (vaddr == IRQ_STATUS) {
+            // IRQ is acknowledged when IRQ status register is read.
+            data->irq_enable = data->irq_enable & ~IRQ_ACK_MASK;
+        }
+        else if (vaddr == NMI_VECTOR || vaddr == NMI_VECTOR + 1) {
+            // Scanline counter, IRQ status and in-frame flag is reset on NMI.
+            data->irq_status = 0x00;
+            data->scanline = 0;
+        }
+        else if (vaddr == RES_VECTOR || vaddr == RES_VECTOR + 1) {
+            // Scanline IRQ is disabled on reset.
+            data->irq_enable = false;
+        }
     }
-    else {
-        // PPU
-
+    else if (!write) {
+        // Detect PPU reads from the nametable.
+        if (vaddr >= 0x2000 && vaddr <= 0x2FFF && vaddr == data->last_ppu_addr) {
+            data->match_count++;
+            if (data->match_count == 2) {
+                // Start of scanline.
+                if ((data->irq_status & IN_FRAME_MASK) == 0) {
+                    data->irq_status |= IN_FRAME_MASK;
+                    data->scanline = 0;
+                }
+                else {
+                    data->scanline++;
+                    data->reading_bkg = true;   
+                    data->nt_bytes_read = 0;
+                    if (data->scanline == data->irq_scanline) {
+                        data->irq_status |= IRQ_ACK_MASK;
+                        if (data->irq_enable) {
+                            mapper->irq = true;
+                        }
+                    }
+                }
+            }
+        }
+        else {
+            data->match_count = 0;
+        }
+        data->last_ppu_addr = vaddr;
+        
+        // Detect when the PPU stops reading the background.
+        if (vaddr >= 0x2000 && vaddr <= 0x2FFF && ((vaddr >> 5) & 0x1F) < 30) {
+            data->nt_bytes_read++;
+            if (data->nt_bytes_read == 32) {
+                data->reading_bkg = false;
+            }
+        }
     }
 }
 
@@ -333,7 +421,7 @@ static uint8_t *map_chr(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *t
     }
     
     // Offset based on the page that is selected for the current bank.
-    uint8_t index = ((bank & ~mask) | mask) & 0x07;
+    uint8_t index = data->reading_bkg && data->sprite_sz ? 8 + (bank % 4) : ((bank & ~mask) | mask) & 0x07;
     target += data->chr_banks[index] * size * CHR_BANK_SIZE;
 
     // Adjust the address to the correct bank (as each 1KB segment points to the top of memory).
@@ -353,7 +441,7 @@ static uint8_t *map_nts(mapper_t *mapper, prog_t *prog, addr_t vaddr, uint8_t *t
     }
     else if (nt == 4) {
         // Fill mode.
-        if (((vaddr & 0xF0) >> 4) >= 15) {
+        if (((vaddr >> 5) & 0x1F) < 30) {
             data->read_buffer = data->fill_mode_tile;
             target = &data->read_buffer;
         }

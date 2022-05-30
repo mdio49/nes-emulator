@@ -395,6 +395,7 @@ static inline void render_cycle(ppu_t *ppu, bool rendering, bool vbl_suppress) {
                 addr_t pt_addr = get_pt_addr(ppu->nt_latch);
                 ppu->tile_latch[1] = as_read(ppu->as, pt_addr);
                 
+                // Increment VRAM address.
                 if (rendering) {
                     if (ppu->draw_x == 256) {
                         // Increment y.
@@ -418,12 +419,7 @@ static inline void render_cycle(ppu_t *ppu, bool rendering, bool vbl_suppress) {
             }
             else if (ppu->draw_x % 8 == 2) {
                 // Fetch NT byte.
-                addr_t nt_addr = get_nt_addr(ppu->v);
-                uint8_t tile = as_read(ppu->as, nt_addr);
-                ppu->nt_latch.tile_x = tile & 0x0F;
-                ppu->nt_latch.tile_y = (tile & 0xF0) >> 4;
-                ppu->nt_latch.table = ppu->controller.bpt_addr;
-                ppu->nt_latch.fine_y = ppu->v.fine_y;
+                ppu->nt_latch = fetch_tile(ppu);
             }
             else if (ppu->draw_x % 8 == 4) {
                 // Fetch AT byte.
@@ -449,8 +445,7 @@ static inline void render_cycle(ppu_t *ppu, bool rendering, bool vbl_suppress) {
         }
         else if (ppu->draw_x == 338 || ppu->draw_x == 340) {
             // Unused NT fetches.
-            addr_t attr_addr = get_at_addr(ppu->v);
-            as_read(ppu->as, attr_addr);
+            ppu->nt_latch = fetch_tile(ppu);
         }
     }
     else if (ppu->draw_y == 241) {

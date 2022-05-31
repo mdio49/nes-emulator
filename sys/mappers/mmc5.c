@@ -287,8 +287,8 @@ static void monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vadd
         }
     }
     else if (!write) {
-        // Detect when the PPU makes 3 consecutive reads from the same address.
-        if (vaddr >= 0x2000 && vaddr <= 0x2FFF && vaddr == data->last_ppu_addr) {
+        // Detect when the PPU makes 3 consecutive reads from the same nametable address.
+        if (vaddr >= NAMETABLE0 && vaddr < NAMETABLE3 + NT_SIZE && vaddr == data->last_ppu_addr) {
             data->match_count++;
             if (data->match_count == 2) {
                 // Start of scanline.
@@ -322,7 +322,7 @@ static void monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vadd
         data->ppu_reading = true;
         
         // Detect when the PPU stops reading the background.
-        if (vaddr >= 0x2000 && vaddr <= 0x2FFF && ((vaddr >> 5) & 0x1F) < 30) {
+        if (vaddr >= NAMETABLE0 && vaddr < NAMETABLE3 + NT_SIZE && ((vaddr >> 5) & 0x1F) < 30) {
             data->nt_bytes_read++;
             if (data->nt_bytes_read == 32) {
                 data->bkg_flag = false;

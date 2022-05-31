@@ -141,8 +141,9 @@ void sys_insert(prog_t *prog) {
 void sys_run(handlers_t *handlers) {
     // Reset the CPU (so the program counter is set correctly).
     cpu_reset(cpu);
-
+    
     // Run the program.
+    bool irq_pending = false;
     handlers->running = true;
     while (handlers->running) {
         // If emulation is paused, then update the screen so that the program responds and spin until emulation is resumed.
@@ -190,8 +191,12 @@ void sys_run(handlers_t *handlers) {
 
         // Check for IRQ.
         if (apu->irq_flag || curprog->mapper->irq) {
+            irq_pending = true;
             apu->irq_flag = false;
             curprog->mapper->irq = false;
+        }
+        if (irq_pending && !cpu->frame.sr.irq) {
+            irq_pending = false;
             cpu_irq(cpu);
         }
 

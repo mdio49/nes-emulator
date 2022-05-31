@@ -189,10 +189,11 @@ void sys_run(handlers_t *handlers) {
         apu_update(apu, cpu->as, cycles);
 
         // Check for IRQ.
-        if ((apu->status.d_irq || apu->status.f_irq || curprog->mapper->irq) && !cpu->frame.sr.irq) {
+        if ((apu->irq_flag || curprog->mapper->irq) && !cpu->frame.sr.irq) {
             curprog->mapper->irq = false;
             cpu_irq(cpu);
         }
+        apu->irq_flag = false;
 
         // Check for NMI.
         if (ppu->status.vblank && ppu->controller.nmi && !(nmi_delay && ppu->controller.nmi) && !ppu->nmi_suppress && !ppu->nmi_occurred) {

@@ -270,7 +270,8 @@ typedef struct apu {
     unsigned        step            : 3;    // The current sequencer step.
     unsigned        cyc_carry       : 1;    // Set if the last update had one half-cycle left over.
     unsigned        irq_occurred    : 1;    // Set if an IRQ has already occurred for the current frame.
-    unsigned                        : 3;    
+    unsigned        irq_flag        : 1;    // Set if an IRQ should occur.
+    unsigned                        : 2;
 
     float           pulse_table[31];        // Pulse output lookup table.
     float           tnd_table[16][16][128]; // Triangle-noise-DMC output lookup table.

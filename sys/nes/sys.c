@@ -180,20 +180,19 @@ void sys_run(handlers_t *handlers) {
             if (handlers->after_execute != NULL) {
                 handlers->after_execute(ins);
             }
-        }        
+        }
+
+        // Cycle the mapper.
+        mapper_cycle(curprog->mapper, curprog, cycles);  
 
         // Cycle the APU.
         apu_update(apu, cpu->as, cycles);
 
         // Check for IRQ.
         if (apu->irq_flag || curprog->mapper->irq) {
-            //printf("IRQ %lld ~ %lld\n", cpu->cycles, cpu->cycles + cycles);
             apu->irq_flag = false;
             curprog->mapper->irq = false;
             cpu_irq(cpu);
-
-            // Add 7 cycles for the IRQ to occur.
-            //cycles += 7;
         }
 
         // Check for NMI.

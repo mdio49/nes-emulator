@@ -37,7 +37,7 @@ static inline addr_t get_at_addr(vram_reg_t addr) {
     return 0x2000 | (addr.nt_y << 11) | (addr.nt_x << 10) | (0x0F << 6) | ((addr.coarse_y >> 2) << 3) | (addr.coarse_x >> 2);
 }
 
-static inline pt_entry_t fetch_tile(ppu_t *ppu) {
+static inline pt_entry_t fetch_nt_byte(ppu_t *ppu) {
     pt_entry_t result = {
         .table = ppu->controller.bpt_addr,
         .fine_y = ppu->v.fine_y
@@ -47,6 +47,16 @@ static inline pt_entry_t fetch_tile(ppu_t *ppu) {
     result.tile_x = tile & 0x0F;
     result.tile_y = (tile & 0xF0) >> 4;
     return result;
+}
+
+static inline uint8_t fetch_at_byte(ppu_t *ppu) {
+    addr_t attr_addr = get_at_addr(ppu->v);
+    uint8_t attr = as_read(ppu->as, attr_addr);
+    if ((ppu->v.coarse_x & 0x02) > 0)
+        attr >>= 2;
+    if ((ppu->v.coarse_y & 0x02) > 0)
+        attr >>= 4;
+    return attr & 0x03;
 }
 
 static inline void put_pixel(ppu_t *ppu, int screen_x, int screen_y, color_t color) {
@@ -417,19 +427,13 @@ static inline void render_cycle(ppu_t *ppu, bool rendering, bool vbl_suppress) {
                 ppu->sr_tile[0] = (ppu->sr_tile[0] & 0xFF00) | ppu->tile_latch[0];
                 ppu->sr_tile[1] = (ppu->sr_tile[1] & 0xFF00) | ppu->tile_latch[1];
             }
-            else if (ppu->draw_x % 8 == 2) {
+            if (ppu->draw_x % 8 == 2) {
                 // Fetch NT byte.
-                ppu->nt_latch = fetch_tile(ppu);
+                ppu->nt_latch = fetch_nt_byte(ppu);
             }
             else if (ppu->draw_x % 8 == 4) {
                 // Fetch AT byte.
-                addr_t attr_addr = get_at_addr(ppu->v);
-                uint8_t attr = as_read(ppu->as, attr_addr);
-                if ((ppu->v.coarse_x & 0x02) > 0)
-                    attr >>= 2;
-                if ((ppu->v.coarse_y & 0x02) > 0)
-                    attr >>= 4;
-                ppu->attr_latch = attr & 0x03;
+                ppu->attr_latch = fetch_at_byte(ppu);
             }
             else if (ppu->draw_x % 8 == 6) {
                 // Fetch low BG tile byte.
@@ -445,7 +449,7 @@ static inline void render_cycle(ppu_t *ppu, bool rendering, bool vbl_suppress) {
         }
         else if (ppu->draw_x == 338 || ppu->draw_x == 340) {
             // Unused NT fetches.
-            ppu->nt_latch = fetch_tile(ppu);
+            ppu->nt_latch = fetch_nt_byte(ppu);
         }
     }
     else if (ppu->draw_y == 241) {
@@ -530,12 +534,13 @@ static inline void sprite_evaluation(ppu_t *ppu) {
             }
         }
         else if (ppu->draw_x <= 320) {
-            // Reset OAMADDR.
-            ppu->oam_addr = 0;
-        }
-        else if (ppu->draw_x == 321) {
-            // Fill shift registers.
-            for (int i = 0; i < 8; i++) {
+            int i = (ppu->draw_x - 257) / 8;
+            if (ppu->draw_x % 8 == 0) {
+                // Fetch high BG sprite byte.
+                ppu->oam_p[i][1] = as_read(ppu->as, ppu->pt_addr + 0x08);
+            }
+            else if (ppu->draw_x % 8 == 1) {
+                // Get sprite data.
                 uint8_t sprite_y = ppu->oam2[4 * i];
                 uint8_t fine_y = ppu->draw_y - sprite_y;
                 uint8_t tile = ppu->oam2[4 * i + 1];
@@ -553,22 +558,33 @@ static inline void sprite_evaluation(ppu_t *ppu) {
                 }
 
                 // Get pattern table address.
-                addr_t pt_addr;
                 if (ppu->controller.spr_size) {
-                    pt_addr = ((tile & 0x01) << 12) | ((tile & ~0x01) << 4) | ((fine_y & 0x08) << 1) | (fine_y & 0x07); // 8x16 sprite mode.
+                    ppu->pt_addr = ((tile & 0x01) << 12) | ((tile & ~0x01) << 4) | ((fine_y & 0x08) << 1) | (fine_y & 0x07); // 8x16 sprite mode.
                 }
                 else {
-                    pt_addr = (ppu->controller.spt_addr << 12) | (tile << 4) | (fine_y & 0x07); // 8x8 sprite mode.
+                    ppu->pt_addr = (ppu->controller.spt_addr << 12) | (tile << 4) | (fine_y & 0x07); // 8x8 sprite mode.
                 }
-
-                // Fetch tile planes.
-                ppu->oam_p[i][0] = as_read(ppu->as, pt_addr);
-                ppu->oam_p[i][1] = as_read(ppu->as, pt_addr + 0x08);
 
                 // Fetch x-position.
                 ppu->oam_x[i] = ppu->oam2[4 * i + 3];
             }
+            else if (ppu->draw_x % 8 == 2) {
+                // Garbage NT fetch.
+                ppu->nt_latch = fetch_nt_byte(ppu);
+            }
+            else if (ppu->draw_x % 8 == 4) {
+                // Garbage AT byte.
+                ppu->attr_latch = fetch_at_byte(ppu);
+            }
+            else if (ppu->draw_x % 8 == 6) {
+                // Fetch low BG sprite byte.
+                ppu->oam_p[i][0] = as_read(ppu->as, ppu->pt_addr);
+            }
 
+            // Reset OAMADDR.
+            ppu->oam_addr = 0;
+        }
+        else if (ppu->draw_x == 321) {
             // Check if sprite 0 is included at indices 0-3 of the secondary OAM.
             ppu->szc = ppu->szn;
         }

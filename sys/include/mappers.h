@@ -34,17 +34,22 @@ struct mapper {
      */
     mapper_t        *(*init)(void);
 
-    /* function pointers */
+    /* function pointers (must be declared by mapper)  */
 
     void            (*insert)(mapper_t *mapper, prog_t *prog);
     void            (*monitor)(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vaddr, uint8_t value, bool write);
 
-    /* mapper functions */
+    /* mapper functions (do not need to be declared by mapper) */
 
     map_rule_t      map_ram;    // Maps PRG-RAM.
     map_rule_t      map_prg;    // Maps PRG-ROM.
     map_rule_t      map_chr;    // Maps CHR-ROM/RAM.
     map_rule_t      map_nts;    // Maps nametables.
+
+    /* additional functions (do not need to be declared by mapper) */
+
+    void            (*cycle)(mapper_t *mapper, prog_t *prog, int cycles);
+    float           (*mix)(mapper_t *mapper, prog_t *prog, float input);
 
     /* system pointers */
 
@@ -96,6 +101,28 @@ void mapper_insert(mapper_t *mapper, prog_t *prog);
  * @param write Set if the access was a write.
  */
 void mapper_monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vaddr, uint8_t value, bool write);
+
+/**
+ * @brief Invoked whenever a CPU cycle occurs (or when a series of cycles occur). The
+ * mapper can detect this via a rising edge of the M2 pin; for emulation purposes, this
+ * method is simply called by the system at the end of a CPU cycle.
+ * 
+ * @param mapper The mapper.
+ * @param prog The NES program that is using the mapper.
+ * @param cycles The number of cycles that have elapsed (should be 1 if CPU is implemented faithfully).
+ */
+void mapper_cycle(mapper_t *mapper, prog_t *prog, int cycles);
+
+/**
+ * @brief Invoked whenever an APU cycle occurs, allowing the mapper to manipulate the
+ * mixer output in order to add additional audio data.
+ * 
+ * @param mapper The mapper.
+ * @param prog The NES program that is using the mapper.
+ * @param input The current value ready to be sent to the mixer.
+ * @return The new value that will be outputted to the mixer.
+ */
+float mapper_mix(mapper_t *mapper, prog_t *prog, float input);
 
 /* mapper singletons */
 extern const mapper_t nrom, mmc1, uxrom, ines003, mmc3, mmc5, mmc2;

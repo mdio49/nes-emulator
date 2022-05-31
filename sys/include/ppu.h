@@ -143,6 +143,7 @@ typedef struct ppu {
 
     uint8_t         oam2_ptr;           // Pointer to secondary OAM memory during sprite evaluation.
     uint8_t         oam_buffer;         // OAM read buffer during sprite evaluation.
+    addr_t          pt_addr;            // Pattern table address of next sprite.
 
     /* memory mapped registers (stored contiguously) */
     

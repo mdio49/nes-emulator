@@ -51,6 +51,10 @@ mapper_t *mapper_create(void) {
     mapper->map_prg = default_map;
     mapper->map_chr = default_map;
     mapper->map_nts = default_map;
+
+    // Additional functions which default to not changing anything.
+    mapper->cycle = NULL;
+    mapper->mix = NULL;
     
     // By default, the mapper contains no bank registers and uses no additional data.
     mapper->banks = NULL;
@@ -82,4 +86,16 @@ void mapper_insert(mapper_t *mapper, prog_t *prog) {
 
 void mapper_monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vaddr, uint8_t value, bool write) {
     mapper->monitor(mapper, prog, as, vaddr, value, write);
+}
+
+void mapper_cycle(mapper_t *mapper, prog_t *prog, int cycles) {
+    // Only call this method if the mapper defines it.
+    if (mapper->cycle != NULL) {
+        mapper->cycle(mapper, prog, cycles);
+    }
+}
+
+float mapper_mix(mapper_t *mapper, prog_t *prog, float input) {
+    // Default to simply not changing the mixer output.
+    return mapper->mix != NULL ? mapper->mix(mapper, prog, input) : input;
 }

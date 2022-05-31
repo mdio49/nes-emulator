@@ -216,8 +216,7 @@ typedef struct ppu {
 
     int16_t     draw_x, draw_y;         // Current screen position of render.
     char        out[PPU_BUFFER];        // Pixel output (3 bytes per pixel; RGB order).
-
-    //unsigned    nmi_output      : 1;   // Set if an NMI should occur on the next CPU instruction fetch.
+    
     unsigned    nmi_occurred    : 1;    // Set if an NMI has already occurred for the current frame.
     unsigned    nmi_suppress    : 2;    // If set, then NMI will not occur for the given number of PPU cycles.
     unsigned    vbl_occurred    : 1;    // Set if a vblank just occured and the screen should be redrawn.

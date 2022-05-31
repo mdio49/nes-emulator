@@ -180,7 +180,7 @@ static void monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vadd
             data->w = !data->w;
         }
     }
-    else {
+    else if (vaddr < NAMETABLE0) {
         // Monitor PPU reads and writes to CHR memory.
         struct mmc3_data *data = (struct mmc3_data*)mapper->data;
         bool a12 = (vaddr & 0x1000) > 0;

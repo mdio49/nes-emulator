@@ -230,7 +230,6 @@ void apu_update(apu_t *apu, addrspace_t *cpuas, int hcycles) {
         }
         else {
             apu->status.f_irq = 1;
-            apu->irq_flag = true;
         }
         apu->irq_occurred = true;
     }
@@ -475,7 +474,6 @@ void apu_update(apu_t *apu, addrspace_t *cpuas, int hcycles) {
                         else if (apu->dmc.irq) {
                             // Generate IRQ if enabled and if not looping.
                             apu->status.d_irq = true;
-                            apu->irq_flag = true;
                         }
                     }
                 }

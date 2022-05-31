@@ -143,7 +143,6 @@ void sys_run(handlers_t *handlers) {
     cpu_reset(cpu);
     
     // Run the program.
-    bool irq_pending = false;
     handlers->running = true;
     while (handlers->running) {
         // If emulation is paused, then update the screen so that the program responds and spin until emulation is resumed.
@@ -190,13 +189,8 @@ void sys_run(handlers_t *handlers) {
         apu_update(apu, cpu->as, cycles);
 
         // Check for IRQ.
-        if (apu->irq_flag || curprog->mapper->irq) {
-            irq_pending = true;
-            apu->irq_flag = false;
+        if ((apu->status.d_irq || apu->status.f_irq || curprog->mapper->irq) && !cpu->frame.sr.irq) {
             curprog->mapper->irq = false;
-        }
-        if (irq_pending && !cpu->frame.sr.irq) {
-            irq_pending = false;
             cpu_irq(cpu);
         }
 

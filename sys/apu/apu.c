@@ -251,7 +251,7 @@ void apu_update(apu_t *apu, addrspace_t *cpuas, int hcycles) {
                 if (half_frame) {
                     // Adjust the period of the pulse if applicable if the sweep unit is not currently silencing the channel.
                     if (!sweep_mute[i] && pulse->sweep_u.divider == 0 && pulse->sweep.enabled && pulse->sweep.shift != 0) {
-                        pulse->timer_high = (target[i] & 0x300) >> 8;
+                        pulse->timer_high = (target[i] & 0x700) >> 8;
                         pulse->timer_low = target[i] & 0x0FF;
                     }
 

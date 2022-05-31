@@ -239,10 +239,6 @@ static void monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vadd
     if (as == mapper->cpuas) {
         // CPU
         if (write) {
-            if (vaddr >= CHR_SELECT && vaddr < CHR_SELECT + 12 && data->chr_banks[vaddr - CHR_SELECT] != value) {
-                //printf("chr bank %d = $%.2x\n", vaddr - CHR_SELECT, value);
-            }
-
             if (vaddr == PPU_CTRL) {
                 // Update sprite size flag.
                 data->sprite_sz = (value >> 5) & 0x01;
@@ -251,6 +247,7 @@ static void monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vadd
                 // Determine whether rendering is enabled.
                 data->rendering = (value >> 3) & 0x03;
                 if (!data->rendering) {
+                    // Clear in-frame flag if not rendering.
                     data->irq_status = data->irq_status & ~IN_FRAME_MASK;
                 }
             }

@@ -322,12 +322,12 @@ static void monitor(mapper_t *mapper, prog_t *prog, addrspace_t *as, addr_t vadd
         data->ppu_reading = true;
         
         // Detect when the PPU stops reading the background.
-        if (vaddr >= NAMETABLE0 && vaddr < NAMETABLE3 + NT_SIZE && ((vaddr >> 5) & 0x1F) < 30) {
+        if (vaddr < NAMETABLE0) {
             data->nt_bytes_read++;
-            if (data->nt_bytes_read == 32) {
+            if (data->nt_bytes_read == 64) {
                 data->bkg_flag = false;
             }
-            if (data->nt_bytes_read == 40) {
+            if (data->nt_bytes_read == 80) {
                 data->bkg_flag = true;
             }
         }

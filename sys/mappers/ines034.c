@@ -6,14 +6,6 @@
 #include <stdlib.h>
 #include <ppu.h>
 
-/**
- * bank registers:
- * 0 - control
- * 1 - CHR bank 0
- * 2 - CHR bank 1
- * 3 - PRG bank
- */
-
 #define N_REGISTERS     3
 #define PRG_SELECT      0
 #define CHR_SELECT0     1

@@ -125,6 +125,6 @@ void mapper_cycle(mapper_t *mapper, prog_t *prog, int cycles);
 float mapper_mix(mapper_t *mapper, prog_t *prog, float input);
 
 /* mapper singletons */
-extern const mapper_t nrom, mmc1, uxrom, ines003, mmc3, mmc5, mmc2;
+extern const mapper_t nrom, mmc1, uxrom, ines003, mmc3, mmc5, mmc2, ines034;
 
 #endif

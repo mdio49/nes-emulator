@@ -224,9 +224,6 @@ typedef struct dmc {
     unsigned    start_flag      : 1;    // Set if the sample should be (re)started.
     unsigned                    : 7;
 
-    uint8_t     old_output;             // Output of DMC on previous APU cycle.
-    uint64_t    rep_cycles;             // Number of APU cycles the DMC output has been repeated.
-
 } dmc_t;
 
 /**

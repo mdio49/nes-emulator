@@ -491,22 +491,7 @@ void apu_update(apu_t *apu, addrspace_t *cpuas, int hcycles) {
         }
 
         // Get output of DMC.
-        dmc = apu->dmc.output;
-        if (apu->dmc.old_output == apu->dmc.output) {
-            // Silence the DMC if the output has not changed for a certain number of cycles.
-            const int max_rep_cycles = 100000;
-            apu->dmc.rep_cycles++;
-            if (apu->dmc.rep_cycles > max_rep_cycles) {
-                // Lower the volume of the DMC gradually in order to avoid popping sounds.
-                size_t offset = (apu->dmc.rep_cycles - max_rep_cycles) / 100;
-                dmc = offset < dmc ? dmc - offset : 0;
-            }
-        }
-        else {
-            // Reset the repeat cycle counter.
-            apu->dmc.rep_cycles = 0;
-            apu->dmc.old_output = apu->dmc.output;
-        }
+        dmc = !apu->dmc.silence ? apu->dmc.output : 0;
 
         // Get mixer output.
         float pulse_out = apu->pulse_table[pulse1 + pulse2];

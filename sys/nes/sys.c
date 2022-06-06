@@ -473,9 +473,9 @@ static uint8_t cpu_update_rule(const addrspace_t *as, addr_t vaddr, uint8_t valu
             if (status.dmc) {
                 apu->dmc.start_flag = true;
             }
-            else {
+            /*else {
                 apu->dmc.output = 0;
-            }
+            }*/
 
             value = status.value;
         }

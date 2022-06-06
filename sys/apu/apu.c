@@ -428,7 +428,7 @@ void apu_update(apu_t *apu, addrspace_t *cpuas, int hcycles) {
         }
 
         // Update DMC timer.
-        bool dmc_sample_ended = false;
+        //bool dmc_sample_ended = false;
         if (apu->dmc.timer == 0) {
             // Reload the timer.
             apu->dmc.timer = DMC_RATES[apu->dmc.rate] / 2;
@@ -483,7 +483,7 @@ void apu_update(apu_t *apu, addrspace_t *cpuas, int hcycles) {
                 else if (!apu->dmc.silence) {
                     // Silence the channel if the sample buffer is empty (or if $4015 was cleared).
                     apu->dmc.silence = true;
-                    dmc_sample_ended = true;
+                    //dmc_sample_ended = true;
                 }
                 apu->dmc.bits_remaining = 8;
             }
@@ -493,12 +493,12 @@ void apu_update(apu_t *apu, addrspace_t *cpuas, int hcycles) {
         }
 
         // Get output of DMC.
-        dmc = apu->dmc.output;
+        dmc = !apu->dmc.silence ? apu->dmc.output : 0;
 
         // Clear the DMC output if the sample buffer just ended.
-        if (dmc_sample_ended) {
+        /*if (dmc_sample_ended) {
             apu->dmc.output = 0;
-        }
+        }*/
 
         // Get mixer output.
         float pulse_out = apu->pulse_table[pulse1 + pulse2];
